@@ -1,0 +1,111 @@
+/* DARRIK — Buttons, inputs, selects. */
+.btn {
+  font: inherit;
+  font-size: 13.5px;
+  border: 1px solid #cdd7dd;
+  background: #fff;
+  color: var(--ink);
+  padding: 7px 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-weight: 550;
+}
+.btn:hover {
+  border-color: #9fb2be;
+  background: #f8fafb;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn.primary:hover {
+  filter: brightness(0.9);
+}
+.btn.danger {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
+}
+.btn.danger.ghost {
+  background: none;
+  color: var(--bad);
+  border-color: transparent;
+}
+.btn.ghost {
+  background: none;
+  border-color: transparent;
+}
+.btn.ghost:hover {
+  background: var(--line2);
+}
+.btn.sm {
+  padding: 4px 9px;
+  font-size: 12.5px;
+}
+.btn.xs {
+  padding: 1px 6px;
+  font-size: 11px;
+}
+.btn.big {
+  padding: 11px 20px;
+  font-size: 15px;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.icon-btn {
+  border: 0;
+  background: none;
+  font-size: 17px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 7px;
+  color: var(--ink2);
+}
+.icon-btn:hover {
+  background: var(--line2);
+}
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 13.5px;
+  border: 1px solid #cdd7dd;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: #fff;
+  color: var(--ink);
+  width: 100%;
+}
+input:focus,
+select:focus,
+textarea:focus,
+.btn:focus-visible {
+  outline: 2px solid rgba(14, 124, 134, 0.35);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--accent);
+}
+textarea {
+  resize: vertical;
+}
+input.ro {
+  background: var(--line2);
+}
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 500;
+  padding: 7px 0;
+  cursor: pointer;
+}

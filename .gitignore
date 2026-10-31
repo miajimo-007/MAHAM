@@ -1,0 +1,9 @@
+dist/
+node_modules/
+tests/screenshots/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*.log
+DARRIK Data/

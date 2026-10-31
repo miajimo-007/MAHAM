@@ -1,0 +1,49 @@
+/* DARRIK — Connect / sign-in screens. */
+body.pre #app {
+  display: block;
+}
+.connect {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: radial-gradient(circle at 20% 10%, #dff1f2, transparent 50%), var(--bg);
+}
+.connect-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px 36px;
+  max-width: 640px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(16, 34, 46, 0.1);
+  border: 1px solid var(--line);
+}
+.connect-card h1 {
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+.connect-card p {
+  line-height: 1.55;
+}
+.who {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+.who-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.who-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}

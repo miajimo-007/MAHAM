@@ -1,0 +1,52 @@
+"""Daily ManageEngine import: Excel export, the 'daily details report' layout, pasted rows, no duplicates."""
+import os
+from harness import app_session, Check, FIX, run
+async def main():
+    c = Check('ManageEngine import')
+    async with app_session() as s:
+        pg = s.page
+        await s.js("Store.save(Object.assign({}, Store.get('settings-team'), {members: Store.members().map(m => m.id==='yousef' ? Object.assign({}, m, {role:'teamleader'}) : m)}))"); await pg.wait_for_timeout(400)
+        await s.sign_in_as('yousef'); await s.go('#/helpdesk/import')
+        await pg.set_input_files('#impfile', os.path.join(FIX, 'me_test.xlsx')); await pg.wait_for_selector('#impgo', timeout=30000)
+        c('Excel export: 40 requests found', '40 requests found' in await pg.inner_text('#impprev'))
+        await pg.click('#impgo'); await pg.wait_for_timeout(600)
+        r = await s.js("Store.get('hd-1490329')")
+        c('40 imported', await s.js("Store.all('helpdesk').length") == 40)
+        c('dates + elapsed parsed', r['created'] == '2026-06-11T08:41' and abs(r['elapsedHrs'] - 2.0225) < 0.01 and r['team'] == 'apps', r)
+        # the next day's upload: unchanged requests are not saved again, changed ones are updated
+        ts = r['_ts']
+        await s.js("Store.save(Object.assign({}, Store.get('hd-1490329'), {status: 'Open (old)'}))"); await pg.wait_for_timeout(200)
+        ts2 = await s.js("Store.get('hd-1490329')._ts")
+        await s.go('#/helpdesk/import'); await pg.set_input_files('#impfile', os.path.join(FIX, 'me_test.xlsx')); await pg.wait_for_selector('#impgo', timeout=30000)
+        pv = await pg.inner_text('#impprev')
+        c('re-upload: 1 changed, 39 unchanged', '1 changed' in pv and '39 unchanged' in pv, pv[:200])
+        other = await s.js("Store.get('hd-1490330') ? Store.get('hd-1490330')._ts : Store.all('helpdesk').find(x => x.id !== 'hd-1490329')._ts")
+        oid = await s.js("Store.all('helpdesk').find(x => x.id !== 'hd-1490329').id")
+        ots = await s.js(f"Store.get('{oid}')._ts")
+        await pg.click('#impgo'); await pg.wait_for_timeout(500)
+        c('changed request updated with the new status', await s.js("Store.get('hd-1490329').status") != 'Open (old)' and await s.js("Store.get('hd-1490329')._ts") > ts2)
+        c('unchanged request not saved again', await s.js(f"Store.get('{oid}')._ts") == ots)
+        c('still one record per request', await s.js("Store.all('helpdesk').length") == 40)
+        # someone else imports a newer version → the older copy in Yousef's file can be cleaned up by the admin
+        await s.js("Store.flush()"); await pg.wait_for_timeout(300)
+        await s.sign_in_as('apps-mgr'); await s.js("Store.save(Object.assign({}, Store.get('hd-1490329'), {status: 'Closed'}))"); await s.js("Store.flush()"); await pg.wait_for_timeout(300)
+        await s.sign_in_as('adam'); await s.js("Store.sync(true)"); await pg.wait_for_timeout(300)
+        c('older copy detected', await s.js("Store.staleHelpdesk().some(x => x.file === 'yousef.json' && x.id === 'hd-1490329')"))
+        t = await s.go('#/admin/data', 500); c('Admin → Data shows help-desk storage', 'Older copies in other files' in t)
+        await pg.click('#hdcompact'); await pg.click('[data-yes]'); await pg.wait_for_timeout(1500)
+        c('older copies removed, request still there', await s.js("Store.staleHelpdesk().length") == 0 and await s.js("Store.get('hd-1490329').status") == 'Closed')
+        await s.sign_in_as('yousef')
+        await s.go('#/helpdesk/import'); await pg.fill('#imppaste', open(os.path.join(FIX, 'me_paste.txt')).read()); await pg.wait_for_timeout(700)
+        c('pasted rows recognised as updates', '0 new' in await pg.inner_text('#impprev'))
+        await pg.click('#impgo'); await pg.wait_for_timeout(400)
+        c('no duplicates after paste', await s.js("Store.all('helpdesk').length") == 40)
+        c('"imported today" recorded', await s.js("Store.meta().helpdeskUpdated === U.todayStr()"))
+        await s.go('#/helpdesk/import'); await pg.set_input_files('#impfile', os.path.join(FIX, 'me_report.xlsx')); await pg.wait_for_selector('#impgo', timeout=30000)
+        await pg.click('#impgo'); await pg.wait_for_timeout(500)
+        r = await s.js("Store.get('hd-1525653')")
+        c('report layout (title rows, "Aug 8, 2026 09:17 PM")', r and r['created'] == '2026-08-08T21:17' and r['resolved'] == '2026-08-09T12:13', r)
+        c('technician names matched ignoring commas', await s.js("Store.memberByMeName('NASSER ADAM') === 'adam' && Store.memberByMeName('Harbi, Layla T') === 'layla'"))
+        await s.go('#/helpdesk/import'); await pg.set_input_files('#impfile', os.path.join(FIX, 'me_dup.xlsx')); await pg.wait_for_selector('#impgo', timeout=30000)
+        c('duplicate rows in one file merged', 'duplicate rows merged' in await pg.inner_text('#impprev'))
+        c.done(s)
+run(main())

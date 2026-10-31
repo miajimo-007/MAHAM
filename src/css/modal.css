@@ -1,0 +1,77 @@
+/* DARRIK — Modal dialogs and toasts. */
+.modal-wrap {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 30, 42, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 6vh 16px;
+  z-index: 50;
+  overflow-y: auto;
+}
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+.modal.wide {
+  max-width: 760px;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.modal-head h2 {
+  font-size: 16px;
+  flex: 1;
+}
+.modal-body {
+  padding: 16px 18px;
+}
+.modal-foot {
+  display: flex;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  background: #fafcfd;
+  border-radius: 0 0 12px 12px;
+  align-items: center;
+}
+#toasts {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  display: grid;
+  gap: 8px;
+  z-index: 99;
+}
+.toast {
+  background: var(--ink);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: 0.25s;
+  max-width: 380px;
+}
+.toast.show {
+  opacity: 1;
+  transform: none;
+}
+.toast.good {
+  background: #17633a;
+}
+.toast.bad {
+  background: #a12f23;
+}
+.toast.warn {
+  background: #8a5300;
+}

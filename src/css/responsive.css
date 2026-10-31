@@ -1,0 +1,73 @@
+/* DARRIK — Small screens and printing — keep this file last. */
+@media (max-width: 1280px) {
+  .kpis.k6 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 1000px) {
+  .cols2,
+  .cols2.wide-left,
+  .cols3 {
+    grid-template-columns: 1fr;
+  }
+  .kpis,
+  .kpis.k9,
+  .kpis.k6,
+  .kpis.k4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .side {
+    position: fixed;
+    left: -240px;
+    z-index: 30;
+    transition: left 0.2s;
+  }
+  body.nav-open .side {
+    left: 0;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.3);
+  }
+  .menu {
+    display: block;
+  }
+  main {
+    padding: 16px;
+  }
+  .top {
+    padding: 10px 16px;
+  }
+  .quick .q-row,
+  .quick .q-row:nth-child(2) {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .grid-form {
+    grid-template-columns: 1fr;
+  }
+  .fld.span2 {
+    grid-column: auto;
+  }
+  .who {
+    grid-template-columns: 1fr;
+  }
+  .sync {
+    display: none;
+  }
+}
+@media print {
+  .side,
+  .top,
+  .page-actions,
+  .tbl-tools,
+  .btn {
+    display: none !important;
+  }
+  main {
+    padding: 0;
+  }
+  .card,
+  .tbl-wrap {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}

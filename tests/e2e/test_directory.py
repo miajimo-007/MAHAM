@@ -1,0 +1,83 @@
+"""Directory: Team + Reports to, person card, hierarchy, loop check, bulk set, Users tab + departments, edit = Functions."""
+import os
+from harness import app_session, Check, run, SHOTS
+async def main():
+    c = Check('directory')
+    async with app_session() as s:
+        pg = s.page; J = s.js
+        await J("Store.saveMany([{c:'itdir', id:'d-cio', name:'Saad CIO', title:'Chief Information Officer', region:'Central', team:'IT Leadership'}, {c:'itdir', id:'d-dir', name:'Faisal Director', title:'IT Director WR', region:'Jeddah', team:'IT Leadership', reportsTo:'d-cio'}, {c:'itdir', id:'d-mgr', name:'Khalid Manager', title:'Applications Manager', region:'Jeddah', team:'Applications', reportsTo:'d-dir', office:'2301'}, {c:'itdir', id:'d-a1', name:'Ahmed Analyst', title:'System Analyst', region:'Jeddah', team:'Applications', bn:'12345', office:'2345', email:'ahmed@x.org'}, {c:'itdir', id:'d-a2', name:'Sara Analyst', title:'System Analyst', region:'Jeddah', team:'Applications'}, {c:'itdir', id:'d-lone', name:'Lonely Person', title:'Tech', region:'Jeddah'}])")
+        # bulk set reports to
+        t = await s.go('#/directory/it', 500)
+        c('IT Directory opens as the hierarchy (no list)', 'Saad CIO' in t and await pg.locator('[data-dview]').count() == 0 and await pg.locator('.dt').count() > 0)
+        await pg.click('#dtbulk'); await pg.wait_for_selector('#brf')
+        await pg.select_option('#brf [name=mgr]', 'd-mgr'); await pg.check('#brf [name=who][value="d-a1"]'); await pg.check('#brf [name=who][value="d-a2"]'); await pg.click('.modal [data-ok]'); await pg.wait_for_timeout(400)
+        c('bulk "Reports to"', await J("Store.get('d-a1').reportsTo") == 'd-mgr' and await J("Store.get('d-a2').reportsTo") == 'd-mgr')
+        # loop check
+        await J("Store.save(Object.assign({}, Store.get('d-cio'), {reportsTo: 'd-a1'}))"); await pg.wait_for_timeout(200)
+        c('loop is refused', not await J("Store.get('d-cio').reportsTo"))
+        # person card
+        await J("DirX.card('d-a1')"); await pg.wait_for_selector('.modal .dc-chain')
+        m = await pg.inner_text('.modal')
+        c('card: chain to the top', 'Saad CIO' in m and 'Faisal Director' in m and 'Khalid Manager' in m)
+        c('card: manager + team + same manager', 'Manager' in m and 'Sara Analyst' in m and 'Applications' in m)
+        await pg.screenshot(path=f'{SHOTS}/dir_card.png')
+        await J("UI.closeModal()")
+        # hierarchy
+        t = await s.go('#/directory/tree', 500)
+        c('old hierarchy link opens the IT Directory chart', 'Saad CIO' in t and 'Ahmed Analyst' in t and await pg.locator('.tabs a', has_text='Hierarchy').count() == 0)
+        c('no-manager list', 'No manager set' in t and 'Lonely Person' in t)
+        await pg.fill('#dtq', 'ahmed'); await pg.wait_for_timeout(700)
+        c('search highlights the person', await pg.locator('.dt-n.hit').count() >= 1)
+        await pg.screenshot(path=f'{SHOTS}/dir_tree.png', full_page=True)
+        # users tab + departments
+        t = await s.go('#/directory/users', 500)
+        c('Users tab with default departments', 'Pharmacy' in t and 'Nursing' in t and 'Physicians' in t)
+        await J("Store.save({c:'userdir', id:'u1', name:'Nora Pharmacist', dept:'Pharmacy', position:'Clinical pharmacist', ext:'5501'})"); await pg.wait_for_timeout(200)
+        await s.go('#/home', 200); t = await s.go('#/directory/users', 400); c('user listed', 'Nora Pharmacist' in t)
+        t = await s.go('#/admin/lists', 600); c('departments card in Admin → Lists & scoring', 'Users directory — departments' in t)
+        await pg.click('#udadd'); await pg.fill('#udl .li:last-child input', 'Radiology')
+        await pg.fill('[data-was="Pharmacy"]', 'Pharmacy Dept'); await pg.click('#udsave'); await pg.wait_for_timeout(500)
+        c('department added', 'Radiology' in await J("JSON.stringify(DirX.depts())"))
+        c('rename moves the users', await J("Store.get('u1').dept") == 'Pharmacy Dept')
+        # editing is the Directory function's Edit level
+        await s.sign_in_as('yousef'); t = await s.go('#/directory/users', 400)
+        c('analyst can view', 'Nora Pharmacist' in t and 'Add user' not in t)
+        await J("Store.save({c:'userdir', id:'u2', name:'Hack', dept:'Other'})"); await pg.wait_for_timeout(200)
+        c('analyst cannot add without Edit', not await J("!!Store.get('u2')"))
+        await s.sign_in_as('adam'); await J("saveMembersAll(Store.members().map(m => m.id === 'yousef' ? Object.assign({}, m, {pages: Object.assign({}, m.pages, {directory: 'edit'})}) : m), 'ok')"); await pg.wait_for_timeout(300)
+        await s.sign_in_as('yousef'); await J("Store.save({c:'userdir', id:'u3', name:'Allowed', dept:'Other'})"); await pg.wait_for_timeout(200)
+        c('given Edit → can add', await J("!!Store.get('u3')"))
+        # Excel import dialog (as admin)
+        await s.sign_in_as('adam'); await s.go('#/home', 200); await s.go('#/directory/it', 400)
+        await pg.click('[data-dimp="itdir"]'); await pg.wait_for_selector('#dimpz')
+        c('import dialog explains columns + template', 'Reports to' in await pg.inner_text('.modal') and await pg.locator('.modal [data-tpl]').count() == 1)
+        await pg.set_input_files('#dimpf', os.path.join(os.path.dirname(__file__), 'it_sample.xlsx')); await pg.wait_for_timeout(800)
+        await pg.click('.modal [data-yes]'); await pg.wait_for_timeout(600)
+        c('IT import with Reports to by badge', await J("(() => { const b = Store.all('itdir').find(r => r.name === 'Boss Person'); const w = Store.all('itdir').find(r => r.name === 'Worker Person'); return !!b && !!w && w.reportsTo === b.id; })()"))
+        await s.go('#/directory/users', 400); await pg.click('[data-dimp="userdir"]'); await pg.wait_for_selector('#dimpz')
+        await pg.set_input_files('#dimpf', os.path.join(os.path.dirname(__file__), 'users_sample.xlsx')); await pg.wait_for_timeout(800)
+        await pg.click('.modal [data-yes]'); await pg.wait_for_timeout(600)
+        c('Users import', await J("Store.all('userdir').some(r => r.name === 'Huda Nurse' && r.dept === 'Nursing') && Store.all('userdir').some(r => r.name === 'Omar Physician')"))
+        c('unknown department → Other unless it exists', await J("(Store.all('userdir').find(r => r.name === 'Zed Unknown') || {}).dept") in ('Radiology', 'Other'))
+        # their own layout: no header, "0" rows split the teams, the first name is the manager
+        await s.go('#/home', 200); await s.go('#/directory/it', 400); await pg.click('[data-dimp="itdir"]'); await pg.wait_for_selector('#dimpz')
+        await pg.set_input_files('#dimpf', os.path.join(os.path.dirname(__file__), 'it_blocks.xlsx')); await pg.wait_for_selector('[data-gteam="0"]')
+        c('two teams found', await pg.locator('[data-gteam]').count() == 2 and 'Faisal Mansour' in await pg.inner_text('.modal'))
+        await pg.fill('[data-gteam="0"]', 'APPS'); await pg.fill('[data-gteam="1"]', 'LAB'); await pg.click('.modal [data-ok]'); await pg.wait_for_timeout(600)
+        g = await J("(() => { const by = n => Store.all('itdir').find(r => r.name === n) || {}; return { h: by('Faisal Mansour'), t: by('Khalid Al Shehri'), m: by('Adam Nasr'), f: by('Tariq Hamdan'), a: by('Hind Saleh') }; })()")
+        c('first name = manager, others report to him', g['t'].get('reportsTo') == g['h'].get('id') and g['m'].get('reportsTo') == g['h'].get('id') and g['a'].get('reportsTo') == g['f'].get('id'))
+        c('team names applied', g['t'].get('team') == 'APPS' and g['a'].get('team') == 'LAB')
+        c('names trimmed (no trailing spaces)', g['h'].get('name') == 'Faisal Mansour')
+        await pg.screenshot(path=f'{SHOTS}/dir_blocks.png', full_page=True)
+        # the real export: a 0 row with headings (BN, TITLE, Office, Email: team@) opens each team
+        await s.go('#/home', 200); await s.go('#/directory/it', 400); await pg.click('[data-dimp="itdir"]'); await pg.wait_for_selector('#dimpz')
+        await pg.set_input_files('#dimpf', os.path.join(os.path.dirname(__file__), 'it_real.xlsx')); await pg.wait_for_selector('[data-gteam="0"]')
+        c('team names suggested from the section', await pg.input_value('[data-gteam="0"]') == 'APPLICATIONS (APP)' and await pg.input_value('[data-gteam="1"]') == 'LAB INFO SYS (LAB)')
+        await pg.click('.modal [data-ok]'); await pg.wait_for_timeout(600)
+        r = await J("(() => { const by = n => Store.all('itdir').find(r => r.name === n) || {}; return { h: by('Faisal Mansour'), t: by('Khalid Al Shehri'), f: by('Tariq Hamdan'), a: by('Hind Saleh') }; })()")
+        h_ = r['h']
+        c('columns read: badge, title, ext, email, region, dept, section', h_.get('bn') == '9100009' and h_.get('title') == 'Manager PACS' and h_.get('office') == '66858' and h_.get('email') == 'mansourf@example.org' and h_.get('region') == 'Jeddah' and h_.get('dept') == 'INFORAMTION TECHNOLOGY - JEDDAH' and h_.get('section') == 'APPLICATIONS (APP) - JEDDAH', str(h_))
+        c('manager + team email', r['t'].get('reportsTo') == h_.get('id') and r['a'].get('reportsTo') == r['f'].get('id') and h_.get('teamEmail') == 'it@example.org')
+        c('no duplicates on re-import', await J("Store.all('itdir').filter(r => r.name === 'Faisal Mansour').length") == 1)
+        c.done(s)
+run(main())

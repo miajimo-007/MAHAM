@@ -1,0 +1,53 @@
+/* DARRIK — Element defaults and text utilities. */
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+}
+a {
+  color: inherit;
+}
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+code,
+.mono {
+  font-family: Consolas, 'Cascadia Mono', monospace;
+  font-size: 12.5px;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 12px;
+}
+.strong {
+  font-weight: 700;
+}
+.grow {
+  flex: 1;
+}
+.t-good {
+  color: var(--good);
+}
+.t-warn {
+  color: var(--warn);
+}
+.t-bad {
+  color: var(--bad);
+}
+.link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.link:hover {
+  text-decoration: underline;
+}

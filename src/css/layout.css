@@ -1,0 +1,274 @@
+/* DARRIK — Page layout: sidebar, top bar, main area. */
+#app {
+  display: flex;
+  min-height: 100vh;
+}
+.side {
+  width: 232px;
+  flex: none;
+  background: var(--side);
+  color: var(--sideink);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 18px 16px 14px;
+  color: #fff;
+}
+.brand b {
+  display: block;
+  font-size: 15px;
+}
+.brand small {
+  display: block;
+  color: #8fb0c3;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+.logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #12a3a8, #0e4a6b);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: #fff;
+  font-size: 18px;
+  flex: none;
+}
+.brand.big .logo {
+  width: 46px;
+  height: 46px;
+  font-size: 24px;
+}
+.brand.big {
+  color: var(--ink);
+  padding: 0 0 18px;
+}
+.brand.big small {
+  color: var(--muted);
+  max-width: none;
+}
+nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 10px 10px;
+}
+.nav-g {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: #6f93a8;
+  margin: 14px 8px 4px;
+  font-weight: 700;
+}
+nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  text-decoration: none;
+  color: var(--sideink);
+  font-size: 13.5px;
+}
+nav a:hover {
+  background: var(--side2);
+  color: #fff;
+}
+nav a.on {
+  background: #fff;
+  color: var(--side);
+  font-weight: 650;
+}
+.ni {
+  width: 18px;
+  text-align: center;
+  opacity: 0.85;
+  font-size: 13px;
+}
+.side-foot {
+  padding: 10px;
+  border-top: 1px solid #1c4660;
+}
+.me {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  text-align: left;
+  font: inherit;
+}
+.me:hover {
+  background: var(--side2);
+}
+.me small {
+  display: block;
+  color: #8fb0c3;
+  font-size: 11px;
+}
+.av {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #1d6f8a;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+}
+.mainwrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 26px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.top h1 {
+  font-size: 19px;
+}
+.menu {
+  display: none;
+}
+.yearsel {
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.yearsel select {
+  padding: 4px 6px;
+}
+.sync {
+  font-size: 12.5px;
+  color: var(--ink2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot.good {
+  background: var(--good);
+}
+.dot.warn {
+  background: #e0a100;
+}
+.dot.bad {
+  background: var(--bad);
+}
+main {
+  padding: 20px 26px 60px;
+  max-width: 1500px;
+  width: 100%;
+}
+.logo.img {
+  background: #fff;
+  padding: 3px;
+  overflow: hidden;
+}
+.logo.img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.brand small#brandteam {
+  color: #8fb0c3;
+}
+
+/* super admin: analyst / admin mode */
+.side-foot .modebtn {
+  width: 100%;
+  margin-bottom: 8px;
+  justify-content: center;
+  position: relative;
+  background: #fbbf24;
+  color: #3b2a00;
+  border-color: #f59e0b;
+  font-weight: 600;
+}
+.side-foot .modebtn.back {
+  background: transparent;
+  color: #fde68a;
+  border-color: #b45309;
+}
+.mdot {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #0f2a3a;
+}
+.mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  background: #fef3c7;
+  color: #78350f;
+  border-bottom: 1px solid #fcd34d;
+  font-size: 14px;
+}
+.mode-bar span {
+  flex: 1;
+}
+.li.ck {
+  text-decoration: none;
+  color: inherit;
+}
+.li.ck .ckm {
+  width: 22px;
+  display: inline-block;
+}
+.li.ck.ok .ckm {
+  color: #15803d;
+}
+.li.ck.bad .ckm {
+  color: #b45309;
+}
+.stuck .li.sub {
+  padding-left: 18px;
+  font-size: 13px;
+}

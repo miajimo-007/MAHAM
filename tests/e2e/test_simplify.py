@@ -1,0 +1,34 @@
+"""Simpler layout: tabbed Director Desk, one Performance page, Admin → Lists & scoring, one task vocabulary,
+one assign dialog, no organisation-levels switch."""
+from harness import app_session, Check, run, SHOTS
+async def main():
+    c = Check('simplify')
+    async with app_session() as s:
+        pg = s.page; J = s.js
+        await s.sign_in_as('khalid')
+        nav = await J("[...document.querySelectorAll('nav a')].map(a => a.textContent.trim())")
+        c('no separate overview / assigned-tasks menu items', not any('Overview' in x or 'Assigned Tasks' in x for x in nav), nav)
+        t = await s.go('#/home', 500); c('Director Desk tabs', all(x in t for x in ['Today', 'By team', 'Tasks', 'Meetings']))
+        await pg.click('#dirassign'); await pg.wait_for_selector('#asgf')
+        await pg.fill('#asgf [name=task]', 'Update downtime plan'); await pg.check('#asgf [name=who][value="apps-mgr"]'); await pg.check('#asgf [name=who][value="lab-mgr"]'); await pg.click('.modal [data-ok]'); await pg.wait_for_timeout(400)
+        c('assign dialog: one grouped task for two managers', await J("(l => l.length === 2 && l[0].group && l[0].group === l[1].group)(Store.all('mgrtask').filter(t => t.task === 'Update downtime plan'))"))
+        t = await s.go('#/director/team', 600); c('By team tab = all-teams board', 'all teams overview' in t.lower() and 'Update downtime plan' in t)
+        t = await s.go('#/director/tasks', 600); c('Tasks tab', 'Update downtime plan' in t and '0 of 2 managers done' in t)
+        await pg.screenshot(path=f'{SHOTS}/director_tabs.png', full_page=True)
+        t = await s.go('#/director/meetings', 500); c('Meetings tab', 'meeting' in t.lower())
+        await s.sign_in_as('yousef')
+        nav = await J("[...document.querySelectorAll('nav [data-nav]')].map(a => a.dataset.nav)")
+        c('one Performance item', 'perf' in nav and not any(k in nav for k in ['dashboard', 'employee', 'lazy', 'projperf']), nav)
+        t = await s.go('#/perf', 600); c('Performance tabs', all(x in t for x in ['Team Dashboard', 'Employee', 'Details', 'Lazy Days', 'Projects']))
+        await pg.screenshot(path=f'{SHOTS}/perf_tabs.png', full_page=True)
+        await J("Store.save({c: 'todo', id: 'w1', task: 'Words', analyst: 'yousef', team: 'apps', assigned: U.todayStr(), duration: 1, finish: U.todayStr(), status: 'Resolved'})")
+        t = await s.go('#/todo', 500); c('To Do shows "Done", not "Resolved"', 'Resolved' not in t.split('Status')[-1] and 'Done' in t)
+        await s.sign_in_as('adam')
+        nav = await J("[...document.querySelectorAll('nav [data-nav]')].map(a => a.dataset.nav)")
+        c('no Settings menu item', 'settings' not in nav, nav)
+        t = await s.go('#/admin/lists', 600); c('Admin → Lists & scoring', 'Scoring rules' in t and 'Dropdown lists' in t)
+        t = await s.go('#/settings', 500); c('old Settings link opens Lists & scoring', 'Scoring rules' in t)
+        t = await s.go('#/admin/teams', 500); c('no organisation-levels switch', 'Organisation levels' not in t and 'Departments' in t)
+        c('AED / director roles always available', any(r[0] == 'aed' for r in await J("Store.rolesFor('analyst')")))
+        c.done(s)
+run(main())

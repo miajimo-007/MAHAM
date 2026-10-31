@@ -1,0 +1,9 @@
+DARRIK
+Copyright (c) 2026 Mohammed Miaji. All rights reserved.
+
+This product bundles the following third-party software:
+
+JSZip v3.10.1 — src/vendor/jszip.min.js
+  Copyright (c) 2009-2016 Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso
+  Dual licensed under the MIT license or GPLv3. Used here under the MIT license.
+  https://github.com/Stuk/jszip
