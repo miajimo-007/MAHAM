@@ -1,4 +1,4 @@
-# DARRIK
+# MAHAM
 
 **From effort to impact.** DARRIK is a team work-tracking and performance app that runs as **one HTML file** —
 no server, no installation, no internet connection. A team keeps the file and its data in a shared network folder;
