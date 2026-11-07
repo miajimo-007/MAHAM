@@ -37,6 +37,7 @@ Object.assign(Store, {
     } else await check(Store.dataDir, 'seed.json', 'seed');
     for await (const [name, handle] of Store.usersDir.entries()) {
       if (handle.kind !== 'file' || !name.endsWith('.json')) continue;
+      if (Store.STRAY_RE.test(name)) continue; // a stray file written while nobody was signed in (2026.11.07.2 bug) — never read; its owner's records are rescued (Store.rescueStray)
       Store.noteFile(name);
       if (!Store.wantFile(name)) continue; // archives of past years: only when that year is asked for (data/files.js)
       await check(Store.usersDir, name, 'u:' + name);
@@ -64,8 +65,46 @@ Object.assign(Store, {
     return changed;
   },
   flushSoon: null,
+  STRAY_RE: /^(null|undefined)(\.|$)/,
+  /* 2026.11.07.2 could write "null.json" when someone signed out while a save was waiting. That file holds copies of
+     that person's records: put any that are newer than their own copy back into their own file (once, quietly). */
+  async rescueStray() {
+    if (!App.me || App.preview || !Store.usersDir || Store._rescued === App.me) return 0;
+    Store._rescued = App.me;
+    const back = [];
+    try {
+      for await (const [name, h] of Store.usersDir.entries()) {
+        if (h.kind !== 'file' || !Store.STRAY_RE.test(name) || !name.endsWith('.json')) continue;
+        let j;
+        try {
+          j = JSON.parse(await (await h.getFile()).text());
+        } catch (e) {
+          continue;
+        }
+        const arr = Array.isArray(j.records) ? j.records : Object.values(j.records || {});
+        for (const r of arr) {
+          if (!r || !r.id || r._by !== App.me) continue;
+          const cur = Store.own[r.id] || Store.db.get(r.id);
+          if (!cur || (cur._ts || 0) < (r._ts || 0)) back.push(r);
+        }
+      }
+    } catch (e) {
+      return 0;
+    }
+    if (!back.length) return 0;
+    for (const r of back) {
+      Store.own[r.id] = r;
+      Store.pending[r.id] = r;
+    }
+    Store.dirty = true;
+    LS.set('bct.unsaved.' + App.me, Store.pending);
+    Store.applyLocal(back);
+    Store.flushSoon();
+    Store.emit();
+    return back.length;
+  },
   async flush() {
-    if (!Store.dirty || Store.saving || !Store.usersDir || App.preview) return;
+    if (!Store.dirty || Store.saving || !Store.usersDir || App.preview || !App.me) return; // never write without a signed-in person
     Store.saving = true;
     Store.emit();
     const me = App.me,

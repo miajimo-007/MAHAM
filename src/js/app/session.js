@@ -3,7 +3,7 @@
 
 Object.assign(App, {
   chooseMe(switching) {
-    if (switching && !App.isSuper()) return; // only the super admin can switch person; everyone else signs out and in
+    if (switching && !App.realSuper()) return; // only the super admin can switch person; everyone else signs out and in
     const all = Store.members().filter(m => m.active !== false && !m.hidden);
     const btn = m =>
       `<button class="who-btn" data-me="${U.h(m.id)}"><span class="av">${U.h((m.short || m.name).slice(0, 1))}</span><span><b>${U.h(m.name)}</b>${(m.role && m.role !== 'analyst') || m.title || m.superAdmin ? `<small class="muted" style="display:block">${U.h(Store.titleOf(m))}</small>` : ''}</span></button>`;
@@ -211,6 +211,11 @@ Object.assign(App, {
       /* */
     }
     const wel = Custom.get('welcome', '');
+    try {
+      UI.closeModal();
+    } catch (e) {
+      /* */
+    } // no window from the signed-in app stays on top of the login page
     document.body.className = 'pre login-pre';
     {
       const t = document.getElementById('toasts');
@@ -299,7 +304,7 @@ Object.assign(App, {
     return raw.match(/.{4}/g).join('-');
   },
   recoveryDialog() {
-    if (!App.isSuper() || App.preview) return;
+    if (!App.realSuper() || App.preview) return;
     const cur = App.recoveryOf(App.me);
     UI.modal({
       title: '🔑 Recovery code',
@@ -397,19 +402,27 @@ Object.assign(App, {
     App.launch();
   },
   async signOut() {
+    if (App.preview) App.exitPreview();
     try {
-      if (typeof Admin !== 'undefined' && !App.preview) Admin.flushUsage();
+      if (typeof Admin !== 'undefined') Admin.flushUsage();
     } catch (e) {
       /* */
     }
-    try {
-      if (Store.dirty) await Store.flush();
-    } catch (e) {
-      /* the unsaved changes stay on this PC and are saved at the next sign-in */
+    // everything is written to MY file before "me" is cleared: a save that ran later would have nobody to write for
+    for (let i = 0; i < 50 && Store.saving; i++) await new Promise(r => setTimeout(r, 100));
+    if (Store.dirty) {
+      try {
+        await Store.flush();
+      } catch (e) {
+        /* */
+      }
     }
+    if (Store.dirty)
+      return UI.toast('Your last changes could not be saved to the shared folder yet — check the connection, then sign out again.', 'bad');
     LS.set('bct.session', null);
-    App.preview = null;
     App.me = null;
+    Store.own = {};
+    Store._rescued = null;
     history.replaceState(null, '', location.pathname);
     App.loginScreen();
   },

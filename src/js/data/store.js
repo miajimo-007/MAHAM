@@ -73,6 +73,10 @@ Object.assign(Store, {
     return rec;
   },
   saveMany(list) {
+    if (!App.me) {
+      console.warn('Nothing saved: nobody is signed in');
+      return;
+    } // every record belongs to the person signed in
     if (App.tooOld && App.tooOld()) {
       if (typeof UI !== 'undefined')
         UI.toast(

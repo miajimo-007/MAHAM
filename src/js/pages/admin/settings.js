@@ -50,7 +50,7 @@ P.settings = mode => {
     html,
     mount(root) {
       (root.querySelector('#switchme') || {}).onclick = () => {
-        if (App.isSuper()) App.chooseMe(true);
+        if (App.realSuper()) App.chooseMe(true);
       };
       (root.querySelector('#pickfolder') || {}).onclick = async () => {
         try {

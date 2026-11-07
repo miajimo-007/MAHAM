@@ -98,6 +98,24 @@ async def main():
         c('the same code cannot be used twice', 'no recovery code' in await pg.inner_text('.login-err'))
         await pg.click('#lback'); await pg.wait_for_selector('#loginf'); await sign_in_page(pg, 'adam', '7777'); await pg.wait_for_selector('#main')
         await J("App.setMe('layla'); App.launch()"); await pg.click('#mebtn'); await pg.wait_for_selector('#m_out'); c('others have no recovery code button', await pg.locator('#m_rc').count() == 0)
+        # ---------- 2026.11.07.3: sign out never writes a "null" file; one written by .2 is rescued and ignored ----------
+        await J("App.setMe('adam'); App.mode = 'admin'; App.launch()"); await pg.wait_for_timeout(300)
+        await J("Store.save({ c: 'mytask', id: 'mt-bye', owner: 'adam', title: 'Saved just before sign out', status: 'Open' }); Admin.flushUsage && Admin.flushUsage()")
+        await J("App.signOut()"); await pg.wait_for_selector('#loginf'); await pg.wait_for_timeout(6500)
+        files = await J("(async () => { const o = []; for await (const [n] of Store.usersDir.entries()) o.push(n); return o; })()")
+        c('signing out right after a change writes no "null" file', not any(f.startswith('null') for f in files), files)
+        mine = await J("Store.usersDir.getFileHandle('adam.json').then(h => h.getFile()).then(f => f.text())")
+        c('…the change went to my own file', 'mt-bye' in mine)
+        # a stray null.json like the one 2026.11.07.2 wrote: one newer record of mine + an old copy of settings
+        await J("""(async () => { const own = JSON.parse(await (await (await Store.usersDir.getFileHandle('adam.json')).getFile()).text());
+            const recs = (Array.isArray(own.records) ? own.records : Object.values(own.records)).slice(0, 50);
+            recs.push({ c: 'mytask', id: 'mt-lost', owner: 'adam', title: 'Only in the stray file', status: 'Open', _ts: Date.now() + 5000, _by: 'adam' });
+            const h = await Store.usersDir.getFileHandle('null.json', { create: true }); const w = await h.createWritable(); await w.write(JSON.stringify({ user: 'null', records: recs })); await w.close(); })()""")
+        await sign_in_page(pg, 'adam', '7777'); await pg.wait_for_selector('#main'); await pg.wait_for_timeout(1500)
+        c('my newer change from the stray file is put back in my file', await J("!!Store.get('mt-lost') && !!Store.own['mt-lost']"))
+        await J("Store.flush()"); await pg.wait_for_timeout(800)
+        c('…and saved there', 'mt-lost' in await J("Store.usersDir.getFileHandle('adam.json').then(h => h.getFile()).then(f => f.text())"))
+        c('the stray file is never read (no ignored changes from it)', await J("!Store.sources['u:null.json'] && !(Store.rejected || []).some(x => /null/.test(x.file || ''))"))
         c.done(s)
 
 run(main())

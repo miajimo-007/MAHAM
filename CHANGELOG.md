@@ -2,6 +2,16 @@
 
 Versions are dates (`YYYY.MM.DD.n`).
 
+## 2026.11.07.3
+
+- Fixed: signing out right after a change could write a stray "null.json" in the users folder. Sign out now waits for
+  every save; nothing is ever saved while nobody is signed in; a stray file is ignored and its owner's newer records
+  are put back into their own file at their next sign-in.
+- Fixed: Switch person and the recovery code were hidden while the super admin worked in analyst mode.
+- The login page closes any window left open; the background refresh does nothing while signed out.
+- Release test: several people on one PC (sign in, save, sign out at once, switch person, view as) — every file holds
+  only its owner's records, no stray files, nothing ignored.
+
 ## 2026.11.07.2
 
 - Login page (same look as the Lab): employee ID + PIN. Existing PINs keep working and are re-stored as salted

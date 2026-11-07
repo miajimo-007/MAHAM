@@ -37,7 +37,7 @@ Object.assign(App, {
     UI.$('#mebtn').onclick = () =>
       UI.modal({
         title: Store.memberName(App.me),
-        body: `<p class="muted small">${U.h(Store.titleOf(Store.member(App.me) || {}))} · ${U.h(Store.teamName(App.viewTeam))}</p><div class="row-btns">${App.isSuper() && !App.preview ? '<button class="btn" id="m_switch">Switch person</button>' : ''}<button class="btn" id="m_pin">${App.pinFor(App.me) ? 'Change my PIN' : 'Set my PIN'}</button>${App.isSuper() && !App.preview ? `<button class="btn" id="m_rc">🔑 Recovery code${App.recoveryOf(App.me) ? '' : ' ⚠'}</button>` : ''}<span class="grow"></span><button class="btn" id="m_out">⎋ Sign out</button></div><p class="muted small">You stay signed in on this PC until you sign out.</p>`,
+        body: `<p class="muted small">${U.h(Store.titleOf(Store.member(App.me) || {}))} · ${U.h(Store.teamName(App.viewTeam))}</p><div class="row-btns">${App.realSuper() && !App.preview ? '<button class="btn" id="m_switch">Switch person</button>' : ''}<button class="btn" id="m_pin">${App.pinFor(App.me) ? 'Change my PIN' : 'Set my PIN'}</button>${App.realSuper() && !App.preview ? `<button class="btn" id="m_rc">🔑 Recovery code${App.recoveryOf(App.me) ? '' : ' ⚠'}</button>` : ''}<span class="grow"></span><button class="btn" id="m_out">⎋ Sign out</button></div><p class="muted small">You stay signed in on this PC until you sign out.</p>`,
         onMount: w => {
           App.bindCopy(w);
           const sw = w.querySelector('#m_switch');
@@ -86,6 +86,13 @@ Object.assign(App, {
     UI.$('#savebtn').onclick = () => App.saveNow();
     App.modeUi();
     Store.on(App.renderSync);
+    Store.rescueStray()
+      .then(n => {
+        if (n) UI.toast(`${n} change${n > 1 ? 's' : ''} saved just before a sign-out were put back in your file`, 'good');
+      })
+      .catch(() => {
+        /* */
+      });
     window.onhashchange = () => {
       document.body.classList.remove('nav-open');
       App.route();
@@ -276,6 +283,7 @@ Object.assign(App, {
     }
   },
   async poll() {
+    if (!App.me) return; // signed out: the login page needs nothing from the shared folder
     Store.autoBackup();
     if (Date.now() - (App._verChecked || 0) > 15 * 60000) {
       App._verChecked = Date.now();

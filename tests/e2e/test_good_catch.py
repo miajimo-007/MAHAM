@@ -33,8 +33,12 @@ async def main():
         c('finder sees it on My Day', 'Your good catches were resolved' in t and 'Allergy banner' in t)
         await pg.click('[data-gcseen]'); await pg.wait_for_timeout(300); c('OK, seen hides it', 'Your good catches were resolved' not in await pg.inner_text('#main'))
         # finder turns it into a quick win
-        await s.go('#/oncall/goodcatch'); await J(f"UI.editRecord('gcatch', Store.get('{g}'))"); await pg.wait_for_selector('[data-gcqw]'); await pg.click('[data-gcqw]'); await pg.wait_for_selector('#recform')
-        await pg.fill('#recform [name=module]', 'Chart'); await pg.click('[data-save]'); await pg.wait_for_timeout(400)
+        await s.go('#/oncall/goodcatch'); await J(f"UI.editRecord('gcatch', Store.get('{g}'))"); await pg.wait_for_selector('[data-gcqw]'); await pg.click('[data-gcqw]'); await pg.wait_for_selector('#recform [name=module]')
+        await pg.fill('#recform [name=module]', 'Chart'); await pg.click('[data-save]')
+        for _ in range(40):   # wait for the save (slower machines), not a fixed time
+            if await J(f"Store.all('quickwin').some(q => q.fromCatch === '{g}')"): break
+            await pg.wait_for_timeout(250)
+        if await pg.locator('#modal').count(): print('   form still open:', (await pg.inner_text('#modal'))[:300].replace('\n', ' | '), await pg.inner_text('#toasts'))
         c('quick win made from it and marked', await J(f"Store.all('quickwin').some(q => q.fromCatch === '{g}')") and await J(f"Store.get('{g}').convertedTo") == 'quickwin')
         await pg.screenshot(path=f'{SHOTS}/good_catch.png', full_page=True)
         # counts
