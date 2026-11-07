@@ -52,19 +52,17 @@ function adminFlows() {
         });
       root.querySelector('#wfex').onclick = () => open(Object.assign(Flow.example(), { _new: true }));
       root.querySelectorAll('[data-wfedit]').forEach(b => (b.onclick = () => open(Flow.get(b.dataset.wfedit))));
-      root
-        .querySelectorAll('[data-wfcopy]')
-        .forEach(
-          b =>
-            (b.onclick = () =>
-              open(
-                Object.assign(JSON.parse(JSON.stringify(Flow.get(b.dataset.wfcopy))), {
-                  id: U.uid('wf'),
-                  name: Flow.get(b.dataset.wfcopy).name + ' (copy)',
-                  _new: true,
-                })
-              ))
-        );
+      root.querySelectorAll('[data-wfcopy]').forEach(
+        b =>
+          (b.onclick = () =>
+            open(
+              Object.assign(JSON.parse(JSON.stringify(Flow.get(b.dataset.wfcopy))), {
+                id: U.uid('wf'),
+                name: Flow.get(b.dataset.wfcopy).name + ' (copy)',
+                _new: true,
+              })
+            ))
+      );
       root.querySelectorAll('[data-wfdel]').forEach(
         b =>
           (b.onclick = () =>

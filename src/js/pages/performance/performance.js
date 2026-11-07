@@ -199,13 +199,11 @@ function projPerfView(y) {
       'Sprint reliability (finished sprints)',
       R.sp.length
         ? UI.barChart(
-            R.sp
-              .slice(-12)
-              .map(x => ({
-                label: (x.s.name || '').slice(0, 10),
-                value: x.rel == null ? 0 : Math.round(x.rel * 100),
-                color: x.rel != null && x.rel < 0.7 ? 'var(--bad, #dc2626)' : '',
-              })),
+            R.sp.slice(-12).map(x => ({
+              label: (x.s.name || '').slice(0, 10),
+              value: x.rel == null ? 0 : Math.round(x.rel * 100),
+              color: x.rel != null && x.rel < 0.7 ? 'var(--bad, #dc2626)' : '',
+            })),
             { fmt: v => v + '%', target: 85 }
           )
         : empty('No finished sprints this year.')
