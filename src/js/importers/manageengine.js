@@ -1,4 +1,4 @@
-/* DARRIK — ManageEngine "daily details report" import: column names, date and elapsed-time parsing. */
+/* MAHAM — ManageEngine "daily details report" import: column names, date and elapsed-time parsing. */
 'use strict';
 
 /* ---------- ManageEngine import ---------- */

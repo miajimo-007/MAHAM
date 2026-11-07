@@ -1,4 +1,4 @@
-/* DARRIK — Admin tabs: Home (health tiles, reminders, usage), Month locks, Scoring what-if, Data (technician
+/* MAHAM — Admin tabs: Home (health tiles, reminders, usage), Month locks, Scoring what-if, Data (technician
  * names, clean-up, export, backup settings) and Change log (with undo). */
 'use strict';
 
@@ -360,7 +360,7 @@ function adminData() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const label = c => (typeof COLL_LABEL !== 'undefined' && COLL_LABEL[c]) || c;
   const what = r => r.task || r.subject || r.title || r.name || r.course || r.description || r.id;
-  const html = `${card(
+  const html = `${Health.card()}${card(
     `Technician names in ManageEngine <span class="count">${un.length}</span>`,
     `<p class="muted small">Help-desk rows whose technician doesn't match anyone are not counted in scores. Match a name to a person (it is added to their "Other names"), or ignore it if it isn't one of your people.</p>
     ${un.length ? `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Name in ManageEngine</th><th class="num">Rows</th><th>Teams</th><th>Is this…</th><th></th></tr></thead><tbody>${un.map((x, i) => `<tr><td><b>${h(x.name)}</b></td><td class="num">${x.n}</td><td>${h([...x.teams].map(Store.teamName).join(', '))}</td><td><select data-tm="${i}"><option value="">— pick a person —</option>${people.map(m => `<option value="${h(m.id)}">${h(m.name)} (${h(Store.teamName(m.team))})</option>`).join('')}</select></td><td class="nw"><button class="btn xs" data-tmatch="${i}">Match</button> <button class="btn xs ghost" data-tign="${i}">Ignore</button></td></tr>`).join('')}</tbody></table></div>` : empty('Every technician name matches someone.')}
@@ -421,6 +421,7 @@ function adminData() {
       ${st.length ? '<div class="row-btns"><button class="btn" id="hdcompact">🧹 Remove older copies</button></div>' : ''}`;
       })()
     )}
+    ${LabFind.card()}
     ${card('Export everything', `<p class="muted small">One Excel file with every kind of record (one sheet each), for audit or reporting. Nothing leaves this PC.</p><div class="row-btns"><button class="btn primary" id="exportall2">⬇ Download Excel</button></div>`)}
     ${card(
       'Backups',
@@ -438,6 +439,7 @@ function adminData() {
             location.hash = '#/adminperson/' + el.dataset.goperson;
           })
       );
+      Health.bind(root);
       root.querySelectorAll('[data-tmatch]').forEach(
         b =>
           (b.onclick = () => {
@@ -536,6 +538,7 @@ function adminData() {
         exportAll();
         Store.noteCopied();
       };
+      LabFind.bind(root);
       const bkSave = patch => {
         Store.save(Object.assign({}, Store.get('settings-backup') || { id: 'settings-backup', c: 'settings' }, patch));
         UI.toast('Saved', 'good');
@@ -712,3 +715,112 @@ function adminScoreMonths() {
     },
   };
 }
+
+/* ---------------- Findings from MAHAM Lab: an analyst's findings file → info items or To Dos ---------------- */
+const LabFind = {
+  file: null,
+  card() {
+    return card(
+      'Findings from MAHAM Lab',
+      `<p class="muted small">An analyst's findings file from MAHAM Lab (📌 Findings → Send to MAHAM). It has titles and notes only — no rows and no pictures. Each finding becomes an info item or a To Do.</p><label class="btn"><input type="file" id="labfind" accept=".json" hidden>📂 Load a findings file…</label><div id="labfindbox"></div>`
+    );
+  },
+  ref: (f, i) => `lab:${f.at}#${i}`,
+  bind(root) {
+    const inp = root.querySelector('#labfind');
+    if (!inp) return;
+    const box = root.querySelector('#labfindbox');
+    inp.onchange = async () => {
+      const file = inp.files[0];
+      inp.value = '';
+      box.innerHTML = '';
+      if (!file) return; // cleared so the same file can be picked again
+      let f;
+      try {
+        f = JSON.parse(await file.text());
+      } catch (e) {
+        return UI.toast('This is not a findings file', 'bad');
+      }
+      if (!f || f.kind !== 'maham-lab-findings' || !Array.isArray(f.items)) return UI.toast('This is not a MAHAM Lab findings file', 'bad');
+      f.items = f.items
+        .slice(0, 200)
+        .map(x => ({
+          title: String(x.title || '').slice(0, 300),
+          note: String(x.note || '').slice(0, 4000),
+          at: String(x.at || '').slice(0, 10),
+        }))
+        .filter(x => x.title);
+      LabFind.file = f;
+      const done = new Set([...Store.all('info', '*'), ...Store.all('todo', '*')].map(r => r.labRef).filter(Boolean));
+      box.innerHTML = `<p class="small">From <b>${h(f.by || '?')}</b> · dataset <b>${h(f.dataset || '?')}</b> (${h(f.label || '')}) · ${h(U.fmtDate(String(f.at).slice(0, 10)))}</p>
+        <div class="scroll-list">${f.items
+          .map((x, i) => {
+            const was = done.has(LabFind.ref(f, i));
+            return `<label class="li check"><input type="checkbox" data-lf="${i}" ${was ? 'disabled' : 'checked'}> <span class="grow"><b>${h(x.title)}</b>${x.note ? `<div class="muted small">${h(x.note.slice(0, 220))}${x.note.length > 220 ? '…' : ''}</div>` : ''}</span>${was ? '<span class="badge">already added</span>' : ''}</label>`;
+          })
+          .join('')}</div>
+        <form class="grid-form" id="lff">${UI.field(
+          {
+            key: 'as',
+            label: 'Add them as',
+            type: 'select',
+            options: [
+              ['info', 'Info items (Reference)'],
+              ['todo', 'To Do tasks'],
+            ],
+            blank: false,
+          },
+          'info'
+        )}${UI.field({ key: 'who', label: 'To Do for', type: 'member' }, App.me)}${UI.field({ key: 'days', label: 'Due in (days)', type: 'number', min: 0, step: 1 }, 7)}</form>
+        <div class="row-btns"><span class="grow"></span><button class="btn primary" id="lfadd">Add</button></div>`;
+      const sync = () => {
+        const todo = box.querySelector('[name=as]').value === 'todo';
+        box.querySelector('[name=who]').closest('.fld').style.display = todo ? '' : 'none';
+        box.querySelector('[name=days]').closest('.fld').style.display = todo ? '' : 'none';
+      };
+      box.querySelector('[name=as]').onchange = sync;
+      sync();
+      box.querySelector('#lfadd').onclick = () => {
+        const pick = [...box.querySelectorAll('[data-lf]:checked')].map(c => +c.dataset.lf);
+        if (!pick.length) return UI.toast('Tick at least one finding', 'bad');
+        const as = box.querySelector('[name=as]').value,
+          who = box.querySelector('[name=who]').value,
+          days = Math.max(0, +box.querySelector('[name=days]').value || 0);
+        if (as === 'todo' && !who) return UI.toast('Pick who the To Dos are for', 'bad');
+        const src = `MAHAM Lab · ${f.dataset || 'dataset'} · ${f.by || ''} · ${U.fmtDate(String(f.at).slice(0, 10))}`;
+        const recs = pick.map(i => {
+          const x = f.items[i];
+          const labRef = LabFind.ref(f, i);
+          if (as === 'info')
+            return {
+              id: U.uid('info'),
+              c: 'info',
+              category: 'MAHAM Lab findings',
+              title: x.title,
+              value: `${x.note ? x.note + '\n\n' : ''}— ${src}`,
+              labRef,
+            };
+          const r = {
+            id: U.uid('todo'),
+            c: 'todo',
+            task: `${x.title}${x.note ? '\n' + x.note : ''}`.slice(0, 2000),
+            analyst: who,
+            assigned: U.todayStr(),
+            duration: days,
+            priority: 'Normal',
+            fu: false,
+            status: 'In Progress',
+            instruction: `From a MAHAM Lab finding (${src})`,
+            labRef,
+          };
+          if (Schemas.todo && Schemas.todo.beforeSave) Schemas.todo.beforeSave(r);
+          return r;
+        });
+        Store.saveMany(recs);
+        UI.toast(`${recs.length} finding${recs.length > 1 ? 's' : ''} added as ${as === 'info' ? 'info items' : 'To Dos'}`, 'good');
+        LabFind.file = null;
+        App.render();
+      };
+    };
+  },
+};

@@ -23,7 +23,7 @@ async def main():
         # the acting person
         await s.sign_in_as('yousef'); nav = await pg.inner_text('nav')
         c('acting person gets "Acting manager" menu', 'acting manager' in nav.lower() and 'Manager Desk' in nav)
-        c('…and keeps his own My Day', 'My Day' in nav)
+        c('…and keeps his own My Day', 'Analyst Desk' in nav)
         t = await s.go('#/manager')
         c('Manager Desk opens with "You are acting for"', 'You are acting for' in t and 'Q4 access review' in t)
         c('has the manager\'s permissions (approve QW, assign To Do)', await s.js("App.can('approveQW') && App.can('assignTodo')"))

@@ -1,4 +1,4 @@
-/* DARRIK — Feedback: everyone reports issues and ideas (menu → Feedback); the super admin tracks them
+/* MAHAM — Feedback: everyone reports issues and ideas (menu → Feedback); the super admin tracks them
  * (Admin → Feedback). feedback { type, title, details, page, urgency, ver, from, status, priority, reply, fixedIn,
  * dupOf, repliedAt } — written by the sender; only the administrator changes status / priority / reply / fixed in.
  * fbvote { fb, by } — "Me too", one record per person, in their own file. */
@@ -71,7 +71,7 @@ const FB = {
       ${UI.field({ key: 'urgency', label: 'How urgent?', type: 'select', options: FB.URG, blank: false }, r.urgency)}
       ${UI.field({ key: 'title', label: 'Title', type: 'text', required: true, span: 2, placeholder: 'One line — e.g. "Attendance page does not save permission hours"' }, r.title || '')}
       ${UI.field({ key: 'details', label: 'Details', type: 'textarea', span: 2, rows: 5, placeholder: 'For an issue: what did you do? what happened? what did you expect?\nFor an idea: what would help and why?' }, r.details || '')}
-      ${UI.field({ key: 'page', label: 'Which page?', type: 'select', options: [['', '— not about one page —'], ...Store.PAGES.map(([k, l]) => [k, l]), ['home', 'My Day / desk'], ['projects', 'Projects'], ['meetings', 'Meetings'], ['admin', 'Admin'], ['other', 'Other']], blank: false }, r.page || '')}
+      ${UI.field({ key: 'page', label: 'Which page?', type: 'select', options: [['', '— not about one page —'], ...Store.PAGES.map(([k, l]) => [k, l]), ['home', 'Analyst Desk / desk'], ['projects', 'Projects'], ['meetings', 'Meetings'], ['admin', 'Admin'], ['other', 'Other']], blank: false }, r.page || '')}
       </form><p class="note">Please don't write patient names, MRNs or anything that identifies a patient.</p>`,
       actions: `${!isNew ? '<button class="btn danger ghost" data-del>Withdraw</button>' : ''}<span class="grow"></span><button class="btn" data-c>Cancel</button><button class="btn primary" data-ok>${isNew ? 'Send' : 'Save'}</button>`,
       onMount: w => {
@@ -141,7 +141,7 @@ const FB = {
         })
     );
   },
-  /* notice for the sender (My Day / desk) */
+  /* notice for the sender (Analyst Desk / desk) */
   banner() {
     const l = FB.unseen();
     if (!l.length) return '';
@@ -187,11 +187,13 @@ P.feedback = () => {
 function adminFeedback() {
   const f = ps('fbadm');
   const all = FB.all();
+  const fbDay = r => r.date || (r._created || r._ts ? U.ds(new Date(r._created || r._ts)) : '');
   let rows = all.filter(
     r =>
       (!f.type || r.type === f.type) &&
       (!f.st || (f.st === '_open' ? FB.open(r) : (r.status || 'New') === f.st)) &&
-      (!f.team || r.team === f.team)
+      (!f.team || r.team === f.team) &&
+      (!f.month || (inMonth(fbDay(r), f.month) && U.year(fbDay(r)) === App.year))
   );
   const sort = f.sort || 'new';
   rows = rows
@@ -216,7 +218,7 @@ function adminFeedback() {
         ['question', 'Questions'],
       ],
       'Type'
-    )}${sel('st', [['', 'All'], ['_open', 'Open'], ...FB.ST.map(s => [s, s])], 'Status')}${sel('team', [['', 'All'], ...Store.teams().map(t => [t.id, t.name])], 'Team')}${sel(
+    )}${sel('st', [['', 'All'], ['_open', 'Open'], ...FB.ST.map(s => [s, s])], 'Status')}${sel('month', [['', 'All months'], ...U.MONTHS.map((m, i) => [String(i + 1), m])], 'Month')}${sel('team', [['', 'All'], ...Store.teams().map(t => [t.id, t.name])], 'Team')}${sel(
       'sort',
       [
         ['new', 'Newest'],

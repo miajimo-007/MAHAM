@@ -1,4 +1,4 @@
-/* DARRIK — Admin dialogs: permissions and function access per person / team. */
+/* MAHAM — Admin dialogs: permissions and function access per person / team. */
 'use strict';
 
 /* ---------- permissions editor ---------- */
@@ -62,7 +62,7 @@ function bindPerms(root) {
         const e = edits[m.id];
         if (!e) return m;
         const perms = {};
-        for (const [k, v] of Object.entries(e)) if (v !== Store.roleDefault(m.role || 'analyst', k)) perms[k] = v;
+        for (const [k, v] of Object.entries(e)) if (v !== Store.teamRoleDefault(m, k)) perms[k] = v;
         if (!App.isSuper())
           for (const k of Store.SUPER_ONLY) {
             delete perms[k];
@@ -127,7 +127,7 @@ function editPerms(mid) {
       w.querySelector('[data-ok]').onclick = () => {
         const perms = {};
         w.querySelectorAll('[data-p]').forEach(cb => {
-          if (cb.checked !== Store.roleDefault(role, cb.dataset.p)) perms[cb.dataset.p] = cb.checked;
+          if (cb.checked !== Store.teamRoleDefault(Store.member(mid), cb.dataset.p)) perms[cb.dataset.p] = cb.checked;
         });
         UI.closeModal();
         saveMembersAll(

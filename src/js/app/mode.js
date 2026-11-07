@@ -1,4 +1,4 @@
-/* DARRIK — Two modes for the super admin: the app opens as a normal analyst; "⚡ Switch to Admin" turns
+/* MAHAM — Two modes for the super admin: the app opens as a normal analyst; "⚡ Switch to Admin" turns
  * on full super admin at once, "Back to analyst" returns. Only this screen changes: other PCs, the trust checks on
  * read and the records themselves always use the real permissions (Store._real), and saves are still made as you.
  * While in analyst mode Store.member(me) is a copy with superAdmin off, role analyst and no personal permissions. */

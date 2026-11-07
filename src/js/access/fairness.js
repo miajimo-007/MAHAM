@@ -1,4 +1,4 @@
-/* DARRIK — Score fairness rules (used when saving AND when files are read, so hand-edited files
+/* MAHAM — Score fairness rules (used when saving AND when files are read, so hand-edited files
  * cannot get around them):
  *   To Do       analysts may update / finish their own To Do, but not cancel it, not change the manager's
  *               fields, not finish in the future or before it was assigned; an earlier-than-today finish date
@@ -12,7 +12,40 @@
 'use strict';
 
 Object.assign(Store, {
-  FAIR_COLLS: new Set(['todo', 'quickwin', 'shadow', 'attendance']),
+  FAIR_COLLS: new Set([
+    'todo',
+    'quickwin',
+    'shadow',
+    'attendance',
+    'central',
+    'oncall',
+    'course',
+    'info',
+    'srs',
+    'reccourse',
+    'pcomment',
+    'gcupdate',
+    'gcatch',
+  ]),
+  /* items that belong to someone: their owner, or anyone with "Change or delete other people's items", may change them */
+  OWNED: {
+    central: 'analyst',
+    oncall: 'analyst',
+    course: 'analyst',
+    attendance: 'analyst',
+    info: 'createdBy',
+    srs: 'createdBy',
+    reccourse: 'createdBy',
+    pcomment: 'createdBy',
+    preq: 'createdBy',
+    gcupdate: 'createdBy',
+  },
+  recOwner(r) {
+    if (r && r.c === 'gcatch') return r.createdBy || r._by || '';
+    const k = r && Store.OWNED[r.c];
+    if (!k) return (r && (r.analyst || r.owner)) || '';
+    return k === 'createdBy' ? r.createdBy || r._by || '' : r[k] || '';
+  },
   TODO_MGR_FIELDS: [
     'task',
     'analyst',
@@ -70,13 +103,40 @@ Object.assign(Store, {
     const priv = key => Store.privileged(by, key, ts);
     const no = why => Object.assign(out, { reject: why });
     // locked months
-    if (!priv('lockScores'))
+    if (!priv('lockScores') && ['todo', 'quickwin', 'shadow', 'attendance'].includes(r.c))
       for (const x of [r, p]) {
         if (!x) continue;
         const ym = Store.recMonth(x);
         const t = ym && (locks || {})[`${x.team || r.team || 'apps'}|${ym}`];
         if (t && ts > t) return no(`${Store.monthLabel(ym)} is locked — only your manager can change it now`);
       }
+    const ok = Store.OWNED[r.c];
+    if (ok && !(ts && ts < Config.OWN_SINCE) && !(priv('editOthers') || (r.c === 'attendance' && priv('editAttendanceOthers')))) {
+      const owner = p ? Store.recOwner(p) : ok === 'createdBy' ? by : r[ok];
+      if (owner && owner !== by)
+        return no(
+          `This belongs to ${Store.memberShort(owner)} — only they, or someone given "Change or delete other people's items", can change it`
+        );
+      if (ok !== 'createdBy' && r[ok] && r[ok] !== by) return no('You can only add this for yourself');
+      if (ok === 'createdBy' && p && !eq(r.createdBy, p.createdBy)) out.fixed = Object.assign({}, r, { createdBy: p.createdBy });
+    }
+    // good catch: the finder (and "Change or delete other people's items") changes anything; anyone may take an open one
+    // nobody has; the person who took it may only change status, who has it and the resolution
+    if (r.c === 'gcatch' && p && by !== (p.createdBy || p._by) && !priv('editOthers')) {
+      if (r._del) return no('Only the person who found it can delete a good catch');
+      const free = !p.taker && ['New', 'In progress'].includes(p.status || 'New');
+      if (p.taker !== by && !(free && r.taker === by)) return no('Take it first — someone else is on it');
+      const f = Object.assign({}, r);
+      for (const k of Object.keys(Object.assign({}, p, r)))
+        if (
+          !['status', 'taker', 'resolution', 'resolvedOn', 'resolvedBy', 'convertedTo', '_ts', '_by', '_v', 'id', 'c'].includes(k) &&
+          !eq(r[k], p[k])
+        ) {
+          if (p[k] === undefined) delete f[k];
+          else f[k] = p[k];
+        }
+      out.fixed = f;
+    }
     if (r.c === 'todo' && !priv('assignTodo')) {
       if (!p) return no(r._del ? 'Only your manager can delete a To Do' : 'Only a manager or team leader can add To Dos');
       if (r._del) return no('Only your manager can delete a To Do');
@@ -141,7 +201,7 @@ Object.assign(Store, {
       out.fixed = f;
       return out;
     }
-    if (r.c === 'shadow' && !priv('manageTeam')) {
+    if (r.c === 'shadow' && !priv('manageTeam') && !priv('editOthers')) {
       if (p && p.analyst !== by) return no('This shadow work entry belongs to someone else');
       if (r.analyst !== by) return no('You can only log shadow work for yourself');
       const oldest = U.addDays(day, -Config.SELF_BACKDATE_DAYS);
@@ -161,6 +221,13 @@ Object.assign(Store, {
     return out;
   },
 
+  /* may I change this record (as it is now)? — used to open other people's items read-only */
+  mayChange(r) {
+    if (!r || !r.id || !Store.FAIR_COLLS.has(r.c) || App.isSuper()) return true;
+    const prev = Store.db.get(r.id);
+    if (!prev) return true;
+    return !Store.fairCheck(Object.assign({}, prev, { _ts: Date.now() }), prev, App.me, Date.now(), Store.lockMap()).reject;
+  },
   /* save-time check for the person using the app: a message when something is not allowed */
   whyNotFair(r) {
     if (!r || !Store.FAIR_COLLS.has(r.c) || !App.me) return '';

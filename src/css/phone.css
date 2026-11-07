@@ -1,4 +1,4 @@
-/* DARRIK — Phones (basic). Loaded after responsive.css. Big enough to tap, nothing wider than the screen. */
+/* MAHAM — Phones (basic). Loaded after responsive.css. Big enough to tap, nothing wider than the screen. */
 @media (max-width: 700px) {
   html {
     -webkit-text-size-adjust: 100%;

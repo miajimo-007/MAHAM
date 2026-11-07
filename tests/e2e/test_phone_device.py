@@ -17,7 +17,7 @@ async def main():
             ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
             await ctx.add_init_script(NO_FOLDER)
             pg = await ctx.new_page(); errors = []; pg.on('pageerror', lambda e: errors.append(str(e)))
-            url = f'http://127.0.0.1:{port}/DARRIK.html'
+            url = f'http://127.0.0.1:{port}/MAHAM.html'
             await pg.goto(url); await pg.wait_for_selector('[data-me]', timeout=15000)
             c('no folder support → straight to "who are you" (this device)', await pg.evaluate("Store.storageMode") == 'device')
             await pg.click('[data-me="yousef"]'); await pg.wait_for_selector('#main .kpis')
@@ -37,7 +37,7 @@ async def main():
             await pg.click('#menubtn'); await pg.wait_for_timeout(300)
             c('menu opens from the ☰ button', await pg.evaluate("document.body.classList.contains('nav-open')"))
             await pg.screenshot(path=f'{SHOTS}/phone_menu.png')
-            for f in ['darrik.config.js', 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png']:
+            for f in ['maham.config.js', 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png']:
                 r = await pg.request.get(f'http://127.0.0.1:{port}/{f}')
                 c(f'served next to the app: {f}', r.ok)
             c('installable on https (manifest linked)', await pg.evaluate("!!document.querySelector('link[rel=manifest]')"))

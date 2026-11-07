@@ -1,4 +1,4 @@
-/* DARRIK — Work-flow rules shared by several pages: director tasks, forwarding, project health, quick-win history. */
+/* MAHAM — Work-flow rules shared by several pages: director tasks, forwarding, project health, quick-win history. */
 'use strict';
 
 function mineOrAll(list) {
@@ -54,9 +54,31 @@ function myWork(who) {
       if (p && !['Done', 'Canceled'].includes(p.status))
         out.push({ r: t, kind: 'Project task', title: t.title, due: t.due || '', src: '◈ ' + p.name, proj: p.id });
     }
-  for (const t of Store.all('mytask'))
-    if (t.owner === me && t.status === 'Open')
-      out.push({ r: t, kind: 'Personal', title: t.title, due: t.due || '', src: from(t) || 'my own', edit: 'mytask|' + t.id });
+  if (typeof PT !== 'undefined') {
+    for (const t of PT.today(me))
+      out.push({
+        r: t,
+        kind: 'Personal',
+        title: t.title,
+        due: t.due || '',
+        src:
+          from(t) ||
+          (t.fromWho ? 'personal · from ' + Store.memberShort(t.fromWho) : 'personal · only you see it') +
+            (t.repeat ? ' · ↻ ' + PT.REPEAT_LABEL[t.repeat] : ''),
+        edit: 'mytask|' + t.id,
+      });
+    if (me === App.me)
+      for (const t of PT.offersForMe())
+        out.push({
+          r: t,
+          kind: 'Offered',
+          title: t.title,
+          due: t.due || '',
+          src: `offered by ${Store.memberShort(t.owner)}${t.offer.note ? ' · “' + t.offer.note + '”' : ''}`,
+          href: '#/mytasks',
+          offer: true,
+        });
+  }
   for (const t of Store.all('action'))
     if (t.who === me && t.status === 'Open')
       out.push({
@@ -126,6 +148,7 @@ function myWorkCard() {
   );
   if (!l.length && !wait.length && o.hideEmpty) return '';
   const kc = {
+    Offered: 'k-mtg',
     Approval: 'k-req',
     Stuck: 'k-task',
     'To Do': 'k-task',
@@ -140,7 +163,7 @@ function myWorkCard() {
       ? ''
       : `${x.r.priority === 'High' ? ' ' + UI.badge('High', 'bad') : ''}${x.r.dirUpdated && x.r.dirUpdated >= U.addDays(today, -7) ? ' ' + UI.badge('updated by director', 'warn') : ''}${x.r.nudgedOn && x.r.nudgedOn >= U.addDays(today, -3) ? ' ' + UI.badge('🔔 ' + Store.memberShort(x.r.nudgedBy) + ' asked for an update', 'warn') : ''}${x.r.dirNote ? `<div class="small">📝 Director: ${h(x.r.dirNote)}</div>` : ''}`;
   const row = x =>
-    `<div class="li click" ${x.edit ? `data-edit="${h(x.edit)}"` : x.href ? `data-href="${h(x.href)}"` : `data-proj="${h(x.proj)}"`}><span class="ag-kind ${kc[x.kind]}">${h(x.kind)}</span><div class="grow"><b>${h(x.title)}</b>${nw.has(x.r.id) ? ' <span class="badge warn">new</span>' : ''}${extra(x)}<div class="muted small">${h(x.src)}</div></div>${x.due ? `<span class="ov-due ${x.late ? 'late' : x.due === today ? 'today' : ''}">${x.late ? 'overdue · ' : ''}${x.due === today ? 'today' : U.fmtDate(x.due)}</span>` : ''}${x.r.c === 'action' || x.r.c === 'todo' || x.r.c === 'mytask' ? ` <button class="btn sm" data-mineok="${h(x.r.id)}" title="Mark as done today">✓ Done</button>` : ''}</div>`;
+    `<div class="li click" ${x.edit ? `data-edit="${h(x.edit)}"` : x.href ? `data-href="${h(x.href)}"` : `data-proj="${h(x.proj)}"`}><span class="ag-kind ${kc[x.kind]}">${h(x.kind)}</span><div class="grow"><b>${h(x.title)}</b>${nw.has(x.r.id) ? ' <span class="badge warn">new</span>' : ''}${extra(x)}<div class="muted small">${h(x.src)}</div></div>${x.due ? `<span class="ov-due ${x.late ? 'late' : x.due === today ? 'today' : ''}">${x.late ? 'overdue · ' : ''}${x.due === today ? 'today' : U.fmtDate(x.due)}</span>` : ''}${x.offer ? ` <button class="btn sm primary" data-ptacc="${h(x.r.id)}">Accept</button> <button class="btn sm ghost" data-ptdec="${h(x.r.id)}">Decline</button>` : x.r.c === 'action' || x.r.c === 'todo' || x.r.c === 'mytask' ? ` <button class="btn sm" data-mineok="${h(x.r.id)}" title="Mark as done today">✓ Done</button>` : ''}</div>`;
   const wrow = t =>
     `<div class="li click waiting" data-edit="todo|${h(t.id)}"><span class="ag-kind k-task">To Do</span><div class="grow"><b>${h(t.task)}</b><div class="muted small">✓ done ${t.finish === today ? 'today' : U.fmtDate(t.finish)} — waiting for your manager to confirm</div></div></div>`;
   return card(
@@ -148,7 +171,12 @@ function myWorkCard() {
     l.length || wait.length
       ? `<div class="scroll-list">${l.slice(0, 30).map(row).join('')}${wait.map(wrow).join('')}</div>`
       : empty('Nothing assigned to you right now. 🎉'),
-    App.pageAllowed('todo') ? '<a href="#/todo" class="link">All To Dos →</a>' : ''
+    [
+      App.pageAllowed('mytasks') ? '<a href="#" class="link" data-ptnew="">＋ Personal task</a>' : '',
+      App.pageAllowed('todo') ? '<a href="#/todo" class="link">All To Dos →</a>' : '',
+    ]
+      .filter(Boolean)
+      .join(' <span class="muted">·</span> ')
   );
 }
 
@@ -202,7 +230,7 @@ function projDerive(r) {
 
 const healthKind = h2 => ({ 'On track': 'good', Done: 'good', Behind: 'warn', 'On hold': 'warn', Overdue: 'bad', Canceled: '' })[h2] || '';
 
-/* quick wins that are finished business: rejected (and, for My Day, completed) = history only */
+/* quick wins that are finished business: rejected (and, for Analyst Desk, completed) = history only */
 function qwHistory(r, rejectedOnly) {
   const ap = U.lc(r.approval),
     st = U.lc(r.status);

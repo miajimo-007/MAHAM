@@ -22,3 +22,5 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: npm run build
       - run: npm test
+      - run: npm run build:lab
+      - run: npm run test:lab

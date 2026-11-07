@@ -1,4 +1,4 @@
-/* DARRIK — Admin → Workflows: statuses, allowed moves, who may move, one approver, conditions, stuck alerts.
+/* MAHAM — Admin → Workflows: statuses, allowed moves, who may move, one approver, conditions, stuck alerts.
  * Only the super admin can change them (they are settings). Rules live in domain/flows.js. */
 'use strict';
 

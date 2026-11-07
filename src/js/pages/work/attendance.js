@@ -1,4 +1,4 @@
-/* DARRIK — Attendance — monthly grid and day editor. */
+/* MAHAM — Attendance — monthly grid and day editor. */
 'use strict';
 
 function editAttendance(date, mid, preset) {
@@ -43,7 +43,7 @@ function editAttendance(date, mid, preset) {
       w.querySelector('[data-s]').onclick = () => {
         const v = UI.readForm(f, [{ key: 'status' }, { key: 'leave' }, { key: 'permHrs', type: 'number' }]);
         if (v.status === 'ON') v.leave = '';
-        v.permHrs = +v.permHrs || 0;
+        v.permHrs = v.status === 'OFF' ? 0 : +v.permHrs || 0; // a day off has no permission hours
         if (v.status === 'OFF' && !v.leave) {
           UI.toast('Pick the leave type', 'bad');
           return;

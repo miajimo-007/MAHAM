@@ -1,4 +1,4 @@
-/* DARRIK — Minimal Excel (.xlsx) reader / writer on top of JSZip — no internet, no other libraries. */
+/* MAHAM — Minimal Excel (.xlsx) reader / writer on top of JSZip — no internet, no other libraries. */
 'use strict';
 
 /* ---------------- minimal XLSX read/write (JSZip) ---------------- */
@@ -141,6 +141,12 @@ const XL = {
     });
   },
   download(blob, name) {
+    if (typeof Admin !== 'undefined' && Admin.fn)
+      try {
+        Admin.fn('excel:export');
+      } catch (e) {
+        /* usage only */
+      }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;

@@ -1,4 +1,4 @@
-/* DARRIK — Meetings, minutes and follow-up.
+/* MAHAM — Meetings, minutes and follow-up.
  * meeting  { title, type, series, date, owner, scribe, attendees[], items[{ id, title, notes, decision }], privateNotes,
  *            followups{ taskId: { outcome, on, due } } }
  * Anyone can set up a meeting, with the people they work with:
@@ -271,7 +271,7 @@ const Meetings = {
   },
   /* personal tasks (only their owner sees them) */
   myTasks(who) {
-    return Store.all('mytask').filter(t => t.owner === (who || App.me));
+    return Store.all('mytask').filter(t => t.owner === (who || App.me) && !t.declineOf);
   },
   /* upcoming meetings I am in */
   upcoming(who) {

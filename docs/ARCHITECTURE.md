@@ -65,7 +65,7 @@ Methods always refer to their namespace by name (`Store.get(…)`, never `this`)
                  │
         Store.flushSoon()  (debounced)
                  │
-   write  DARRIK Data/users/<me>.json        ◄── only this person's PC writes this file
+   write  MAHAM Data/users/<me>.json        ◄── only this person's PC writes this file
                  ▲
    every 20 s / Refresh: Store.sync() re-reads files whose modified time changed
                  │
@@ -91,4 +91,4 @@ All user text goes through `h()` before it is placed in HTML.
 
 `tools/build.py` checks that every file exists, that every `.js`/`.css` under `src/` is referenced exactly
 once by `index.html`, and that every script passes `node --check`. It then inlines everything, in the same
-order, into `dist/DARRIK/DARRIK.html`.
+order, into `dist/MAHAM/MAHAM.html`.

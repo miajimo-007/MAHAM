@@ -1,4 +1,4 @@
-/* DARRIK — Shadow Works. */
+/* MAHAM — Shadow Works. */
 'use strict';
 
 P.shadow = () => {
@@ -33,6 +33,25 @@ P.shadow = () => {
       rows,
       exportName: 'Shadow Works',
       onRow: true,
+      bulk: [
+        {
+          label: '🗑 Delete…',
+          cls: 'ghost',
+          ok: x => App.canEdit('shadow') && UI.canEditField('shadow', x.r, 'subject'),
+          run: (rows, done) => {
+            UI.confirm(`Delete ${rows.length} shadow work entr${rows.length > 1 ? 'ies' : 'y'}?`, () => {
+              done();
+              UI.saveUndo(
+                rows.map(x => Object.assign({}, x.r, { _del: true })),
+                `${rows.length} deleted`,
+                ''
+              );
+              App.render(true);
+            });
+            return false;
+          },
+        },
+      ],
       cols: [
         { key: 'date', label: 'Date', get: x => U.fmtDate(x.r.date), sortVal: x => x.r.date },
         { key: 'analyst', label: 'Analyst', get: x => Store.memberShort(x.r.analyst) },

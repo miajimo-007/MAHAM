@@ -1,4 +1,4 @@
-/* DARRIK — Browser-local storage: IndexedDB (remembers the chosen folder) and localStorage (per-PC preferences, unsaved-change backup). */
+/* MAHAM — Browser-local storage: IndexedDB (remembers the chosen folder) and localStorage (per-PC preferences, unsaved-change backup). */
 'use strict';
 
 /* ---------------- IndexedDB (remember the folder handle) ---------------- */

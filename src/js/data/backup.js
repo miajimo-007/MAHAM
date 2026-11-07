@@ -1,6 +1,6 @@
-/* DARRIK — Automatic backups of the shared data folder.
+/* MAHAM — Automatic backups of the shared data folder.
  * Once a day, the first person who opens the app saves a zip of every data file into
- * "DARRIK Data/Backups/backup-YYYY-MM-DD.zip" (the last Config.BACKUP_KEEP are kept).
+ * "MAHAM Data/Backups/backup-YYYY-MM-DD.zip" (the last Config.BACKUP_KEEP are kept).
  * Restore (super admin, System Check) puts records back as they were in a backup:
  * every record in the backup gets a fresh time stamp so it wins; records created after the backup are kept. */
 'use strict';
@@ -118,7 +118,7 @@ Object.assign(Store, {
       stamp = Date.now();
     for (const [fname, json] of Object.entries(files)) {
       if (only && only.length && !only.includes(fname)) continue;
-      const owner = fname.slice(0, -5);
+      const owner = Store.fileOwner(fname);
       const back = (json.records || []).filter(
         r => r && r.id && (r._by === owner || /^_old-/.test(owner)) && (!kinds || !kinds.length || kinds.includes(r.c))
       );
@@ -209,10 +209,7 @@ Object.assign(Store, {
       const w = await fh.createWritable();
       await w.write(JSON.stringify(Object.assign({}, json, { updated: U.nowStr(), records: recs })));
       await w.close();
-      if (fname === App.me + '.json') {
-        Store.own = {};
-        for (const r of recs) Store.own[r.id] = r;
-      }
+      Store.ownFromFile(fname, recs);
     }
     await Store.sync(true);
     return n;
@@ -253,10 +250,7 @@ Object.assign(Store, {
       const w = await fh.createWritable();
       await w.write(JSON.stringify(Object.assign({}, json, { updated: U.nowStr(), records: recs })));
       await w.close();
-      if (fname === App.me + '.json') {
-        Store.own = {};
-        for (const r of recs) Store.own[r.id] = r;
-      }
+      Store.ownFromFile(fname, recs);
     }
     await Store.sync(true);
     return n;
@@ -286,7 +280,7 @@ Object.assign(Store, {
       } catch (e) {
         continue;
       }
-      const owner = fname.slice(0, -5);
+      const owner = Store.fileOwner(fname);
       const recs = (json.records || []).flatMap(r => {
         const x = r && xs.find(y => y.id === r.id && (r._ts || 0) === y.ts);
         if (!x) return [r];
@@ -298,10 +292,7 @@ Object.assign(Store, {
       const w = await fh.createWritable();
       await w.write(payload);
       await w.close();
-      if (owner === App.me) {
-        Store.own = {};
-        for (const r of recs) Store.own[r.id] = r;
-      }
+      Store.ownFromFile(fname, recs);
     }
     await Store.sync(true);
     return n;

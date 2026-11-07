@@ -1,4 +1,4 @@
--- DARRIK — online database (Supabase / PostgreSQL). Run once in Supabase → SQL Editor → New query → Run.
+-- MAHAM — online database (Supabase / PostgreSQL). Run once in Supabase → SQL Editor → New query → Run.
 -- The app keeps the same data as in the shared folder: one JSON "file" per person, per company.
 -- Security is enforced here (row-level security), not in the browser:
 --   * people read only their own company's files
@@ -28,7 +28,7 @@ create table if not exists public.company_members (
 -- the data: what used to be files in the shared folder
 create table if not exists public.files (
   company_id  uuid not null references public.companies (id) on delete cascade,
-  path        text not null,            -- e.g. 'DARRIK Data/users/adam.json'
+  path        text not null,            -- e.g. 'MAHAM Data/users/adam.json'
   content     text not null default '',
   size        integer generated always as (octet_length(content)) stored,
   updated_at  timestamptz not null default now(),
@@ -86,21 +86,21 @@ drop policy if exists files_write on public.files;
 create policy files_write on public.files for insert with check (
   public.is_member(company_id) and (
     public.is_owner(company_id)
-    or path = 'DARRIK Data/users/' || public.my_member_id(company_id) || '.json'
-    or path like 'DARRIK Data/Backups/%'
+    or path = 'MAHAM Data/users/' || public.my_member_id(company_id) || '.json'
+    or path like 'MAHAM Data/Backups/%'
   )
 );
 drop policy if exists files_update on public.files;
 create policy files_update on public.files for update using (
   public.is_member(company_id) and (
     public.is_owner(company_id)
-    or path = 'DARRIK Data/users/' || public.my_member_id(company_id) || '.json'
-    or path like 'DARRIK Data/Backups/%'
+    or path = 'MAHAM Data/users/' || public.my_member_id(company_id) || '.json'
+    or path like 'MAHAM Data/Backups/%'
   )
 );
 drop policy if exists files_delete on public.files;
 create policy files_delete on public.files for delete using (
-  public.is_member(company_id) and (public.is_owner(company_id) or path like 'DARRIK Data/Backups/%')
+  public.is_member(company_id) and (public.is_owner(company_id) or path like 'MAHAM Data/Backups/%')
 );
 
 -- ---------------------------------------------------------------------------------------------------------------

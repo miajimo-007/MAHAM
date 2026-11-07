@@ -4,8 +4,8 @@
 
 ```
 <shared folder>/
-  DARRIK.html
-  DARRIK Data/
+  MAHAM.html
+  MAHAM Data/
     users/<memberId>.json     one per person: { version, kind: "user", user, updated, records: [...] }
     Import/                   a place to drop the old Excel files (optional)
     Backups/backup-YYYY-MM-DD.zip   daily copy of users/*.json (last 30 kept; restore in System Check)

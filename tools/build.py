@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Build DARRIK for the shared folder.
+"""Build MAHAM for the shared folder.
 
     python tools/build.py            # check + build dist/
     python tools/build.py --check    # only run the checks
 
 Output
-    dist/DARRIK/DARRIK.html   the whole app in ONE file (this is what goes in the shared folder)
-    dist/DARRIK/READ ME FIRST.txt
-    dist/DARRIK/DARRIK Data/  empty data folder (users/, Import/) for a first install
-    dist/DARRIK_App_<version>.zip
+    dist/MAHAM/MAHAM.html   the whole app in ONE file (this is what goes in the shared folder)
+    dist/MAHAM/READ ME FIRST.txt
+    dist/MAHAM/MAHAM Data/  empty data folder (users/, Import/) for a first install
+    dist/MAHAM_App_<version>.zip
 
 Checks (build stops if any fails)
     - every file referenced by src/index.html exists
@@ -20,8 +20,8 @@ import os, re, sys, shutil, subprocess, zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'src')
 DIST = os.path.join(ROOT, 'dist')
-PKG = os.path.join(DIST, 'DARRIK')
-APP_FILE = 'DARRIK.html'
+PKG = os.path.join(DIST, 'MAHAM')
+APP_FILE = 'MAHAM.html'
 
 def fail(msg):
     print('BUILD FAILED:', msg); sys.exit(1)
@@ -70,19 +70,19 @@ def bundle(html, css, js):
 def build():
     html, css, js, version = check()
     shutil.rmtree(DIST, ignore_errors=True)
-    for d in ('DARRIK Data/users', 'DARRIK Data/Import'): os.makedirs(os.path.join(PKG, d))
+    for d in ('MAHAM Data/users', 'MAHAM Data/Import'): os.makedirs(os.path.join(PKG, d))
     with open(os.path.join(PKG, APP_FILE), 'w', encoding='utf-8') as f: f.write(bundle(html, css, js))
     shutil.copy(os.path.join(ROOT, 'tools', 'READ_ME_FIRST.txt'), os.path.join(PKG, 'READ ME FIRST.txt'))
     pub = os.path.join(ROOT, 'public')   # files served next to the app as they are (settings file, phone install files) — when present
     if os.path.isdir(pub): shutil.copytree(pub, PKG, dirs_exist_ok=True)
-    zpath = os.path.join(DIST, f'DARRIK_App_{version}.zip')
+    zpath = os.path.join(DIST, f'MAHAM_App_{version}.zip')
     with zipfile.ZipFile(zpath, 'w', zipfile.ZIP_DEFLATED) as z:
         for d, dirs, files in os.walk(PKG):
             rel = os.path.relpath(d, DIST)
             if not files and not dirs: z.write(d, rel + '/')
             for f in files: z.write(os.path.join(d, f), os.path.join(rel, f))
     size = os.path.getsize(os.path.join(PKG, APP_FILE))
-    print(f'built dist/DARRIK/{APP_FILE} ({size // 1024} KB) and {os.path.basename(zpath)}')
+    print(f'built dist/MAHAM/{APP_FILE} ({size // 1024} KB) and {os.path.basename(zpath)}')
 
 if __name__ == '__main__':
     check() if '--check' in sys.argv else build()

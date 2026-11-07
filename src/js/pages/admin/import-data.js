@@ -1,4 +1,4 @@
-/* DARRIK — Import Old Data — screen for the old per-sheet Excel files. */
+/* MAHAM — Import Old Data — screen for the old per-sheet Excel files. */
 'use strict';
 
 /* ---------- page ---------- */
@@ -12,7 +12,7 @@ P.importdata = () => {
     'Import old data from Excel (one time)',
     `<ol class="steps">
     <li>Save each sheet of the old workbook as its own Excel file (in Excel: right-click the sheet tab → <b>Move or Copy</b> → <i>(new book)</i> → <b>Create a copy</b>, then save it). Any file name is fine.</li>
-    <li>Put all the files in the <b>Import</b> folder inside <b>DARRIK Data</b> on the shared drive — or pick them below.</li>
+    <li>Put all the files in the <b>Import</b> folder inside <b>MAHAM Data</b> on the shared drive — or pick them below.</li>
     <li>Press <b>Read files</b>, check what was recognised, then press <b>Import</b>.</li></ol>
     <p class="muted small">Sheets used: To Do List (and 2025), Shadow Works, MEDataSource, Attendance, Quick Wins, Riyad FU, Manager Tasks, On-Call Sheet, Courses, IT Directory, EMR Directory, Info &amp; SRS &amp; ECTS, Dashboard (monthly scores), Drops. Calculated sheets (Performance, Details, LazyDays…) are not needed. Importing the same file again does not create duplicates.</p>
     <div class="row-btns"><button class="btn primary" id="impfolder">📁 Read files from the Import folder</button><label class="btn">📄 Pick files…<input type="file" id="impfiles" multiple accept=".xlsx,.csv" hidden></label></div>
@@ -70,7 +70,7 @@ P.importdata = () => {
               files.push({ name, getFile: () => hnd.getFile() });
           if (!files.length) {
             st.innerHTML =
-              '<p class="t-warn">The <b>Import</b> folder (inside DARRIK Data) is empty. Put the Excel files there and press the button again.</p>';
+              '<p class="t-warn">The <b>Import</b> folder (inside MAHAM Data) is empty. Put the Excel files there and press the button again.</p>';
             return;
           }
           run(files.sort((a, b) => a.name.localeCompare(b.name)));

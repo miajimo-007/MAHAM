@@ -1,4 +1,4 @@
-/* DARRIK — "View as" (super admin): see the app exactly as another person sees it, read-only.
+/* MAHAM — "View as" (super admin): see the app exactly as another person sees it, read-only.
  * While previewing, App.preview is set: Store.saveMany refuses every change and Store.flush writes nothing,
  * so nothing can be saved under the other person's name. */
 'use strict';

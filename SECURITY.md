@@ -1,6 +1,6 @@
 # Security
 
-DARRIK runs entirely in the browser and stores data only in the folder the user chooses. It makes no network
+MAHAM runs entirely in the browser and stores data only in the folder the user chooses. It makes no network
 requests. Please report a security problem privately through GitHub's "Report a vulnerability" (Security tab)
 rather than in a public issue.
 

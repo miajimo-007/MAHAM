@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#0e7c86" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="DARRIK" />
+    <meta name="apple-mobile-web-app-title" content="MAHAM" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-    <title>DARRIK</title>
+    <title>MAHAM</title>
     <link rel="stylesheet" href="css/tokens.css" />
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/layout.css" />
@@ -43,7 +43,7 @@
     <!-- Scripts load in dependency order: config → util → data → access → domain → ui → schemas → importers → pages → app.
      Classic scripts (not ES modules) because browsers block modules on pages opened from a folder (file://). -->
     <!-- settings for a hosted copy, kept as a separate file so it can be edited without a rebuild (docs/HOSTING.md) -->
-    <script src="darrik.config.js" data-external></script>
+    <script src="maham.config.js" data-external></script>
     <script src="vendor/jszip.min.js"></script>
     <script src="js/config/seed-data.js"></script>
     <script src="js/config/app-config.js"></script>
@@ -55,15 +55,20 @@
     <script src="js/data/store.js"></script>
     <script src="js/data/folder.js"></script>
     <script src="js/data/sync.js"></script>
+    <script src="js/data/files.js"></script>
     <script src="js/data/backup.js"></script>
     <script src="js/data/people.js"></script>
     <script src="js/domain/custom.js"></script>
+    <script src="js/domain/hdlock.js"></script>
+    <script src="js/domain/goodcatch.js"></script>
     <script src="js/access/permissions.js"></script>
     <script src="js/access/trust.js"></script>
     <script src="js/access/fairness.js"></script>
     <script src="js/domain/metrics.js"></script>
     <script src="js/domain/scoring.js"></script>
     <script src="js/domain/scrum.js"></script>
+    <script src="js/domain/pm.js"></script>
+    <script src="js/domain/pm2.js"></script>
     <script src="js/domain/project-metrics.js"></script>
     <script src="js/domain/flows.js"></script>
     <script src="js/domain/private.js"></script>
@@ -74,7 +79,10 @@
     <script src="js/domain/workflow.js"></script>
     <script src="js/domain/requests.js"></script>
     <script src="js/domain/meetings.js"></script>
+    <script src="js/domain/personal.js"></script>
     <script src="js/domain/admin.js"></script>
+    <script src="js/domain/usage.js"></script>
+    <script src="js/domain/health.js"></script>
     <script src="js/domain/director.js"></script>
     <script src="js/ui/core.js"></script>
     <script src="js/ui/forms.js"></script>
@@ -103,14 +111,18 @@
     <script src="js/pages/follow-up/quickwins.js"></script>
     <script src="js/pages/follow-up/central.js"></script>
     <script src="js/pages/follow-up/oncall.js"></script>
+    <script src="js/pages/admin/usage.js"></script>
     <script src="js/pages/reference/courses.js"></script>
     <script src="js/pages/reference/directory.js"></script>
     <script src="js/pages/reference/info.js"></script>
     <script src="js/pages/work/requests.js"></script>
     <script src="js/pages/work/meetings.js"></script>
+    <script src="js/pages/work/mytasks.js"></script>
     <script src="js/pages/work/announcements.js"></script>
     <script src="js/pages/desks/mgrtasks.js"></script>
     <script src="js/pages/work/projects.js"></script>
+    <script src="js/pages/work/project-pm.js"></script>
+    <script src="js/pages/work/project-pm2.js"></script>
     <script src="js/pages/work/project.js"></script>
     <script src="js/pages/desks/manager.js"></script>
     <script src="js/pages/desks/director.js"></script>
@@ -123,6 +135,7 @@
     <script src="js/pages/admin/admin-tools.js"></script>
     <script src="js/pages/admin/admin-flows.js"></script>
     <script src="js/pages/admin/admin-custom.js"></script>
+    <script src="js/pages/admin/admin-teamrules.js"></script>
     <script src="js/pages/admin/syscheck.js"></script>
     <script src="js/pages/admin/import-data.js"></script>
     <script src="js/pages/about/about.js"></script>

@@ -1,4 +1,4 @@
-/* DARRIK — Customize (Admin → Customize): everything the super admin can change without a new version.
+/* MAHAM — Customize (Admin → Customize): everything the super admin can change without a new version.
  * Kept in the settings record 'settings-custom' (settings are accepted only from a super admin — access/trust.js).
  * The app name and logo stay in 'settings-features' and the About text in 'settings-about' (older copies read them there). */
 'use strict';
@@ -7,11 +7,18 @@ const Custom = {
   ID: 'settings-custom',
   TARGETS: {
     teamScore: { label: 'Team score target', def: 80, unit: '', hint: 'the line on the Performance chart and the banner' },
-    shadowHrs: { label: 'Shadow work target per month', def: 20, unit: 'h', hint: 'shown on My Day' },
+    shadowHrs: { label: 'Shadow work target per month', def: 20, unit: 'h', hint: 'shown on Analyst Desk' },
     hdDays: { label: 'Help desk "open too long" after', def: 3, unit: 'days', hint: 'offered to send to the To Do list' },
     overdueRows: { label: 'Overdue rows on the Manager Desk', def: 8, unit: 'rows', hint: 'the rest behind "All overdue →"' },
+    wlTasks: {
+      label: 'Workload: too many project tasks in a week',
+      def: 5,
+      unit: 'tasks',
+      hint: 'red on Projects → Workload (amber from 60%)',
+    },
+    wlHours: { label: 'Workload: too many estimated hours in a week', def: 30, unit: 'h', hint: 'used once tasks have estimates' },
     greyDays: {
-      label: 'A finished To Do waiting for confirmation stays greyed on My Day for',
+      label: 'A finished To Do waiting for confirmation stays greyed on Analyst Desk for',
       def: 1,
       unit: 'days',
       hint: '1 = until tomorrow',
@@ -47,7 +54,12 @@ const Custom = {
     if (msg) UI.toast(msg, 'good');
   },
   /* ---------- targets ---------- */
-  target(k) {
+  /* a team's own target (Admin → Team rules), else the app-wide one (Customize), else the original */
+  target(k, team) {
+    const tid = team === undefined ? typeof App !== 'undefined' && App.viewTeam : team;
+    const tm = tid && typeof Store !== 'undefined' && Store.teams ? Store.teams().find(x => x.id === tid) : null;
+    const tv = tm && tm.targets ? +tm.targets[k] : 0;
+    if (tv > 0) return tv;
     const t = Custom.get('targets', {});
     const v = +t[k];
     return v > 0 ? v : Custom.TARGETS[k].def;
@@ -65,7 +77,7 @@ const Custom = {
         .join('/') || 'no weekend'
     );
   },
-  /* ---------- tagline, welcome, start page, My Day tiles ---------- */
+  /* ---------- tagline, welcome, start page, Analyst Desk tiles ---------- */
   tagline() {
     return Custom.get('tagline', 'Every Effort Matters.');
   },
@@ -83,6 +95,7 @@ const Custom = {
   /* ---------- menu ---------- */
   navLabel(k, d) {
     const n = Custom.get('nav', {})[k];
+    if (k === 'info' && n && /srs|e-?cts/i.test(n.label || '')) return d; // an old "Info & SRS" name is replaced
     return (n && n.label) || d;
   },
   navIcon(k, d) {
@@ -90,7 +103,7 @@ const Custom = {
     return (n && n.icon) || d;
   },
   groupName(g) {
-    return Custom.get('groups', {})[g] || g;
+    return Custom.get('groups', {})[g] || (Config.NAV_NAMES || {})[g] || g;
   },
   navItems(g, items) {
     // items = [[key, label, icon]] → renamed, re-iconed and in the saved order
@@ -248,7 +261,7 @@ const Custom = {
       return o;
     };
     return {
-      kind: 'darrik-customize',
+      kind: 'maham-customize',
       version: APP_VERSION,
       saved: new Date().toISOString(),
       custom: strip(Store.get(Custom.ID)),
@@ -257,7 +270,7 @@ const Custom = {
     };
   },
   restore(b) {
-    if (!b || b.kind !== 'darrik-customize') throw new Error('Not a DARRIK customize file');
+    if (!b || b.kind !== 'maham-customize') throw new Error('Not a MAHAM customize file');
     const recs = [];
     if (b.custom) recs.push(Object.assign({}, b.custom, { id: Custom.ID, c: 'settings' }));
     if (b.brand)

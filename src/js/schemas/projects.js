@@ -1,4 +1,4 @@
-/* DARRIK — Record types: director task, project, sprint, project task. */
+/* MAHAM — Record types: director task, project, sprint, project task. */
 'use strict';
 
 Object.assign(Schemas, {
@@ -56,6 +56,7 @@ Object.assign(Schemas, {
       status: 'Not Started',
       priority: 'Normal',
       progress: 0,
+      mode: 'kanban',
       team: (Scrum.teamOptions().find(t => t.id === App.viewTeam) || Scrum.teamOptions()[0] || {}).id || 'apps',
       manager: App.isDir() || App.isSuper() ? '' : App.me,
       members: [],
@@ -77,6 +78,31 @@ Object.assign(Schemas, {
       { dir: true, key: 'start', label: 'Start date', type: 'date' },
       { dir: true, key: 'due', label: 'Target date', type: 'date' },
       { dir: true, key: 'description', label: 'Description / scope', type: 'textarea', span: 2, rows: 2 },
+      { dir: true, key: 'goal', label: 'Goal (why we do it)', type: 'textarea', span: 2, rows: 2 },
+      { dir: true, key: 'outScope', label: 'Out of scope', type: 'textarea', span: 2, rows: 2 },
+      { dir: true, key: 'success', label: 'Success criteria (how we know it worked)', type: 'textarea', span: 2, rows: 2 },
+      {
+        dir: true,
+        key: 'sponsor',
+        label: 'Sponsor',
+        type: 'list',
+        options: () =>
+          Store.visible()
+            .filter(m => m.active !== false)
+            .map(m => Store.memberShort(m.id)),
+        placeholder: 'pick or type a name',
+      },
+      {
+        dir: true,
+        key: 'mode',
+        label: 'How the work is run',
+        type: 'select',
+        options: [
+          ['kanban', 'Kanban — To do / Doing / Done (simple)'],
+          ['scrum', 'Scrum — sprints with points'],
+        ],
+        blank: false,
+      },
       {
         dir: true,
         key: 'workflow',
@@ -185,15 +211,41 @@ Object.assign(Schemas, {
             .map(s => [s.id, s.name + (s.status === 'Active' ? ' (active)' : '')]),
         blank: 'Backlog',
       },
+      { mgr: true, key: 'start', label: 'Start date', type: 'date' },
       { mgr: true, key: 'due', label: 'Due date', type: 'date' },
+      { mgr: true, key: 'est', label: 'Estimated hours', type: 'number', min: 0, step: 0.5 },
+      { key: 'actual', label: 'Actual hours', type: 'number', min: 0, step: 0.5, hint: 'fill in when it is done' },
+      {
+        mgr: true,
+        key: 'parent',
+        label: 'Subtask of',
+        type: 'select',
+        options: () =>
+          Scrum.items(UI._recProject)
+            .filter(t => t.id !== (UI._recBase || {}).id && !t.parent)
+            .map(t => [t.id, ptKey(t) + ' · ' + t.title]),
+        blank: '— not a subtask —',
+      },
+      {
+        mgr: true,
+        key: 'after',
+        label: 'Starts after (depends on)',
+        type: 'select',
+        options: () => Scrum.items(UI._recProject).map(t => [t.id, ptKey(t) + ' · ' + t.title]),
+        blank: '— nothing —',
+      },
       { key: 'status', label: 'Status', type: 'select', options: () => Scrum.columns(Scrum.proj(UI._recProject)), blank: false },
       { mgr: true, key: 'description', label: 'Description / acceptance criteria', type: 'textarea', span: 2, rows: 3 },
       { key: 'comment', label: 'Update / notes', type: 'textarea', span: 2, rows: 2 },
     ],
+    onFormMount: (form, base) => PM2V.taskPanel(form, base),
     beforeSave(r, before) {
       const p = Scrum.proj(r.project);
       if (p) r.team = p.team;
       r.points = +r.points || 0;
+      if (PM2V.draft && PM2V.draft.id === (before && before.id ? before.id : '') && document.querySelector('.ptx'))
+        r.checklist = PM2V.draft.list.slice(); // the checklist edited in the open form
+      if (r.parent === r.id) r.parent = '';
       if (!before || !before.id) r.createdOn = r.createdOn || U.todayStr();
       if (!r.startedOn && (Scrum.isDone(r) || Scrum.colIndex(r) > 0)) r.startedOn = U.todayStr();
       if (Scrum.isDone(r) && !r.doneDate) r.doneDate = U.todayStr();
@@ -201,4 +253,148 @@ Object.assign(Schemas, {
       if (!r.n) r.n = Scrum.items(r.project).reduce((a, t) => Math.max(a, t.n || 0), 0) + 1;
     },
   },
+  /* project management: phases & milestones, risks / issues / decisions / actions, weekly status updates */
+  pphase: {
+    single: 'Phase or milestone',
+    canCreate: () => true,
+    canDelete: r => Scrum.planner(Scrum.proj(r.project)),
+    readOnly: r => !Scrum.planner(Scrum.proj(r.project)),
+    defaults: () => ({ kind: 'phase', status: 'Planned' }),
+    fields: [
+      {
+        key: 'kind',
+        label: 'Kind',
+        type: 'select',
+        options: [
+          ['phase', 'Phase (a stretch of time)'],
+          ['milestone', '◆ Milestone (a date to reach)'],
+        ],
+        blank: false,
+      },
+      { key: 'name', label: 'Name', type: 'text', required: true, span: 2 },
+      { key: 'start', label: 'Start', type: 'date', showIf: r => r.kind !== 'milestone' },
+      { key: 'end', label: 'Planned end / date', type: 'date', required: true },
+      { key: 'status', label: 'Status', type: 'select', options: ['Planned', 'In progress', 'Done'], blank: false },
+      { key: 'doneOn', label: 'Actually finished', type: 'date' },
+      { key: 'notes', label: 'Notes', type: 'textarea', span: 2, rows: 2 },
+    ],
+    beforeSave(r) {
+      const p = Scrum.proj(r.project);
+      if (p) r.team = p.team;
+      if (r.status === 'Done' && !r.doneOn) r.doneOn = U.todayStr();
+      if (r.kind === 'milestone') r.start = '';
+    },
+  },
+  praid: {
+    single: 'Risk / issue / decision',
+    canCreate: () => true,
+    canDelete: r => Scrum.planner(Scrum.proj(r.project)) || r.createdBy === App.me,
+    readOnly: r => !!r.id && !(Scrum.planner(Scrum.proj(r.project)) || Scrum.member(Scrum.proj(r.project))),
+    defaults: () => ({ kind: 'Risk', status: 'Open', impact: '2', likelihood: '2' }),
+    fields: [
+      { key: 'kind', label: 'Type', type: 'select', options: ['Risk', 'Issue', 'Decision', 'Action'], blank: false },
+      { key: 'title', label: 'What', type: 'text', required: true, span: 2 },
+      {
+        key: 'impact',
+        label: 'Impact',
+        type: 'select',
+        options: [
+          ['1', '1 · low'],
+          ['2', '2 · medium'],
+          ['3', '3 · high'],
+        ],
+        blank: false,
+        showIf: r => r.kind === 'Risk' || r.kind === 'Issue',
+      },
+      {
+        key: 'likelihood',
+        label: 'Likelihood',
+        type: 'select',
+        options: [
+          ['1', '1 · unlikely'],
+          ['2', '2 · possible'],
+          ['3', '3 · likely'],
+        ],
+        blank: false,
+        showIf: r => r.kind === 'Risk',
+      },
+      {
+        key: 'owner',
+        label: 'Owner',
+        type: 'list',
+        options: () =>
+          Store.visible()
+            .filter(m => m.active !== false)
+            .map(m => Store.memberShort(m.id)),
+      },
+      { key: 'due', label: 'Due / review date', type: 'date' },
+      { key: 'status', label: 'Status', type: 'select', options: ['Open', 'Closed'], blank: false },
+      { key: 'notes', label: 'Mitigation / details', type: 'textarea', span: 2, rows: 3 },
+    ],
+    beforeSave(r) {
+      const p = Scrum.proj(r.project);
+      if (p) r.team = p.team;
+      if (!r.createdBy) r.createdBy = App.me;
+      if (r.status === 'Closed' && !r.closedOn) r.closedOn = U.todayStr();
+    },
+  },
+  pstatus: {
+    single: 'Weekly status update',
+    canCreate: () => true,
+    canDelete: r => r.by === App.me || App.isSuper(),
+    readOnly: r => !!r.id && r.by !== App.me,
+    defaults: () => ({ date: U.todayStr(), health: 'green' }),
+    fields: [
+      { key: 'date', label: 'Week of', type: 'date', required: true },
+      {
+        key: 'health',
+        label: 'Health',
+        type: 'select',
+        options: [
+          ['green', '🟢 On track'],
+          ['amber', '🟡 At risk'],
+          ['red', '🔴 Off track'],
+        ],
+        blank: false,
+      },
+      { key: 'done', label: 'Done this week', type: 'textarea', span: 2, rows: 3 },
+      { key: 'next', label: 'Next week', type: 'textarea', span: 2, rows: 3 },
+      { key: 'blockers', label: 'Blockers / help needed', type: 'textarea', span: 2, rows: 2 },
+    ],
+    beforeSave(r) {
+      const p = Scrum.proj(r.project);
+      if (p) r.team = p.team;
+      r.by = r.by || App.me;
+    },
+  },
+  /* project requests: anyone suggests a project; the team's manager / director decides */
+  preq: {
+    single: 'Project suggestion',
+    canCreate: () => true,
+    canDelete: r => (r.createdBy === App.me && r.status === PM2.REQ.P) || App.isSuper(),
+    readOnly: r => !!r.id && !(r.createdBy === App.me && r.status === PM2.REQ.P) && !App.isSuper(),
+    defaults: () => ({ status: 'Waiting', urgency: 'Normal' }),
+    formExtra: r =>
+      r.decidedBy
+        ? `<p class="note">${h(r.status)} by ${h(Store.memberShort(r.decidedBy))} on ${U.fmtDate(r.decidedOn)}${r.note ? ' — “' + h(r.note) + '”' : ''}</p>`
+        : '',
+    fields: [
+      { key: 'title', label: 'Project name / idea', type: 'text', required: true, span: 2 },
+      { key: 'problem', label: 'The problem (why)', type: 'textarea', span: 2, rows: 3, required: true },
+      { key: 'benefit', label: 'Expected benefit (how we will know it worked)', type: 'textarea', span: 2, rows: 2 },
+      { key: 'dept', label: 'For which department / users', type: 'text' },
+      { key: 'urgency', label: 'Urgency', type: 'select', options: ['High', 'Normal', 'Low'], blank: false },
+      { key: 'team', label: 'Team', type: 'select', options: () => Store.teams().map(t => [t.id, t.name]), blank: false },
+    ],
+    beforeSave(r) {
+      if (!r.at) r.at = Date.now();
+    },
+  },
+  ptemplate: {
+    single: 'Project template',
+    canCreate: () => PM2.canTemplate(),
+    canDelete: () => PM2.canTemplate(),
+    fields: [{ key: 'name', label: 'Name', type: 'text', required: true, span: 2 }],
+  },
+  pcomment: { single: 'Comment', canCreate: () => true, fields: [{ key: 'text', label: 'Comment', type: 'textarea', span: 2 }] },
 });

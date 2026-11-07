@@ -1,9 +1,12 @@
-/* DARRIK — Announcements board: only the super admin posts; everyone reads; the admin sees who has read each one.
+/* MAHAM — Announcements board: only the super admin posts; everyone reads; the admin sees who has read each one.
  * announcement { title, body, audience: [] (empty = everyone) | [teamIds], pinned, until, posted }
  * annread      { ann, at }   — one per person per announcement (id annread-<person>-<announcement>) */
 'use strict';
 
 const Ann = {
+  canPost() {
+    return App.isSuper() || App.can('postAnnouncements');
+  },
   forMe(m) {
     const me = Store.member(App.me) || {};
     const a = m.audience || [];
@@ -41,7 +44,7 @@ const Ann = {
   },
 };
 
-/* unread announcements at the top of My Day and the desks */
+/* unread announcements at the top of Analyst Desk and the desks */
 function annBanner() {
   const u = Ann.unread();
   if (!u.length) return '';
@@ -116,8 +119,9 @@ function annDialog(a) {
 }
 
 P.announcements = () => {
-  const list = Ann.list();
-  const admin = App.isSuper();
+  const fa = ps('ann');
+  const list = Ann.list().filter(a => !fa.month || inMonth(a.posted, fa.month));
+  const admin = Ann.canPost();
   const row = a => {
     const aud = admin ? Ann.audience(a) : [];
     const readers = aud.filter(m => Ann.isRead(a, m.id));
@@ -126,7 +130,7 @@ P.announcements = () => {
       <div class="row-btns tight">${(a.audience || []).length ? `<span class="muted small">For: ${h(a.audience.map(t => Store.teamName(t)).join(', '))}</span>` : '<span class="muted small">For everyone</span>'}<span class="grow"></span>
         ${admin ? `<span class="small">${readers.length} of ${aud.length} read</span> <button class="btn xs ghost" data-annwho="${h(a.id)}">Who</button> <button class="btn xs" data-annedit="${h(a.id)}">Edit</button>` : Ann.isRead(a) ? UI.badge('read', 'good') : `<button class="btn xs primary" data-annread="${h(a.id)}">Got it</button>`}</div></section>`;
   };
-  const html = `<div class="page-actions"><span class="muted small">${admin ? 'Only you can post. Everyone sees new announcements at the top of their start page until they press "Got it".' : 'News from the administrator.'}</span><span class="grow"></span>${admin ? '<button class="btn primary" id="newann">＋ New announcement</button>' : ''}</div>
+  const html = `<div class="page-actions">${filterBar('ann', [{ key: 'month', type: 'month' }])}<span class="muted small">${admin ? 'Only you and people given “Post announcements” can post. Everyone sees new announcements at the top of their start page until they press "Got it".' : 'News from the administrator.'}</span><span class="grow"></span>${admin ? '<button class="btn primary" id="newann">＋ New announcement</button>' : ''}</div>
     ${list.map(row).join('') || empty('No announcements yet.')}`;
   return {
     title: 'Announcements',

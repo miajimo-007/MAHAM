@@ -1,4 +1,4 @@
-/* DARRIK — Connecting to the shared folder (File System Access API) and remembering it between visits. */
+/* MAHAM — Connecting to the shared folder (File System Access API) and remembering it between visits. */
 'use strict';
 
 Object.assign(Store, {
@@ -71,7 +71,7 @@ Object.assign(Store, {
   },
   async useRoot(h) {
     // Accept either the app folder (containing /data) or the data folder itself.
-    // Any folder works: the app keeps its data in a "DARRIK Data" subfolder (created automatically).
+    // Any folder works: the app keeps its data in a "MAHAM Data" subfolder (created automatically).
     let dataDir = null;
     if (/^(data|ehr team data)$/i.test(h.name)) dataDir = h;
     if (!dataDir) {

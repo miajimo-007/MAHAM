@@ -1,4 +1,4 @@
-/* DARRIK — Main layout (menu, top bar) and keeping data fresh: save, refresh, polling, update notice. */
+/* MAHAM — Main layout (menu, top bar) and keeping data fresh: save, refresh, polling, update notice. */
 'use strict';
 
 Object.assign(App, {
@@ -15,30 +15,13 @@ Object.assign(App, {
           new Date().getFullYear(),
           ...Store.all('todo').map(r => U.year(r.assigned)),
           ...Store.all('helpdesk').map(r => U.year(r.created)),
+          ...Store.archiveYears,
         ].filter(Boolean)
       ),
-    ].sort((a, b) => b - a);
+    ].sort((a, b) => b - a); // + years kept in archive files
     UI.$('#app').innerHTML =
       `<aside class="side"><div class="brand">${Store.logoHtml()}<div><b id="brandapp">${U.h(Store.appName())}</b><small id="brandteam">${U.h(Store.teamName(App.viewTeam))}</small></div></div>
-      <nav>${App.isSuper() ? `<div class="nav-g">Admin</div><a href="#/admin" data-nav="admin"><span class="ni">⛨</span>Admin</a><a href="#/syscheck" data-nav="syscheck"><span class="ni">✓</span>System Check</a>${App.isDir() ? '' : `<a href="#/importdata" data-nav="importdata"><span class="ni">⇪</span>Import Old Data</a><div class="nav-g">Desks</div><a href="#/director" data-nav="director"><span class="ni">★</span>Director Desk</a><a href="#/manager" data-nav="manager"><span class="ni">★</span>Manager Desk</a><a href="#/overview" data-nav="overview"><span class="ni">▤</span>All Teams Overview</a><a href="#/mgrtasks" data-nav="mgrtasks"><span class="ni">✦</span>Tasks from Director</a><a href="#/projects" data-nav="projects"><span class="ni">◈</span>Projects</a><a href="#/helpdesk/import" data-nav="hdimport"><span class="ni">⇪</span>ManageEngine Import</a>`}` : ''}${
-        App.isDir()
-          ? `<div class="nav-g">${App.isAED() ? 'AED' : 'Director'}</div><a href="#/home" data-nav="home"><span class="ni">★</span>${App.isAED() ? 'AED Desk' : 'Director Desk'}</a>${App.pageAllowed('projects') ? '<a href="#/projects" data-nav="projects"><span class="ni">◈</span>Projects</a>' : ''}${App.isSuper() ? '<a href="#/importdata" data-nav="importdata"><span class="ni">⇪</span>Import Old Data</a>' : ''}`
-          : (Store.member(App.me) || {}).role === 'teamleader'
-            ? `<div class="nav-g">Team leader</div>${App.can('importME') ? '<a href="#/helpdesk/import" data-nav="hdimport"><span class="ni">⇪</span>ManageEngine Import</a>' : ''}${App.can('editAttendanceOthers') ? '<a href="#/attendance" data-nav="attendance-tl"><span class="ni">▦</span>Team Attendance</a>' : ''}`
-            : App.isMgr()
-              ? `<div class="nav-g">Manager</div><a href="#/home" data-nav="home"><span class="ni">★</span>Manager Desk</a>${App.pageAllowed('projects') ? '<a href="#/projects" data-nav="projects"><span class="ni">◈</span>Projects</a>' : ''}${App.pageAllowed('mgrtasks') ? '<a href="#/mgrtasks" data-nav="mgrtasks"><span class="ni">✦</span>Tasks from Director</a>' : ''}`
-              : ''
-      }${App.isActing() ? `<div class="nav-g">Acting manager</div><a href="#/manager" data-nav="manager" data-actmgr><span class="ni">★</span>Manager Desk</a><a href="#/mgrtasks" data-nav="mgrtasks" data-actmgr><span class="ni">✦</span>Tasks from Director</a>` : ''}${Config.NAV.map(
-        ([g, all]) => {
-          const items = Custom.navItems(g, all).filter(([k]) => !(k === 'home' && App.isMgr()) && App.pageAllowed(k));
-          const extraProj = g === 'Work' && !App.isMgr() && !App.isSuper() && !App.isDir() && App.pageAllowed('projects');
-          return !items.length && !extraProj
-            ? ''
-            : `<div class="nav-g">${U.h(Custom.groupName(g))}</div>${items.map(([k, l, i]) => `<a href="#/${k}${k === 'requests' && !Requests.canRaise() ? '/approve' : ''}" data-nav="${k}"><span class="ni">${i}</span>${l}${k === 'announcements' && Ann.unread().length ? ` <span class="count">${Ann.unread().length}</span>` : ''}</a>`).join('')}${extraProj ? '<a href="#/projects" data-nav="projects"><span class="ni">◈</span>Projects</a>' : ''}`;
-        }
-      ).join(
-        ''
-      )}<div class="nav-g">${U.h(Store.appName())}</div><a href="#/feedback" data-nav="feedback"><span class="ni">💡</span>Feedback</a><a href="#/about" data-nav="about"><span class="ni">✦</span>About ${U.h(Store.appName())}</a></nav>
+      ${App.navHtml()}
       <div class="side-foot"><button class="me" id="mebtn" title="Switch person"><span class="av">${U.h(Store.memberShort(App.me).slice(0, 1))}</span><span><b>${U.h(Store.memberShort(App.me))}</b><small>${U.h(Store.titleOf(App.me))} · switch · PIN</small></span></button></div></aside>
       <div class="mainwrap"><header class="top"><button class="icon-btn menu" id="menubtn" aria-label="Menu">☰</button><h1 id="ptitle"></h1><span class="grow"></span>
         ${
@@ -81,9 +64,10 @@ Object.assign(App, {
         if (App.page === 'home') location.hash = '#/manager';
         else App.render();
       };
-    UI.$('#yearsel').onchange = e => {
+    UI.$('#yearsel').onchange = async e => {
       App.year = +e.target.value;
       LS.set('bct.year', App.year);
+      if (await Store.ensureYears([App.year])) UI.toast(`${App.year} loaded from the archive`, 'good');
       App.render();
     };
     UI.$('#refresh').onclick = () => App.refresh(true);
@@ -118,7 +102,7 @@ Object.assign(App, {
   others() {
     const o = {};
     for (const [k, v] of Object.entries(Store.sources))
-      if (k.startsWith('u:') && k !== 'u:' + App.me + '.json') o[k.slice(2, -5)] = v.mtime;
+      if (Store.isMainKey(k) && k !== 'u:' + App.me + '.json') o[k.slice(2, -5)] = v.mtime;
     return o;
   },
   async refresh(manual) {
@@ -178,7 +162,7 @@ Object.assign(App, {
       const lg = Store.appLogo();
       l.href =
         lg ||
-        `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='#0f766e'/><text x='16' y='23' font-family='Segoe UI,Arial' font-size='19' font-weight='700' fill='white' text-anchor='middle'>${Store.appName().slice(0, 1).toUpperCase()}</text></svg>`)}`;
+        `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='#0f766e'/><text x='16' y='23' font-size='19' text-anchor='middle'>${APP_MARK}</text></svg>`)}`;
     } catch (e) {
       /* */
     }
@@ -189,7 +173,7 @@ Object.assign(App, {
       want.push([
         'bnold',
         'bad',
-        `⛔ <b>This copy of the app is out of date (${U.h(APP_VERSION)}) — it can't save any more.</b> Close it, delete it, and copy the new <b>DARRIK.html</b> from the shared folder (version ${U.h(Store.minVersion())} or newer).`,
+        `⛔ <b>This copy of the app is out of date (${U.h(APP_VERSION)}) — it can't save any more.</b> Close it, delete it, and copy the new <b>MAHAM.html</b> from the shared folder (version ${U.h(Store.minVersion())} or newer).`,
       ]);
     if (Store.lastError && Store.dirty)
       want.push([
@@ -239,9 +223,9 @@ Object.assign(App, {
   },
   myFileName() {
     try {
-      return decodeURIComponent(location.pathname.split('/').pop()) || 'DARRIK.html';
+      return decodeURIComponent(location.pathname.split('/').pop()) || 'MAHAM.html';
     } catch (e) {
-      return 'DARRIK.html';
+      return 'MAHAM.html';
     }
   },
   /* is there a newer copy of the app in the shared folder? (people run a Desktop copy) */
@@ -249,7 +233,7 @@ Object.assign(App, {
     try {
       if (!Store.root) return;
       let newest = '',
-        newestName = 'DARRIK.html';
+        newestName = 'MAHAM.html';
       for await (const [name, hnd] of Store.root.entries()) {
         if (hnd.kind !== 'file' || !/\.html?$/i.test(name)) continue;
         const f = await hnd.getFile();
@@ -304,9 +288,20 @@ Object.assign(App, {
     App.renderSync();
   },
   renderSync() {
+    if (Store._newYears) {
+      Store._newYears = false;
+      const ys = UI.$('#yearsel');
+      if (ys) {
+        const have = new Set([...ys.options].map(o => +o.value));
+        for (const y of Store.archiveYears) if (!have.has(y)) ys.add(new Option(String(y), String(y)));
+        [...ys.options].sort((a, b) => b.value - a.value).forEach(o => ys.appendChild(o));
+        ys.value = String(App.year);
+      }
+    } // years found in archive files
     App.banners();
     App.navCounts();
     if (App.menuCounts) App.menuCounts();
+    App.navSections();
     const el = UI.$('#syncst');
     const sb = UI.$('#savebtn');
     if (sb && !sb.disabled) {
@@ -321,3 +316,64 @@ Object.assign(App, {
     else el.innerHTML = `<span class="dot good"></span>${Store.lastSaved ? 'Saved ' + U.fmtTs(Store.lastSaved).slice(-5) : 'Up to date'}`;
   },
 });
+
+/* ---------- the menu: Home, My Work, Follow-up, Projects, Team & Time, Performance, Reference; ⚙ Admin at the bottom ---------- */
+App.navHtml = function () {
+  const a = (href, key, icon, label, extra) =>
+    `<a href="${href}" data-nav="${key}"${extra || ''}><span class="ni">${icon}</span>${label}</a>`;
+  const role = (Store.member(App.me) || {}).role;
+  const tl = role === 'teamleader';
+  const deskName = App.isDir() ? (App.isAED() ? 'AED Desk' : 'Director Desk') : App.isMgr() ? 'Manager Desk' : null;
+  const groups = Config.NAV.map(([g, all]) => {
+    const meta = Object.fromEntries(all.map(x => [x[0], x[3] || {}]));
+    const items = Custom.navItems(g, all)
+      .filter(([k]) => {
+        const m = meta[k] || {};
+        if (m.superOnly && !App.isSuper()) return false;
+        if (m.mgr && !(App.isMgr() || App.isSuper())) return false;
+        return App.pageAllowed(m.page || k);
+      })
+      .map(([k, l, i]) => {
+        const m = meta[k] || {};
+        if (k === 'home') return a('#/home', 'home', deskName ? '★' : i, deskName && l === 'Analyst Desk' ? deskName : l);
+        if (k === 'requests')
+          return `<a href="#/requests${!Requests.canRaise() ? '/approve' : ''}" data-nav="requests"><span class="ni">${i}</span>${l}</a>`;
+        return a(
+          m.href || '#/' + k,
+          k,
+          i,
+          l + (k === 'announcements' && Ann.unread().length ? ` <span class="count">${Ann.unread().length}</span>` : '')
+        );
+      });
+    // extra links some people have
+    if (g === 'Home') {
+      if (App.isSuper() && !App.isDir())
+        items.push(a('#/manager', 'manager', '★', 'Manager Desk'), a('#/director', 'director', '★', 'Director Desk'));
+      if (App.isActing()) items.push(a('#/manager', 'manager', '★', 'Manager Desk (acting manager)', ' data-actmgr'));
+    }
+    if (g === 'Work' && (App.isSuper() || (tl && App.can('importME'))) && !App.isDir())
+      items.push(a('#/helpdesk/import', 'hdimport', '⇪', 'ManageEngine Import'));
+    if (g === 'Follow-up' && App.isActing() && !App.isMgr() && !App.isSuper())
+      items.push(a('#/mgrtasks', 'mgrtasks', '✦', 'Tasks from Director (acting)', ' data-actmgr'));
+    if (g === 'Team' && tl && App.can('editAttendanceOthers')) items.push(a('#/attendance', 'attendance-tl', '▦', 'Team Attendance'));
+    return { g, items };
+  }).filter(x => x.items.length);
+  /* each section is one link (it opens the page last used there); its pages show as tabs at the top of the page.
+   * The pages' links stay in the menu, folded away, so counts and permissions work the same as before. */
+  const sec = (g, label, icon, items) =>
+    `<a class="sec" data-sec="${U.h(g)}" href="${items[0].match(/href="([^"]+)"/)[1]}"><span class="ni">${icon}</span><span class="sec-l">${U.h(label)}</span><span class="count sec-n" hidden></span></a><div class="nav-items" aria-hidden="true">${items.join('').replace(/<a /g, '<a tabindex="-1" ')}</div>`;
+  const homeName = deskName || Custom.groupName('Home');
+  const body = groups
+    .map(x =>
+      sec(x.g, x.g === 'Home' ? homeName : Custom.groupName(x.g), x.g === 'Home' && deskName ? '★' : Config.NAV_ICONS[x.g] || '•', x.items)
+    )
+    .join('');
+  const admin = App.isSuper()
+    ? sec('Admin', 'Admin', '⚙', [
+        a('#/admin', 'admin', '⛨', 'Admin'),
+        a('#/syscheck', 'syscheck', '✓', 'System Check'),
+        ...(App.isDir() ? [] : [a('#/importdata', 'importdata', '⇪', 'Import Old Data')]),
+      ])
+    : '';
+  return `<nav>${body}<div class="nav-bottom">${admin}<div class="nav-mini">${a('#/feedback', 'feedback', '💡', 'Feedback')}${a('#/about', 'about', '✦', 'About ' + U.h(Store.appName()))}</div></div></nav>`;
+};

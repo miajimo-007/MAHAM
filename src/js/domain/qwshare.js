@@ -1,4 +1,4 @@
-/* DARRIK — Shared quick wins: the analyst who adds a quick win ticks "Worked on with"; each teammate confirms
+/* MAHAM — Shared quick wins: the analyst who adds a quick win ticks "Worked on with"; each teammate confirms
  * (qwjoin-<qw>-<id> { qw, by, ans: 'yes' | 'no' }, saved in their own file). Everyone on it can edit it; one approval and
  * one QW ID; each confirmed analyst gets it in their own score, the team counts it once. The person who added it can
  * delete it (until approved); a teammate leaves with "Remove me". */
@@ -55,7 +55,7 @@ const QS = {
       .map(id => `${h(Store.memberShort(id))} (${st(id)})`)
       .join(', ')}${mine ? ' <button class="btn xs ghost" data-qwleave>Remove me</button>' : ''}</p>`;
   },
-  /* My Day: quick wins I was added to */
+  /* Analyst Desk: quick wins I was added to */
   card() {
     const l = QS.pendingForMe();
     if (!l.length) return '';

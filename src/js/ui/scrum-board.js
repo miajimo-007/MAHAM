@@ -1,4 +1,4 @@
-/* DARRIK — Scrum board pieces: task cards, moving tasks, drag & drop, burndown chart. */
+/* MAHAM — Scrum board pieces: task cards, moving tasks, drag & drop, burndown chart. */
 'use strict';
 
 const ptKey = t => '#' + (t.n || '');
@@ -14,7 +14,7 @@ function ptCard(t, p, opts = {}) {
   const take = !t.assignee && Scrum.member(p) && !Scrum.planner(p);
   return `<div class="pcard pr-${U.lc(t.priority || 'normal')}" ${work ? `draggable="true" data-drag="${h(t.id)}"` : ''} data-edit="ptask|${h(t.id)}">
     <div class="pc-top"><span class="pc-type t-${['story', 'task', 'bug'].includes(U.lc(t.type || 'task')) ? U.lc(t.type || 'task') : 'other'}" title="${h(t.type || 'Task')}">${typeIcon(t.type)}</span><span class="muted small mono">${h(ptKey(t))}</span>${opts.project ? `<span class="muted small">· ${h(p.name)}</span>` : ''}<span class="grow"></span>${t.points ? `<span class="pts" title="Story points">${h(t.points)}</span>` : ''}</div>
-    <div class="pc-title">${h(t.title)}${t.milestone ? ' <span class="tag-ms" title="Milestone">⭐</span>' : ''}</div>
+    <div class="pc-title">${h(t.title)}${t.milestone ? ' <span class="tag-ms" title="Milestone">⭐</span>' : ''}</div>${typeof PM2 !== 'undefined' ? PM2.badges(t) : ''}
     <div class="pc-foot">${t.assignee ? `<span class="av sm" title="${h(Store.memberName(t.assignee))}">${h((Store.memberShort(t.assignee) || '?').slice(0, 1))}</span><span class="small">${h(Store.memberShort(t.assignee))}</span>` : '<span class="muted small">Unassigned</span>'}${t.due ? `<span class="small ${late ? 't-bad strong' : 'muted'}">· ${U.fmtDate(t.due)}</span>` : ''}<span class="grow"></span>
       ${take ? `<button class="btn xs" data-take="${h(t.id)}">Take it</button>` : ''}
       ${work && i > 0 ? `<button class="btn xs ghost" data-mv="${h(t.id)}|-1" title="Move back">◀</button>` : ''}${work && i < last ? `<button class="btn xs ${i === last - 1 ? 'primary' : ''}" data-mv="${h(t.id)}|1" title="Move to ${h(cols[i + 1])}">${i === last - 1 ? '✓ ' + h(cols[last]) : '▶'}</button>` : ''}</div></div>`;

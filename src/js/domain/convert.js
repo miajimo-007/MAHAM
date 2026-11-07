@@ -1,4 +1,4 @@
-/* DARRIK — Convert a record between To Do, Shadow work and Quick win.
+/* MAHAM — Convert a record between To Do, Shadow work and Quick win.
  * The new type's form opens filled in; on save the original is deleted from its area and the new record keeps
  * convertedFrom { c, id, title, date, by, at } ("Converted from To Do"). Undo within 15 minutes brings the original back.
  * Rules: analysts convert their own Shadow work ⇄ Quick win; anything to or from a To Do needs a manager / team leader;

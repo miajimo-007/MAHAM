@@ -1,4 +1,4 @@
-/* DARRIK — Directory: IT contacts (with team and "Reports to" → hierarchy and org chart), hospital Users
+/* MAHAM — Directory: IT contacts (with team and "Reports to" → hierarchy and org chart), hospital Users
  * (pharmacy, nursing, physicians …; departments set by the administrator) and the EMR ward contacts.
  * Everyone can look and search; editing is the Directory function's "Edit" level, which the administrator gives
  * (Admin → person / team → Functions). */
@@ -19,7 +19,7 @@ const DirX = {
   /* who reports to this contact (index rebuilt when the data changes) */
   kidsMap() {
     const all = DirX.it();
-    if (DirX._km && DirX._kmOf === all) return DirX._km;
+    if (DirX._km && DirX._kmOf === Store.ver) return DirX._km;
     const m = new Map();
     for (const r of all)
       if (r.reportsTo) {
@@ -27,7 +27,7 @@ const DirX = {
         m.get(r.reportsTo).push(r);
       }
     DirX._km = m;
-    DirX._kmOf = all;
+    DirX._kmOf = Store.ver;
     return m;
   },
   reports(id) {
@@ -205,7 +205,7 @@ const DirX = {
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
       .map(r => [r.id, `${r.name}${r.title ? ' — ' + r.title : ''}`]);
   },
-  /* a DARRIK user with the same email */
+  /* a MAHAM user with the same email */
   appUser(r) {
     const e = U.lc((r.email || '').trim());
     if (!e) return null;
@@ -237,7 +237,7 @@ const DirX = {
       <div class="dc-grid">${row('Ext.', h(r.office || ''))}${row('Email', r.email && /@/.test(r.email) ? `<a class="link" href="mailto:${h(r.email.trim())}">${h(r.email.trim())}</a>` : h(r.email || ''))}${row('Badge', h(r.bn || ''))}${row('Department', h([r.dept, r.section].filter(Boolean).join(' · ')))}${row('Team', h(r.team || ''))}${(() => {
         const m = r.teamEmail ? r : DirX.chain(r).slice(-1)[0];
         return m && m.teamEmail ? row('Team email', `<a class="link" href="mailto:${h(m.teamEmail)}">${h(m.teamEmail)}</a>`) : '';
-      })()}${au ? row('In DARRIK', `${h(Store.teamName(au.team || 'apps'))} · ${h(Store.titleOf(au))}`) : ''}</div>
+      })()}${au ? row('In MAHAM', `${h(Store.teamName(au.team || 'apps'))} · ${h(Store.titleOf(au))}`) : ''}</div>
       <h4>Chain</h4><div class="dc-chain">${ch.length ? ch.map(DirX.link).join(' › ') + ' › ' : ''}<b>${h(r.name)}</b>${!r.reportsTo ? ' <span class="muted small">(top of the chart — no manager set)</span>' : ''}</div>
       ${mgr ? `<h4>Manager</h4><div>${DirX.link(mgr)} <span class="muted small">${h(mgr.title || '')}${mgr.office ? ' · ext. ' + h(mgr.office) : ''}</span></div>` : ''}
       <div class="cols2"><div><h4>Team${r.team ? ' — ' + h(r.team) : ''} <span class="count">${team.length}</span></h4>${team.length ? team.map(x => `<div>${DirX.link(x)} <span class="muted small">${h(x.title || '')}</span></div>`).join('') : '<p class="muted small">No team set, or nobody else in it.</p>'}${peers.length ? `<h4>Same manager <span class="count">${peers.length}</span></h4>${peers.map(x => `<div>${DirX.link(x)} <span class="muted small">${h(x.title || '')}</span></div>`).join('')}` : ''}</div>

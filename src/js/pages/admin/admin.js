@@ -1,22 +1,52 @@
-/* DARRIK — Admin (super admin only): tabs Home · People · Permissions · Teams · Leave · Months · Scoring · Data · Log.
+/* MAHAM — Admin (super admin only): tabs Home · People · Permissions · Teams · Leave · Months · Scoring · Data · Log.
  * Home / Months / Scoring / Data / Log are in admin-tools.js, Permissions in admin-perms.js, the person card in admin-person.js. */
 'use strict';
 
-const ADMIN_TABS = [
-  ['home', 'Home'],
-  ['people', 'People'],
-  ['permissions', 'Permissions'],
-  ['teams', 'Teams & departments'],
-  ['custom', 'Customize'],
-  ['workflows', 'Workflows'],
-  ['lists', 'Lists & scoring'],
-  ['scoring', 'Scoring'],
-  ['feedback', 'Feedback'],
-  ['data', 'Data'],
-  ['log', 'Change log'],
+/* tabs in groups: who, the organisation, rules, look, the system */
+const ADMIN_GROUPS = [
+  ['', [['home', 'Home']]],
+  [
+    'People & access',
+    [
+      ['people', 'People'],
+      ['permissions', 'Permissions'],
+      ['teamrules', 'Team rules'],
+    ],
+  ],
+  [
+    'Organisation',
+    [
+      ['teams', 'Teams & departments'],
+      ['workflows', 'Workflows'],
+    ],
+  ],
+  [
+    'Rules',
+    [
+      ['lists', 'Lists'],
+      ['scoring', 'Scoring & months'],
+      ['hdmonths', 'Help desk months'],
+    ],
+  ],
+  ['Look', [['custom', 'Customize']]],
+  [
+    'System',
+    [
+      ['data', 'Data'],
+      ['feedback', 'Feedback'],
+      ['log', 'Change log'],
+      ['activity', 'Activity log'],
+    ],
+  ],
 ];
+const ADMIN_TABS = ADMIN_GROUPS.flatMap(g => g[1]);
 /* what the search box finds besides people and teams */
 const ADMIN_FIND = [
+  ['Team rules — what each role can do per team', 'teamrules'],
+  ['Team targets', 'teamrules'],
+  ['Help desk months — lock / unlock', 'hdmonths'],
+  ['Who can post announcements', 'permissions'],
+  ['Add help desk requests by hand', 'permissions'],
   ['Request types', 'teams'],
   ['Team function access', 'teams'],
   ['Add person', 'people'],
@@ -35,16 +65,19 @@ const ADMIN_FIND = [
   ['Export everything to Excel', 'data'],
   ['Backup settings', 'data'],
   ['Change log / undo', 'log'],
+  ['Activity log — who changed what', 'activity'],
+  ['Data health — impossible dates, no owner, broken links', 'data'],
   ['Usage — who opens the app', 'home'],
   ['Reminders / message a team', 'home'],
   ['Dropdown lists, scoring rules, board columns, project categories', 'lists'],
   ['System Check, backups, ignored changes', '#/syscheck'],
   ['Announcements', '#/announcements'],
   ['Import old data', '#/importdata'],
+  ['Findings from MAHAM Lab', 'data'],
 ];
 
 function adminHead(tab) {
-  return `<div class="adm-top"><div class="tabs">${ADMIN_TABS.map(([k, l]) => `<a class="tab ${tab === k ? 'on' : ''}" href="#/admin/${k}">${l}</a>`).join('')}</div>
+  return `<div class="adm-top"><div class="tabs adm-tabs">${ADMIN_GROUPS.map(([g, l]) => `${g ? `<span class="adm-g">${h(g)}</span>` : ''}${l.map(([k, n]) => `<a class="tab ${tab === k ? 'on' : ''}" href="#/admin/${k}">${n}</a>`).join('')}`).join('')}</div>
     <div class="adm-search"><input id="adsearch" type="search" placeholder="🔎 Find a person, team or setting…" autocomplete="off"><div id="adresults" class="adm-results" hidden></div></div></div>`;
 }
 function bindAdminSearch(root) {
@@ -208,6 +241,8 @@ P.admin = sub => {
     home: adminHome,
     people: () => adminJoin(adminPeople(), adminLeave()),
     permissions: adminPerms,
+    teamrules: adminTeamRules,
+    hdmonths: adminHdMonths,
     teams: adminTeams,
     custom: adminCustom,
     workflows: adminFlows,
@@ -215,6 +250,7 @@ P.admin = sub => {
     scoring: () => adminJoin(adminMonths(), adminScoreMonths(), adminScoring()),
     data: adminData,
     log: adminLog,
+    activity: adminActivity,
   }[tab]();
   return {
     title: 'Admin',
@@ -254,12 +290,14 @@ function adminPeople() {
           onb
             .map(
               m =>
-                `<div class="li click" data-goperson="${h(m.id)}"><b class="grow">${h(m.name)}</b>${Admin.onboarding(m)
+                `<div class="li click onb-row" data-goperson="${h(m.id)}"><b class="grow">${h(m.name)}</b><span class="onb-chips">${Admin.onboarding(
+                  m
+                )
                   .map(
                     ([l, ok, info]) =>
                       `<span class="chk ${ok ? 'ok' : info ? 'info' : 'no'}" title="${h(l)}">${ok ? '✓' : info ? '–' : '✗'} ${h(l)}</span>`
                   )
-                  .join('')}</div>`
+                  .join('')}</span></div>`
             )
             .join('')
         )
@@ -544,7 +582,7 @@ function adminTeams() {
   <div class="oneline">The app name, logo, colours, menu, words and targets are in <a class="link" href="#/admin/custom">Admin → Customize</a>.</div>
   ${card(
     'App version',
-    `<p class="muted small">You are using <b>${h(APP_VERSION)}</b>. Require a minimum version so that out-of-date copies stop saving: they show a red bar asking the person to copy the new file, and anything they still manage to save is ignored (listed in System Check). Copy the new DARRIK.html into the shared folder first.</p>
+    `<p class="muted small">You are using <b>${h(APP_VERSION)}</b>. Require a minimum version so that out-of-date copies stop saving: they show a red bar asking the person to copy the new file, and anything they still manage to save is ignored (listed in System Check). Copy the new MAHAM.html into the shared folder first.</p>
     <form class="grid-form" id="mvf">${UI.field({ key: 'minVersion', label: 'Minimum version allowed to save', type: 'text', placeholder: 'none' }, Store.minVersion())}</form>
     <div class="row-btns"><button class="btn ghost" id="mvnow">Require ${h(APP_VERSION)}</button><button class="btn ghost" id="mvoff">No minimum</button><span class="grow"></span><button class="btn primary" id="mvsave">Save</button></div>`
   )}
@@ -561,7 +599,7 @@ function adminTeams() {
       .join('')}</tbody></table>
     <div class="row-btns"><button class="btn" id="addhol">＋ Add holiday</button><span class="grow"></span><button class="btn primary" id="savehol">Save holidays</button></div>`
   )}
-  ${card('Shared folder path', `<p class="muted small">Shown to everyone (Settings, the update notice and the connect screen) so they can find the folder. Browsers can't read the full path of a folder by themselves.${Store.detectedPath() ? ` Detected from where you opened the app: <b>${h(Store.detectedPath())}</b>.` : ''}</p><form class="grid-form" id="spf">${UI.field({ key: 'sharedPath', label: 'Path of the shared folder', type: 'text', span: 2, placeholder: 'e.g. S:\\DARRIK  or  \\\\server\\share\\DARRIK' }, Store.setting('settings-features', 'sharedPath', '') || Store.detectedPath())}</form><div class="row-btns"><span class="grow"></span><button class="btn primary" id="savesp">Save path</button></div>`)}`;
+  ${card('Shared folder path', `<p class="muted small">Shown to everyone (Settings, the update notice and the connect screen) so they can find the folder. Browsers can't read the full path of a folder by themselves.${Store.detectedPath() ? ` Detected from where you opened the app: <b>${h(Store.detectedPath())}</b>.` : ''}</p><form class="grid-form" id="spf">${UI.field({ key: 'sharedPath', label: 'Path of the shared folder', type: 'text', span: 2, placeholder: 'e.g. S:\\MAHAM  or  \\\\server\\share\\MAHAM' }, Store.setting('settings-features', 'sharedPath', '') || Store.detectedPath())}</form><div class="row-btns"><span class="grow"></span><button class="btn primary" id="savesp">Save path</button></div>`)}`;
   return {
     html,
     mount(root) {
@@ -832,4 +870,80 @@ function shrinkLogo(file) {
     rd.onerror = fail;
     rd.readAsDataURL(file);
   });
+}
+
+/* ---------------- Activity log: who added, changed or deleted what (everyone's own monthly log) ---------------- */
+function adminActivity() {
+  if (!Store.loadLogs) {
+    Store.ensureLogs().then(() => App.render(true));
+    return { html: '<div class="card"><p class="muted">Reading everyone\'s activity log…</p></div>' };
+  }
+  const s = ps('actlog');
+  const today = U.todayStr();
+  const from = s.from || U.addDays(today, -6),
+    to = s.to || today;
+  let rows = ActLog.entries(from, to);
+  if (s.who) rows = rows.filter(x => x.who === s.who);
+  if (s.c) rows = rows.filter(x => x.c === s.c);
+  if (s.act) rows = rows.filter(x => x.act === s.act);
+  const people = Store.members()
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const colls = [...new Set(ActLog.entries(from, to).map(x => x.c))].sort();
+  const ACT = { add: ['added', 'good'], edit: ['changed', ''], del: ['deleted', 'bad'], import: ['imported', 'cat'] };
+  const html = `${card(
+    'Activity log',
+    `<p class="muted small">Every add, change and delete, by everyone, from version 2026.11.06 on. Each person's PC writes its own log (users/&lt;id&gt;.log-YYYY-MM.json), so nobody can write someone else's. Only you see this page.</p>
+    <div class="filters"><label class="flt"><span>From</span><input type="date" data-al="from" value="${h(from)}"></label><label class="flt"><span>To</span><input type="date" data-al="to" value="${h(to)}"></label>
+    <label class="flt"><span>Person</span><select data-al="who"><option value="">Everyone</option>${people.map(m => `<option value="${h(m.id)}" ${s.who === m.id ? 'selected' : ''}>${h(m.name)}</option>`).join('')}</select></label>
+    <label class="flt"><span>What</span><select data-al="c"><option value="">Everything</option>${colls.map(c => `<option value="${h(c)}" ${s.c === c ? 'selected' : ''}>${h(Health.LABEL[c] || c)}</option>`).join('')}</select></label>
+    <label class="flt"><span>Action</span><select data-al="act"><option value="">Any</option>${Object.entries(ACT)
+      .map(([k, [l]]) => `<option value="${k}" ${s.act === k ? 'selected' : ''}>${l}</option>`)
+      .join('')}</select></label></div>`
+  )}
+  ${UI.table({
+    id: 'actlog',
+    rows,
+    exportName: 'Activity log',
+    onRow: true,
+    empty: 'Nothing recorded for these filters.',
+    cols: [
+      { key: 'at', label: 'When', get: x => U.fmtTs(x.at), sortVal: x => x.at },
+      { key: 'who', label: 'Who', get: x => Store.memberName(x.who) || x.who },
+      {
+        key: 'act',
+        label: 'Did',
+        html: x => UI.badge((ACT[x.act] || [x.act])[0], (ACT[x.act] || [])[1] || ''),
+        get: x => (ACT[x.act] || [x.act])[0],
+      },
+      { key: 'c', label: 'What', get: x => Health.LABEL[x.c] || x.c },
+      {
+        key: 'what',
+        label: 'Item',
+        html: x => `${h(x.what)}${x.fields.length ? `<div class="muted small">changed: ${h(x.fields.join(', '))}</div>` : ''}`,
+        get: x => x.what + ' ' + x.fields.join(' '),
+      },
+    ],
+  })}`;
+  return {
+    html,
+    mount(root) {
+      root.querySelectorAll('[data-al]').forEach(
+        el =>
+          (el.onchange = () => {
+            ps('actlog')[el.dataset.al] = el.value;
+            App.render();
+          })
+      );
+      UI.bindTables(root, {
+        actlog: x => {
+          const r = Store.get(x.id);
+          if (!r) return UI.toast(x.act === 'del' ? 'This item was deleted' : 'This item is not loaded (maybe an archived year)', 'warn');
+          const o = Health.open(r);
+          if (o.edit) UI.editRecord(r.c, r);
+          else if (o.href) location.hash = o.href;
+        },
+      });
+    },
+  };
 }

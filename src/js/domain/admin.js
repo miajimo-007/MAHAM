@@ -1,4 +1,4 @@
-/* DARRIK — Admin helpers (super admin): change log + undo, usage, health tiles, onboarding,
+/* MAHAM — Admin helpers (super admin): change log + undo, usage, health tiles, onboarding,
  * offboarding / reassignment, permission templates, technician name matching, clean-up.
  *   adminlog { at, what, target, lines[], before (record before the change, or null), afterTs, undoOf }
  *   usage    { days: { 'YYYY-MM-DD': { n, pages: { page: n } } } }   — one per person (id usage-<person>), last 60 days */
@@ -398,7 +398,7 @@ const Admin = {
       const perms = {};
       for (const [k] of Store.PERMS) {
         const v = !!tpl.perms[k];
-        if (v !== Store.roleDefault(m.role || 'analyst', k)) perms[k] = v;
+        if (v !== Store.teamRoleDefault(m, k)) perms[k] = v;
       }
       return Object.assign({}, m, { perms });
     });
@@ -587,6 +587,13 @@ const Admin = {
           .slice(0, 3)
           .map(x => x.name)
           .join(', '),
+      },
+      {
+        k: 'health',
+        label: 'Data health problems',
+        n: typeof Health !== 'undefined' ? Health.count() : 0,
+        href: '#/admin/data',
+        sub: 'no owner · impossible dates · deleted links',
       },
       {
         k: 'retired',

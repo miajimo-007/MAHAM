@@ -1,5 +1,5 @@
-/* DARRIK — starting settings shipped with the app: teams, people, roles, lists.
- * Everything people enter is saved in the shared "DARRIK Data" folder, never here.
+/* MAHAM — starting settings shipped with the app: teams, people, roles, lists.
+ * Everything people enter is saved in the shared "MAHAM Data" folder, never here.
  * Real edits always win over these values (they carry _ts 0/1). */
 'use strict';
 

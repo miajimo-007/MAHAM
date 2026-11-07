@@ -1,4 +1,4 @@
-/* DARRIK — Page layout: sidebar, top bar, main area. */
+/* MAHAM — Page layout: sidebar, top bar, main area. */
 #app {
   display: flex;
   min-height: 100vh;
@@ -195,6 +195,13 @@ main {
   max-width: 1500px;
   width: 100%;
 }
+.logo.mark {
+  font-size: 20px;
+  font-weight: 400;
+}
+.brand.big .logo.mark {
+  font-size: 26px;
+}
 .logo.img {
   background: #fff;
   padding: 3px;
@@ -271,4 +278,84 @@ main {
 .stuck .li.sub {
   padding-left: 18px;
   font-size: 13px;
+}
+/* menu: one link per section; the section's pages are tabs at the top of the page (their menu links are folded away) */
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+nav a.sec {
+  font-size: 14px;
+  font-weight: 600;
+  color: #dbe8ef;
+  padding: 9px 10px;
+}
+nav a.sec .ni {
+  font-size: 15px;
+}
+nav a.sec .sec-l {
+  flex: 1;
+}
+nav a.sec .sec-n {
+  margin-left: auto;
+}
+nav a.sec.on {
+  background: #fff;
+  color: var(--side);
+}
+.nav-items {
+  height: 0;
+  overflow: hidden;
+}
+.nav-bottom {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #1c4660;
+}
+.nav-bottom a.sec {
+  font-size: 13px;
+  color: #9fbccc;
+}
+.nav-mini a {
+  font-size: 12px;
+  padding: 5px 10px;
+  color: #9fbccc;
+}
+/* section tabs at the top of the page */
+.sec-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -6px 0 18px;
+  padding: 0 0 0;
+  border-bottom: 1px solid var(--line);
+}
+.sec-tabs[hidden] {
+  display: none;
+}
+.sec-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px 10px;
+  color: var(--ink2);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 6px 6px 0 0;
+}
+.sec-tab:hover {
+  color: var(--ink);
+  background: #eef4f6;
+}
+.sec-tab.on {
+  color: var(--accent2);
+  border-bottom-color: var(--accent);
+}
+.sec-tab .ni {
+  width: auto;
+  opacity: 0.75;
 }

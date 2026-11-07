@@ -1,4 +1,4 @@
-/* DARRIK — Hidden projects: the super admin can hide a project so only the people he chooses see it
+/* MAHAM — Hidden projects: the super admin can hide a project so only the people he chooses see it
  * (project.restricted = true, project.viewers = [ids]). Hidden projects, their tasks and sprints are left out of every
  * list for everyone else (Store.all is filtered here), and their page says "not found". Only the super admin can
  * change who sees a project. Note: this hides it inside the app; the data is still in the shared folder files. */
@@ -14,7 +14,7 @@
     const hidden = Store.hiddenProjects();
     if (!hidden.size) return list;
     const key = App.me + '|' + App.mode + '|' + (App.preview ? 1 : 0) + '|' + [...hidden].join(',');
-    if (cache.key !== key || cache.byC !== Store.byC) cache = { key, byC: Store.byC, map: {} };
+    if (cache.key !== key || cache.v !== Store.ver) cache = { key, v: Store.ver, map: {} };
     const k = c + '|' + (team || App.viewTeam);
     return cache.map[k] || (cache.map[k] = list.filter(r => !hidden.has(c === 'project' ? r.id : r.project)));
   };
@@ -55,10 +55,10 @@ Object.assign(Store, {
       return 'Only the administrator can change the status or reply — you can edit your feedback while it is New';
     return '';
   },
-  /* help desk: only the super admin adds one by hand or deletes one (the import adds and updates) */
+  /* help desk: only the super admin (or someone given "Add, delete and fix help desk requests by hand") adds one by hand or deletes one (the import adds and updates) */
   hdAllowed(r) {
-    if (!r || r.c !== 'helpdesk' || Store.isSuper(App.me)) return true;
-    if (r._del) return false;
+    if (!r || r.c !== 'helpdesk' || Store.isSuper(App.me) || Store.can(App.me, 'editHelpdeskByHand')) return true;
+    if (r._del) return !!(Store._importing && r.goneOn);
     const isNew = !r.id || !Store.db.get(r.id);
     return !(isNew && !Store._importing);
   },

@@ -1,4 +1,4 @@
-/* DARRIK — Central Follow-up. */
+/* MAHAM — Central Follow-up. */
 'use strict';
 
 P.central = () => {
@@ -7,12 +7,14 @@ P.central = () => {
   const all = rows;
   if (s.analyst) rows = rows.filter(x => x.r.analyst === s.analyst);
   if (s.st) rows = rows.filter(x => x.r.status === s.st);
+  if (s.month) rows = rows.filter(x => inMonth(x.r.date, s.month));
   if (s.open) rows = rows.filter(x => x.c !== 'Request closed');
   rows.sort((a, b) => (b.days || 0) - (a.days || 0));
   const n = t => all.filter(x => x.c === t).length;
   const html = `<div class="kpis k4">${UI.kpi('Need analyst follow-up', n('Need Analyst Follow up'), '> 30 days under review', n('Need Analyst Follow up') ? 'sc-c' : '')}${UI.kpi('Need team leader follow-up', n('Need Team Leader Follow up'), '> 60 days', n('Need Team Leader Follow up') ? 'sc-d' : '')}${UI.kpi('Need manager follow-up', n('Need Manager Follow Up'), '> 90 days', n('Need Manager Follow Up') ? 'sc-e' : '')}${UI.kpi('Missing Redmine / date', all.filter(x => /Insert/.test(x.c)).length, 'accepted requests')}</div>
   <div class="page-actions">${filterBar('riy', [
     { key: 'analyst', type: 'member' },
+    { key: 'month', type: 'month' },
     { key: 'st', label: 'Status', options: Store.list('centralStatus') },
     { key: 'open', type: 'toggle', label: 'Hide closed', dflt: true },
   ])}${addBtn('central', 'New follow-up')}</div>

@@ -1,4 +1,4 @@
-/* DARRIK — Monthly scores — the same formula as the Dashboard sheet of DARRIK-tracker.xlsx (weights and tiers in Config.DEFAULT_SCORING, overridable per team). */
+/* MAHAM — Monthly scores — the same formula as the Dashboard sheet of MAHAM-tracker.xlsx (weights and tiers in Config.DEFAULT_SCORING, overridable per team). */
 'use strict';
 
 Object.assign(Calc, {
@@ -87,7 +87,7 @@ Object.assign(Calc, {
             if (s.hrs) o.active = true;
           });
       for (const q of Store.all('quickwin')) {
-        if (!(U.lc(q.status) === 'completed' && q.expected && U.year(q.expected) === year)) continue;
+        if (!(U.lc(q.status) === 'completed' && U.lc(q.approval) !== 'rejected' && q.expected && U.year(q.expected) === year)) continue; // a rejected quick win never counts
         const mo = U.month(q.expected);
         if (P.members[q.analyst])
           bump(q.analyst, mo, o => {
@@ -103,7 +103,7 @@ Object.assign(Calc, {
         }
       }
       for (const a of Calc.attendance(year))
-        if (P.members[a.analyst] && +a.permHrs)
+        if (P.members[a.analyst] && +a.permHrs && a.status !== 'OFF')
           bump(a.analyst, U.month(a.date), o => {
             o.permHrs += +a.permHrs;
           });
@@ -149,7 +149,8 @@ Object.assign(Calc, {
    * settings-scoremonths-<team> = { months: { 'YYYY-MM': mark }, people: { '<id>|YYYY-MM': mark } },
    * mark = { kind: 'skip' | 'set' | 'normal', score, note, by, at } — a person's mark wins over the team's */
   monthMark(year, mid, mo, team) {
-    const r = Store.get('settings-scoremonths-' + (team || App.viewTeam || 'apps'));
+    const mt = mid && Store.member(mid) && !Store.topRole(Store.member(mid).role) ? Store.member(mid).team : ''; // the person's own team, not the team being viewed
+    const r = Store.get('settings-scoremonths-' + (team || mt || App.viewTeam || 'apps'));
     if (!r) return null;
     const k = `${year}-${U.pad(mo)}`;
     const p = mid ? (r.people || {})[mid + '|' + k] : null;
@@ -197,6 +198,8 @@ Object.assign(Calc, {
     return null;
   },
   /* ---------- Lazy days (no shadow work, no help-desk activity, no to-do assigned) ---------- */
+  /* records that are not "work done that day" (imports, settings, tracking, attendance marks) */
+  LAZY_SKIP: new Set(['helpdesk', 'attendance', 'settings', 'usage', 'ping', 'adminlog', 'userpin', 'scoresnap', 'actlog', 'feedback']),
   lazy(year) {
     return Calc.memo('lazy' + year, () => {
       const team = Store.scoredTeam();
@@ -209,7 +212,20 @@ Object.assign(Calc, {
           const mid = Store.memberByMeName(h.technician);
           if (mid) hd.add(h.resolved.slice(0, 10) + '|' + mid);
         }
-      for (const t of Calc.todos(year)) td.add(t.r.assigned + '|' + t.r.analyst);
+      for (const t of Calc.todos(year)) {
+        td.add(t.r.assigned + '|' + t.r.analyst);
+        if (t.r.finish && t.status !== 'Canceled') td.add(String(t.r.finish).slice(0, 10) + '|' + t.r.analyst);
+      }
+      // other work saved that day: quick wins, project tasks and comments, good catches, personal tasks, meetings…
+      const ot = new Set();
+      const SKIP = Calc.LAZY_SKIP;
+      const ids = new Set(team.map(m => m.id));
+      for (const r of Store.db.values()) {
+        if (r._del || SKIP.has(r.c)) continue;
+        if (r._by && ids.has(r._by) && r._ts > 1e12) ot.add(U.ds(new Date(r._ts)) + '|' + r._by);
+        if (r.c === 'quickwin' && r.date && ids.has(r.analyst)) ot.add(String(r.date).slice(0, 10) + '|' + r.analyst);
+        if (r.c === 'mytask' && r.doneDate && ids.has(r._by)) ot.add(String(r.doneDate).slice(0, 10) + '|' + r._by);
+      }
       const att = Calc.attMap(year);
       const today = U.todayStr();
       const days = [];
@@ -228,8 +244,8 @@ Object.assign(Calc, {
           const k = s + '|' + m.id;
           const mo = d.getMonth() + 1;
           const off = a && a.status === 'OFF';
-          const cell = { sw: sw.has(k), hd: hd.has(k), td: td.has(k), off };
-          cell.lazy = !off && !cell.sw && !cell.hd && !cell.td;
+          const cell = { sw: sw.has(k), hd: hd.has(k), td: td.has(k), ot: ot.has(k), off };
+          cell.lazy = !off && !cell.sw && !cell.hd && !cell.td && !cell.ot;
           if (off) res[m.id][mo].off++;
           else {
             res[m.id][mo].work++;

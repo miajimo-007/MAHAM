@@ -1,4 +1,4 @@
-/* DARRIK — Admin → Permissions: one matrix of people × permissions, and permission templates. */
+/* MAHAM — Admin → Permissions: one matrix of people × permissions, and permission templates. */
 'use strict';
 
 function adminPerms() {
@@ -92,7 +92,7 @@ function adminPerms() {
             const e = edits[m.id];
             if (!e) return m;
             const perms = {};
-            for (const [k, v] of Object.entries(e)) if (v !== Store.roleDefault(m.role || 'analyst', k)) perms[k] = v;
+            for (const [k, v] of Object.entries(e)) if (v !== Store.teamRoleDefault(m, k)) perms[k] = v;
             return Object.assign({}, m, { perms });
           }),
           'Permissions saved'

@@ -1,4 +1,4 @@
-/* DARRIK — Admin → person card: everything about one person on one screen, onboarding checklist,
+/* MAHAM — Admin → person card: everything about one person on one screen, onboarding checklist,
  * offboarding (hand over open work, then retire) and "View as". Route: #/adminperson/<id> (super admin only). */
 'use strict';
 
@@ -15,7 +15,7 @@ P.adminperson = id => {
     (Store.PAGES.find(p => p[0] === k) || [
       k,
       {
-        home: 'My Day',
+        home: 'Analyst Desk',
         director: 'Director Desk',
         manager: 'Team Desk',
         admin: 'Admin',

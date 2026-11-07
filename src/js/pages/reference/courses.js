@@ -1,10 +1,17 @@
-/* DARRIK — Courses (per team). */
+/* MAHAM — Courses (per team). */
 'use strict';
 
 P.courses = () => {
   const team = App.can('viewOthers') ? Store.activeTeam() : Store.activeTeam().filter(m => m.id === App.me);
-  const cs = App.mine(Store.all('course'), r => r.analyst);
+  const allCs = App.mine(Store.all('course'), r => r.analyst);
   const today = U.todayStr();
+  const fc = ps('course');
+  const cs = allCs.filter(
+    r =>
+      (!fc.analyst || r.analyst === fc.analyst) &&
+      (!fc.st || (r.status || (r.completed ? 'Completed' : '')) === fc.st) &&
+      (!fc.month || inMonth(r.start, fc.month) || inMonth(r.completed, fc.month))
+  );
   const sum = team.map(m => {
     const mine = cs.filter(c => c.analyst === m.id);
     const fin = mine.filter(c => c.completed || c.status === 'Completed');
@@ -17,7 +24,11 @@ P.courses = () => {
   });
   const html = `<div class="cols2 wide-left">${card('Team learning summary', `<table class="tbl"><thead><tr><th>Name</th><th class="num">In progress</th><th class="num">Hours</th><th class="num">Finished</th><th class="num">Hours</th><th>Next presentation</th></tr></thead><tbody>${sum.map(r => `<tr><td>${h(Store.memberShort(r.m.id))}</td><td class="num">${r.prog}</td><td class="num">${U.num(r.progH, 1)}</td><td class="num">${r.fin}</td><td class="num">${U.num(r.finH, 1)}</td><td>${r.next ? U.fmtDate(r.next) : ''}</td></tr>`).join('')}</tbody></table>`)}
   ${card('Recommended courses', `<div class="rec">${[...U.groupBy(Store.all('reccourse'), r => r.category)].map(([k, v]) => `<h4>${h(k)}</h4>${v.map(r => `<div class="li click" data-edit="reccourse|${h(r.id)}"><span class="grow">${h(r.course)}</span><span class="muted">${U.num(r.hrs, 1)} h</span></div>`).join('')}`).join('')}</div>`, `<button class="btn sm" data-add="reccourse">＋</button>`)}</div>
-  <div class="page-actions"><span class="grow"></span>${addBtn('course', 'Add course')}</div>
+  <div class="page-actions">${filterBar('course', [
+    { key: 'analyst', type: 'member', label: 'Name' },
+    { key: 'st', label: 'Status', options: () => Store.list('courseStatus') },
+    { key: 'month', type: 'month' },
+  ])}<span class="grow"></span>${addBtn('course', 'Add course')}</div>
   ${UI.table({
     id: 'course',
     rows: cs,

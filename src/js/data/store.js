@@ -1,4 +1,4 @@
-/* DARRIK — Store — the in-memory database.
+/* MAHAM — Store — the in-memory database.
  *  sources : every data file read from the shared folder (one per person)
  *  own     : MY records — the only ones this PC writes (to users/<me>.json)
  *  db      : merged view, newest edit of each record wins (_ts, then _by)
@@ -47,6 +47,7 @@ Object.assign(Store, {
       (byC[r.c] = byC[r.c] || []).push(r);
     }
     Store.byC = byC;
+    Store.ver = (Store.ver || 0) + 1; // data version: caches compare against it
     Calc.invalidate();
   },
   teamOf(r) {
@@ -75,7 +76,7 @@ Object.assign(Store, {
     if (App.tooOld && App.tooOld()) {
       if (typeof UI !== 'undefined')
         UI.toast(
-          `This copy of the app (${APP_VERSION}) is too old — copy the new DARRIK.html from the shared folder. Nothing was saved.`,
+          `This copy of the app (${APP_VERSION}) is too old — copy the new MAHAM.html from the shared folder. Nothing was saved.`,
           'bad'
         );
       return;
@@ -152,11 +153,24 @@ Object.assign(Store, {
       list = list.filter(r => !blocked.includes(r));
       if (!list.length) return;
     }
+    if (typeof Admin !== 'undefined' && Admin.trackSave)
+      try {
+        Admin.trackSave(list);
+      } catch (e) {
+        /* usage only */
+      }
     const logs = typeof Admin !== 'undefined' ? Admin.logFor(list) : []; // super admin: change log (domain/admin.js)
     for (const x of logs) {
       delete x.rec._nolog;
       list.push(x.log);
     }
+    if (typeof ActLog !== 'undefined')
+      try {
+        const a = ActLog.forSave(list);
+        if (a) list.push(a);
+      } catch (e) {
+        console.warn('activity log', e);
+      }
     for (const r of list) {
       delete r._nolog;
       delete r._undoOf;
@@ -167,6 +181,7 @@ Object.assign(Store, {
       const cur = Store.db.get(rec.id);
       // who gave a director task / director project (directors see only the ones they gave)
       if (!cur && !rec.givenBy && (rec.c === 'mgrtask' || rec.c === 'project' || rec.c === 'todo')) rec.givenBy = App.me;
+      if (!cur && !rec.createdBy && Store.OWNED && Store.OWNED[rec.c] === 'createdBy') rec.createdBy = App.me; // shared lists: who added it owns it
       rec._ts = Math.max(now, cur ? (cur._ts || 0) + 1 : 0);
       if ((rec.c === 'mgrtask' || rec.c === 'project') && cur && rec.givenBy !== App.me) {
         rec.updAt = now;
@@ -179,10 +194,38 @@ Object.assign(Store, {
     }
     for (const x of logs) x.log.afterTs = x.rec._ts;
     Store.dirty = true;
-    LS.set('bct.unsaved.' + App.me, Store.own);
-    Store.rebuild();
+    for (const r of list) Store.pending[r.id] = r;
+    LS.set('bct.unsaved.' + App.me, Store.pending); // safety copy of what is not in the shared folder yet (only that, so it stays small)
+    Store.applyLocal(list);
     Store.flushSoon();
     Store.emit();
+  },
+  /* my own saves: update just those records now (instant), and re-check everything with the trust rules shortly after */
+  pending: {},
+  applyLocal(list) {
+    if (list.length > 300 || !Store.byC) {
+      Store.rebuild();
+      return;
+    }
+    for (const rec of list) {
+      const cur = Store.db.get(rec.id);
+      if (cur && !Store.newer(rec, cur)) continue;
+      Store.db.set(rec.id, rec);
+      const arr = (Store.byC[rec.c] = Store.byC[rec.c] || []);
+      const i = arr.findIndex(x => x.id === rec.id);
+      if (rec._del) {
+        if (i >= 0) arr.splice(i, 1);
+      } else if (i >= 0) arr[i] = rec;
+      else arr.push(rec);
+    }
+    Store._scoped = null;
+    Store.ver = (Store.ver || 0) + 1;
+    Calc.invalidate();
+    clearTimeout(Store._recheck);
+    Store._recheck = setTimeout(() => {
+      Store.rebuild();
+      Store.emit();
+    }, 1500);
   },
   remove(id) {
     const cur = Store.db.get(id);

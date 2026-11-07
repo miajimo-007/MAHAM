@@ -1,4 +1,4 @@
-/* DARRIK — Scrum project page, board and cards. */
+/* MAHAM — Scrum project page, board and cards. */
 .phead {
   display: flex;
   gap: 18px;
@@ -198,4 +198,283 @@ select.xs {
   .kanban {
     grid-template-columns: repeat(var(--cols, 4), 78vw);
   }
+}
+
+/* ---------- project management: charter, phases, timeline (Gantt), risks, status report ---------- */
+.pm-ch {
+  margin: 6px 0 10px;
+}
+.pm-ch .info-val {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pm-ic {
+  width: 18px;
+  text-align: center;
+  color: #0f766e;
+}
+.pm-seg {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.badge.raid-risk {
+  background: #fef3c7;
+  color: #92400e;
+}
+.badge.raid-issue {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.badge.raid-decision {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+.badge.raid-action {
+  background: #ccfbf1;
+  color: #115e59;
+}
+.gantt {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  overflow-x: auto;
+}
+.g-row {
+  display: flex;
+  min-width: 760px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.g-row:last-child {
+  border-bottom: 0;
+}
+.g-lab {
+  flex: 0 0 260px;
+  padding: 6px 10px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: 1px solid #e2e8f0;
+}
+.g-track {
+  position: relative;
+  flex: 1;
+  min-height: 30px;
+}
+.g-head .g-track {
+  height: 26px;
+}
+.g-head {
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.g-mon {
+  position: absolute;
+  top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  padding-left: 4px;
+  border-left: 1px solid #cbd5e1;
+}
+.g-wk {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed #eef2f7;
+}
+.g-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid #ef4444;
+  z-index: 1;
+}
+.g-bar {
+  position: absolute;
+  top: 7px;
+  height: 16px;
+  border-radius: 5px;
+  background: #5eead4;
+  border: 1px solid #0f766e;
+  cursor: grab;
+  touch-action: none;
+  z-index: 1;
+  min-width: 6px;
+  box-sizing: border-box;
+}
+.g-bar.phase {
+  background: #c7d2fe;
+  border-color: #4338ca;
+  top: 5px;
+  height: 20px;
+}
+.g-bar.done {
+  background: #d1d5db;
+  border-color: #9ca3af;
+}
+.g-bar.late {
+  background: #fecaca;
+  border-color: #dc2626;
+}
+.g-bar.clash {
+  outline: 2px dashed #dc2626;
+  outline-offset: 1px;
+}
+.g-bar.dragging {
+  opacity: 0.75;
+  cursor: grabbing;
+  z-index: 3;
+}
+.g-bar:not([data-gbar]) {
+  cursor: default;
+}
+.g-grip {
+  position: absolute;
+  right: -1px;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  border-radius: 0 5px 5px 0;
+  background: rgba(0, 0, 0, 0.18);
+}
+.g-ms {
+  position: absolute;
+  top: 8px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  background: #f59e0b;
+  border: 1px solid #b45309;
+  transform: rotate(45deg);
+  z-index: 1;
+  cursor: grab;
+  touch-action: none;
+}
+.g-ms.done {
+  background: #9ca3af;
+  border-color: #6b7280;
+}
+.g-ms.late {
+  background: #ef4444;
+  border-color: #991b1b;
+}
+.g-ms:not([data-gbar]) {
+  cursor: default;
+}
+#pm-print-box {
+  display: none;
+}
+.pm-print h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+.pm-print h3 {
+  font-size: 14px;
+  margin: 14px 0 4px;
+}
+.pm-print .pm-big {
+  font-size: 15px;
+}
+.pm-print table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.pm-print td,
+.pm-print th {
+  border: 1px solid #cbd5e1;
+  padding: 3px 6px;
+  text-align: left;
+}
+@media print {
+  body.printing-pm > *:not(#pm-print-box) {
+    display: none !important;
+  }
+  body.printing-pm #pm-print-box {
+    display: block;
+  }
+}
+/* stage 2: baseline, card badges, workload, task checklist & comments */
+.g-base {
+  position: absolute;
+  top: 22px;
+  height: 5px;
+  border-radius: 3px;
+  background: #94a3b8;
+  opacity: 0.7;
+}
+.g-ms.base {
+  background: transparent;
+  border: 1px dashed #64748b;
+  z-index: 0;
+  cursor: default;
+}
+.pc-bs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 2px;
+}
+.pc-b {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: #f1f5f9;
+  color: #475569;
+  white-space: nowrap;
+}
+.pc-b.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+.wl-t td.wl {
+  cursor: pointer;
+}
+.wl-t td.wl.good {
+  background: #f0fdf4;
+}
+.wl-t td.wl.warn {
+  background: #fef9c3;
+}
+.wl-t td.wl.bad {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.wl-t td[data-wl] {
+  cursor: pointer;
+}
+.ptx {
+  border-top: 1px solid #e2e8f0;
+  margin-top: 10px;
+  padding-top: 4px;
+}
+.ptx-ci {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.ptx-ci .btn {
+  margin-left: auto;
+}
+.ptx-done {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+.ptx-cm {
+  max-height: 240px;
+  overflow: auto;
+}
+.ptx-c {
+  border-left: 3px solid #e2e8f0;
+  padding: 2px 8px;
+  margin: 6px 0;
+}
+.ptx-c .info-val {
+  white-space: pre-wrap;
 }

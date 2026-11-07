@@ -1,4 +1,4 @@
-/* DARRIK — Lazy Days — working days with no recorded activity. */
+/* MAHAM — Lazy Days — working days with no recorded activity. */
 'use strict';
 
 P.lazy = () => {
@@ -16,7 +16,7 @@ P.lazy = () => {
   const drill = sel ? LZ.days.filter(d => (!mo || U.month(d.date) === mo) && d.cells[sel] && d.cells[sel].lazy) : [];
   const html = `${card(
     'Percentage of lazy days',
-    `<p class="muted small">A lazy day is a working day (Sun–Thu, not on leave) with no shadow work logged, no help desk request resolved and no To Do assigned.</p><div class="tbl-scroll"><table class="tbl"><thead><tr><th>Employee / Month</th>${U.MONTHS.map(x => `<th class="num">${x}</th>`).join('')}<th class="num">YTD</th></tr></thead><tbody>
+    `<p class="muted small">A lazy day is a working day (Sun–Thu, not on leave) with no recorded work: no shadow work, no help desk request resolved, no To Do assigned or finished, and nothing saved in quick wins, projects, good catches, personal tasks or meetings.</p><div class="tbl-scroll"><table class="tbl"><thead><tr><th>Employee / Month</th>${U.MONTHS.map(x => `<th class="num">${x}</th>`).join('')}<th class="num">YTD</th></tr></thead><tbody>
     ${team
       .map(m => {
         const tot = Object.values(LZ.res[m.id]).reduce((a, o) => ({ work: a.work + o.work, lazy: a.lazy + o.lazy }), { work: 0, lazy: 0 });

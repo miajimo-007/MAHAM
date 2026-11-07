@@ -9,8 +9,8 @@ async def main():
         c('no bar when the shared folder has the same version', await pg.locator('.updatebar').count() == 0)
         # put a "newer" copy of the app into the shared folder (the test folder)
         cur = await s.js('APP_VERSION'); parts = cur.split('.'); parts[-1] = str(int(parts[-1]) + 1); newer = '.'.join(parts)
-        html = open(f'{APP}/DARRIK.html', encoding='utf-8').read().replace(f"const APP_VERSION = '{cur}'", f"const APP_VERSION = '{newer}'")
-        await s.js(f"(async () => {{ const fh = await Store.root.getFileHandle('DARRIK.html', {{create: true}}); const w = await fh.createWritable(); await w.write({html!r}); await w.close(); }})()")
+        html = open(f'{APP}/MAHAM.html', encoding='utf-8').read().replace(f"const APP_VERSION = '{cur}'", f"const APP_VERSION = '{newer}'")
+        await s.js(f"(async () => {{ const fh = await Store.root.getFileHandle('MAHAM.html', {{create: true}}); const w = await fh.createWritable(); await w.write({html!r}); await w.close(); }})()")
         await s.js("App.checkVersion()"); await pg.wait_for_timeout(1500)
         t = await pg.inner_text('.updatebar') if await pg.locator('.updatebar').count() else ''
         c('bar appears for the newer version', newer in t, t[:120])

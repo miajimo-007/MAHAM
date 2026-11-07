@@ -1,4 +1,4 @@
-/* DARRIK — IT Help Desk — overview, requests, ManageEngine import screen. */
+/* MAHAM — IT Help Desk — overview, requests, ManageEngine import screen. */
 'use strict';
 
 P.helpdesk = sub => {
@@ -34,19 +34,29 @@ P.helpdesk = sub => {
         .join('')}
       <tr class="foot"><td>Total</td><td class="num">${openBC.length}</td><td class="num">${all.filter(x => x.bc && x.month === mo).length}</td><td class="num">${all.filter(x => x.bc).length}</td><td></td><td></td></tr></tbody></table>`
     )}
-    ${card(`Unassigned <span class="count">${unassigned.length}</span>`, unassigned.length ? `<table class="tbl"><thead><tr><th>ID</th><th>Group</th><th>Subject</th></tr></thead><tbody>${unassigned.map(x => `<tr><td>${h(x.r.reqId)}</td><td>${h(x.r.group)}</td><td>${h(x.r.subject)}</td></tr>`).join('')}</tbody></table>` : empty('Nothing unassigned.'))}
+    ${card(
+      `Unassigned <span class="count">${unassigned.length}</span>`,
+      unassigned.length
+        ? `<table class="tbl"><thead><tr><th>ID</th><th>Group</th><th>Subject</th></tr></thead><tbody>${UI.cap('hd-unas', unassigned)
+            .map(x => `<tr><td>${h(x.r.reqId)}</td><td>${h(x.r.group)}</td><td>${h(x.r.subject)}</td></tr>`)
+            .join('')}</tbody></table>${UI.capMore('hd-unas', unassigned.length)}`
+        : empty('Nothing unassigned.')
+    )}
     </div>
     ${HD2T.card()}
     ${card(
       `Open requests <span class="count">${openBC.length}</span>`,
       openBC.length
-        ? `<table class="tbl"><thead><tr><th>ID</th><th>Subject</th><th>Analyst</th><th>Requester</th><th>Status</th><th class="num">Age</th></tr></thead><tbody>${openBC
-            .sort((a, b) => a.r.created.localeCompare(b.r.created))
+        ? `<table class="tbl"><thead><tr><th>ID</th><th>Subject</th><th>Analyst</th><th>Requester</th><th>Status</th><th class="num">Age</th></tr></thead><tbody>${UI.cap(
+            'hd-open',
+            openBC.sort((a, b) => a.r.created.localeCompare(b.r.created)),
+            50
+          )
             .map(
               x =>
                 `<tr><td>${h(x.r.reqId)}</td><td>${h(x.r.subject)}</td><td>${memberCell(x.mid)}</td><td>${h(x.r.requester)}</td><td>${UI.sbadge(x.r.status)}</td><td class="num">${U.diffDays(x.r.created, U.todayStr())}d</td></tr>`
             )
-            .join('')}</tbody></table>`
+            .join('')}</tbody></table>${UI.capMore('hd-open', openBC.length, 50)}`
         : empty('No open requests.')
     )}
     `;
@@ -72,7 +82,7 @@ P.helpdesk = sub => {
           ['Open', 'Still open'],
         ],
       },
-    ])}${App.isSuper() ? addBtn('helpdesk', 'Add manually') : ''}</div>
+    ])}${App.isSuper() || App.can('editHelpdeskByHand') ? addBtn('helpdesk', 'Add manually') : ''}</div>
     ${UI.table({
       id: 'hd',
       rows,
@@ -198,8 +208,10 @@ function bindImport(root) {
     const plan = recs.map(r => {
       const cur = Store.get(r.id);
       const next = withTeam(r);
-      return { next, kind: !cur ? 'new' : same(next, cur) ? 'same' : 'changed' };
-    });
+      if (cur && same(next, cur)) return { next, kind: 'same' };
+      const a = HDLock.forImport(cur, next);
+      return { next: a.rec || next, kind: a.kind };
+    }); // locked months: skipped, or only closed
     // requests the app has (same teams, created within the file's dates) that are not in the file: deleted / merged in ManageEngine
     const teamsIn = new Set(plan.map(p => p.next.team || 'apps'));
     const cr = recs
@@ -209,16 +221,30 @@ function bindImport(root) {
     const fromD = cr[0],
       toD = cr[cr.length - 1];
     const inFile = new Set(recs.map(r => r.id));
-    const gone = fromD
+    // only open months the file covers from their first day (the oldest month of an export is usually cut off)
+    // requests we have that are NOT in today's file, created inside the file's dates = transferred to another team or deleted in ManageEngine.
+    // In open months they are removed; in locked months they are kept (Admin → Help desk months decides which months are locked).
+    const T = d => String(d || '').replace(' ', 'T');
+    const inRange = fromD
       ? Store.all('helpdesk', '*').filter(
-          r => teamsIn.has(r.team || 'apps') && !inFile.has(r.id) && r.created && r.created >= fromD && r.created <= toD
+          r => teamsIn.has(r.team || 'apps') && r.created && T(r.created) >= T(fromD) && T(r.created) <= T(toD)
         )
       : [];
+    const gone = inRange.filter(r => !inFile.has(r.id) && !HDLock.locked(r));
+    const keptLocked = inRange.filter(r => !inFile.has(r.id) && HDLock.locked(r)).length;
+    // automatic only for a full daily export (5+ months of requests) and a sensible number; otherwise the importer ticks it
+    const complete = !!fromD && U.diffDays(fromD.slice(0, 10), toD.slice(0, 10)) >= 150;
+    const auto = complete && gone.length <= Math.max(20, Math.round(inRange.length * 0.1));
+    const goneOpen = gone.filter(r => !Calc.isClosed(r.status)).length;
     const isNew = plan.filter(p => p.kind === 'new').length,
       nChanged = plan.filter(p => p.kind === 'changed').length,
       nSame = plan.filter(p => p.kind === 'same').length;
+    const nClosed = plan.filter(p => p.kind === 'closed').length,
+      nLocked = plan.filter(p => p.kind === 'locked').length;
+    const lockedMonths = [...new Set(plan.filter(p => p.kind === 'locked').map(p => HDLock.monthOf(p.next)))].sort().map(HDLock.label);
     const unknownTech = [...new Set(recs.map(r => r.technician).filter(t => t && !Store.memberByMeName(t) && U.lc(t) !== 'not assigned'))];
-    prev.innerHTML = `<div class="imp-sum">${UI.badge(recs.length + ' requests found', 'good')} ${UI.badge(isNew + ' new')} ${UI.badge(nChanged + ' changed — will be updated')} ${UI.badge(nSame + ' unchanged — skipped')} ${dupes ? UI.badge(dupes + ' duplicate rows merged') : ''} ${missing.length ? UI.badge('Missing columns: ' + missing.join(', '), 'warn') : ''}</div>
+    prev.innerHTML = `<div class="imp-sum">${UI.badge(recs.length + ' requests found', 'good')} ${UI.badge(isNew + ' new')} ${UI.badge(nChanged + ' changed — will be updated')} ${UI.badge(nSame + ' unchanged — skipped')} ${nClosed ? UI.badge(nClosed + ' closed in a locked month — status only', 'warn') : ''} ${nLocked ? UI.badge(`${nLocked} in locked months — skipped`, '') : ''} ${dupes ? UI.badge(dupes + ' duplicate rows merged') : ''} ${missing.length ? UI.badge('Missing columns: ' + missing.join(', '), 'warn') : ''}</div>
+      ${nLocked ? `<p class="muted small">🔒 Locked months (${h(lockedMonths.join(', '))}) are not changed — their numbers stay as reported. Admin → Customize → Help desk months.</p>` : ''}
       ${unknownTech.length ? `<p class="muted small">Technicians not in the team (counted as "not team"): ${unknownTech.map(h).join(', ')}</p>` : ''}
       <div class="tbl-scroll"><table class="tbl"><thead><tr>${HD_COLS.map(c => `<th>${c.label}</th>`).join('')}</tr></thead><tbody>${recs
         .slice(0, 6)
@@ -229,22 +255,22 @@ function bindImport(root) {
         .join('')}</tbody></table></div>
       <p class="muted small">Showing the first ${Math.min(6, recs.length)} rows. Check that dates and elapsed hours look right.</p>
       ${
-        gone.length && App.isSuper()
-          ? `<label class="check imp-miss"><input type="checkbox" id="impdelmiss"> <span><b>Remove ${gone.length} request(s) that are in the app but not in this file</b> <span class="muted small">— created ${U.fmtDate(fromD)} – ${U.fmtDate(toD)}, probably deleted or merged in ManageEngine: ${h(
+        gone.length
+          ? `<label class="check imp-miss"><input type="checkbox" id="impdelmiss" ${auto ? 'checked' : ''}> <span><b>Remove ${gone.length} request(s) no longer with the team</b>${goneOpen ? ` <span class="badge warn">${goneOpen} still open in the app</span>` : ''} <span class="muted small">— in the app but not in this file (created ${U.fmtDate(fromD.slice(0, 10))} – ${U.fmtDate(toD.slice(0, 10))}): transferred to another team or deleted in ManageEngine: ${h(
               gone
-                .slice(0, 6)
+                .slice(0, 8)
                 .map(r => '#' + r.reqId)
                 .join(', ')
-            )}${gone.length > 6 ? '…' : ''}. Only tick this if the file has <b>all</b> requests for that period.</span></span></label>`
+            )}${gone.length > 8 ? '…' : ''}.${keptLocked ? ` ${keptLocked} more in locked months are kept.` : ''}${auto ? ' Ticked for you — untick to keep them.' : complete ? ` <b>Not ticked: that is a lot (${gone.length}) — check the file has all the team's requests first.</b>` : ' <b>Not ticked: this file covers less than 5 months, so it may simply not include them.</b>'}</span></span></label>`
           : ''
       }
-      <button class="btn primary" id="impgo" ${recs.length ? '' : 'disabled'}>${isNew + nChanged ? `Import ${isNew + nChanged} new / changed request${isNew + nChanged === 1 ? '' : 's'}` : 'Nothing changed — mark today as imported'}</button>`;
+      <button class="btn primary" id="impgo" ${recs.length ? '' : 'disabled'}>${isNew + nChanged + nClosed ? `Import ${isNew + nChanged + nClosed} new / changed request${isNew + nChanged + nClosed === 1 ? '' : 's'}` : 'Nothing changed — mark today as imported'}</button>`;
     const go = prev.querySelector('#impgo');
     if (go)
       go.onclick = () => {
-        const merged = plan.filter(p => p.kind !== 'same').map(p => p.next);
+        const merged = plan.filter(p => p.kind === 'new' || p.kind === 'changed' || p.kind === 'closed').map(p => p.next);
         const dm = prev.querySelector('#impdelmiss');
-        if (dm && dm.checked) merged.push(...gone.map(r => Object.assign({}, r, { _del: true })));
+        if (dm && dm.checked) merged.push(...gone.map(r => Object.assign({}, r, { _del: true, goneOn: U.todayStr() })));
         const meta = Object.assign({}, Store.meta(), { id: Store.metaId(), c: 'settings', helpdeskUpdated: U.todayStr() });
         Store._importing = true;
         try {
@@ -252,7 +278,10 @@ function bindImport(root) {
         } finally {
           Store._importing = false;
         }
-        UI.toast(`${isNew} new · ${nChanged} updated · ${nSame} unchanged (not saved again)`, 'good');
+        UI.toast(
+          `${isNew} new · ${nChanged + nClosed} updated · ${nSame} unchanged${nLocked ? ` · ${nLocked} in locked months skipped` : ''}${dm && dm.checked && gone.length ? ` · ${gone.length} removed (no longer with the team)` : ''}`,
+          'good'
+        );
         location.hash = '#/helpdesk/overview';
       };
   };
@@ -287,15 +316,26 @@ const HD2T = {
     return x.r.created ? U.diffDays(x.r.created.slice(0, 10), U.todayStr()) : 0;
   },
   stale() {
-    return Calc.helpdesk(null)
-      .filter(x => x.bc && !x.closed && !x.central && x.mid && HD2T.age(x) > HD2T.DAYS)
-      .sort((a, b) => HD2T.age(b) - HD2T.age(a));
-  },
-  todoOf(x) {
-    return (
-      Store.all('todo', '*').find(t => t.hdReq && String(t.hdReq) === String(x.r.reqId) && t.status !== 'Canceled' && !t.finish) || null
+    return Calc.memo('hd2t-stale' + U.todayStr() + HD2T.DAYS, () =>
+      Calc.helpdesk(null)
+        .filter(x => x.bc && !x.closed && !x.central && x.mid && HD2T.age(x) > HD2T.DAYS)
+        .sort((a, b) => HD2T.age(b) - HD2T.age(a))
     );
   },
+  /* open To Dos made from a help-desk request, by request id — built once per data change */
+  index() {
+    return Calc.memo('hd2t-idx', () => {
+      const m = new Map();
+      for (const t of Store.all('todo', '*'))
+        if (t.hdReq && t.status !== 'Canceled' && !t.finish && !m.has(String(t.hdReq))) m.set(String(t.hdReq), t);
+      return m;
+    });
+  },
+  todoOf(x) {
+    return HD2T.index().get(String(x.r.reqId)) || null;
+  },
+  SHOW: 50,
+  _all: false,
   can() {
     return App.can('assignTodo') && App.canEdit('todo');
   },
@@ -329,23 +369,35 @@ const HD2T = {
     return card(
       `Open requests older than ${HD2T.DAYS} days <span class="count">${l.length}</span>`,
       `<div class="row-btns tight"><label class="check"><input type="checkbox" data-h2all> Select all</label><span class="grow"></span><button class="btn sm primary" data-h2bulk ${waiting.length ? '' : 'disabled'}>→ Send selected to To Do</button></div>
-      <div class="tbl-scroll"><table class="tbl"><thead><tr><th></th><th>ID</th><th>Subject</th><th>Analyst</th><th class="num">Days open</th><th></th></tr></thead><tbody>${l
+      <div class="tbl-scroll"><table class="tbl"><thead><tr><th></th><th>ID</th><th>Subject</th><th>Analyst</th><th class="num">Days open</th><th></th></tr></thead><tbody>${(HD2T._all
+        ? l
+        : l.slice(0, HD2T.SHOW)
+      )
         .map(x => {
           const t = HD2T.todoOf(x);
           return `<tr><td>${t ? '' : `<input type="checkbox" data-h2="${h(x.r.id)}">`}</td><td class="mono">${h(x.r.reqId)}</td><td>${h(x.r.subject || '')}</td><td>${h(Store.memberShort(x.mid))}</td><td class="num t-bad">${HD2T.age(x)}</td><td class="nw">${t ? '<span class="badge good">in To Do</span>' : `<button class="btn xs" data-h2one="${h(x.r.id)}">→ To Do</button>`}</td></tr>`;
         })
         .join('')}</tbody></table></div>
+      ${l.length > HD2T.SHOW && !HD2T._all ? `<p class="small"><a href="#" class="link" data-h2more>Show all ${l.length} (showing the ${HD2T.SHOW} oldest)</a></p>` : ''}
       <p class="muted small">Each becomes a To Do for that analyst: “Help desk #… : subject”, due tomorrow, High priority. Requests already in a To Do are marked.</p>`
     );
   },
   bind(root) {
+    const more = root.querySelector('[data-h2more]');
+    if (more)
+      more.onclick = e => {
+        e.preventDefault();
+        HD2T._all = true;
+        App.render(true);
+      };
     const all = root.querySelector('[data-h2all]');
     if (all)
       all.onchange = () =>
         root.querySelectorAll('[data-h2]').forEach(c => {
           c.checked = all.checked;
         });
-    const get = id => Calc.helpdesk(null).find(x => x.r.id === id);
+    const byId = new Map(Calc.helpdesk(null).map(x => [x.r.id, x]));
+    const get = id => byId.get(id);
     root.querySelectorAll('[data-h2one]').forEach(
       b =>
         (b.onclick = e => {

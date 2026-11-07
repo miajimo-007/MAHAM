@@ -1,4 +1,4 @@
-/* DARRIK — Date helpers. Dates are stored as local "YYYY-MM-DD" (or "YYYY-MM-DDTHH:MM") strings. */
+/* MAHAM — Date helpers. Dates are stored as local "YYYY-MM-DD" (or "YYYY-MM-DDTHH:MM") strings. */
 'use strict';
 
 Object.assign(U, {

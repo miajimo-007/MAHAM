@@ -1,4 +1,4 @@
-/* DARRIK — My Day — personal start page for analysts. */
+/* MAHAM — Analyst Desk — personal start page for analysts. */
 'use strict';
 
 P.home = () => {
@@ -81,7 +81,7 @@ P.home = () => {
   })()}
   </div>
   <div class="cols2">
-    <div>${myWorkCard()}
+    <div>${GC.myDayCard()}${myWorkCard()}
     ${
       nAct
         ? card(
@@ -105,6 +105,7 @@ P.home = () => {
           )
         : ''
     }
+    ${monthGlance(me, y, mo, live)}
     </div>
     <div>
     ${
@@ -136,7 +137,7 @@ P.home = () => {
     </div>
   </div>`;
   return {
-    title: 'My Day',
+    title: 'Analyst Desk',
     html,
     mount(root) {
       const f = root.querySelector('#quicksw');
@@ -180,6 +181,54 @@ P.home = () => {
       bindRequests(root);
       bindAnn(root);
       QS.bind(root);
+      GC.bindMyDay(root);
     },
   };
 };
+
+/* Analyst Desk: this month at a glance — where my score comes from, lazy days so far, and what is due in the next 7 days */
+function monthGlance(me, y, mo, live) {
+  const today = U.todayStr(),
+    wk = U.addDays(today, 7);
+  const S = Calc.scoring(y);
+  const W = S.weights;
+  const parts = live
+    ? [
+        ['To Do on time', live.todo, W.todo],
+        ['Help desk', live.helpdesk, W.helpdesk],
+        ['Shadow work', live.shadow, W.shadow],
+        ['Quick wins', live.quickwins, W.quickwins],
+        ['Attendance', live.attendance, W.attendance],
+      ]
+    : [];
+  const lz = (() => {
+    try {
+      const r = Calc.lazy(y).res[me];
+      return r && r[mo];
+    } catch (e) {
+      return null;
+    }
+  })();
+  const due = [
+    ...Calc.todos(null)
+      .filter(t => t.r.analyst === me && t.status === 'In Progress' && t.due && t.due <= wk)
+      .map(t => ({ d: t.due, t: 'To Do', s: t.r.task, e: `todo|${t.r.id}` })),
+    ...Store.all('quickwin')
+      .filter(q => q.analyst === me && U.lc(q.status) === 'in-progress' && q.expected && q.expected <= wk)
+      .map(q => ({ d: q.expected, t: 'Quick win', s: q.subject, e: `quickwin|${q.id}` })),
+    ...Store.all('ptask')
+      .filter(t => t.assignee === me && t.status !== 'Done' && t.due && t.due <= wk)
+      .map(t => ({ d: t.due, t: 'Project task', s: t.title, href: `#/project/${t.project}` })),
+  ]
+    .sort((a, b) => a.d.localeCompare(b.d))
+    .slice(0, 8);
+  if (!parts.length && !due.length && !(lz && lz.work)) return '';
+  const row = x =>
+    `<div class="li ${x.e ? 'click' : ''}" ${x.e ? `data-edit="${h(x.e)}"` : ''}><span class="grow">${x.href ? `<a href="${x.href}">${h(x.s)}</a>` : h(x.s)}<div class="muted small">${x.t}</div></span><span class="nw ${x.d < today ? 't-bad' : x.d === today ? 't-warn' : 'muted'}">${x.d < today ? 'late · ' : x.d === today ? 'today · ' : ''}${U.fmtDate(x.d)}</span></div>`;
+  return card(
+    `This month at a glance`,
+    `${parts.length ? `<div class="glance">${parts.map(([l, v, w]) => `<div class="gl-row"><span>${l}</span><div class="pbar"><span style="width:${w ? Math.round((v / w) * 100) : 0}%"></span></div><b>${U.num(v, 1)}<span class="muted">/${w}</span></b></div>`).join('')}</div>` : ''}
+    ${lz && lz.work ? `<p class="small ${lz.lazy ? '' : 'muted'}" style="margin:8px 0">${lz.lazy ? `⚠ <b>${lz.lazy}</b> of ${lz.work} working day${lz.work > 1 ? 's' : ''} this month have no recorded work.` : `✓ Work recorded on all ${lz.work} working days so far.`}</p>` : ''}
+    <h4 class="glance-h">Due in the next 7 days</h4>${due.length ? due.map(row).join('') : '<p class="muted small">Nothing due this week.</p>'}`
+  );
+}

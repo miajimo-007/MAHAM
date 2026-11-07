@@ -1,4 +1,4 @@
-/* DARRIK — UI basics: DOM shortcuts, toasts, modal dialogs, confirm. */
+/* MAHAM — UI basics: DOM shortcuts, toasts, modal dialogs, confirm. */
 'use strict';
 
 const UI = {
@@ -8,16 +8,57 @@ const UI = {
   $$(sel, root) {
     return [...(root || document).querySelectorAll(sel)];
   },
-  toast(msg, kind) {
+  toast(msg, kind, action) {
     const t = document.createElement('div');
     t.className = 'toast ' + (kind || '');
     t.textContent = msg;
+    if (action) {
+      const b = document.createElement('button');
+      b.className = 'toast-act';
+      b.textContent = action.label;
+      b.onclick = () => {
+        t.remove();
+        action.fn();
+      };
+      t.appendChild(b);
+      t.classList.add('has-act');
+    }
     UI.$('#toasts').appendChild(t);
     setTimeout(() => t.classList.add('show'), 10);
-    setTimeout(() => {
-      t.classList.remove('show');
-      setTimeout(() => t.remove(), 300);
-    }, 3200);
+    setTimeout(
+      () => {
+        t.classList.remove('show');
+        setTimeout(() => t.remove(), 300);
+      },
+      action ? 8000 : 3200
+    );
+  },
+  /* save with an "Undo" button on the message: undo puts each record back as it was (a new one is removed again) */
+  saveUndo(list, msg, kind) {
+    list = list.filter(Boolean);
+    for (const r of list) if (!r.id) r.id = U.uid(r.c);
+    const before = list.map(r => {
+      const p = Store.db.get(r.id);
+      return p ? JSON.parse(JSON.stringify(p)) : null;
+    });
+    const ids = list.map(r => r.id);
+    const v0 = Store.ver;
+    Store.saveMany(list);
+    if (Store.ver === v0) return false; // nothing was saved (not allowed) — saveMany already said why
+    UI.toast(msg || 'Saved', kind || 'good', {
+      label: '↶ Undo',
+      fn: () => {
+        const back = ids
+          .map((id, i) =>
+            before[i] ? Object.assign({}, before[i]) : Store.db.get(id) ? Object.assign({}, Store.db.get(id), { _del: true }) : null
+          )
+          .filter(Boolean);
+        Store.saveMany(back);
+        UI.toast('Undone', 'good');
+        App.render(true);
+      },
+    });
+    return true;
   },
   /* ---------- modal ---------- */
   modal({ title, body, wide, onMount, actions }) {
@@ -31,17 +72,48 @@ const UI = {
       ${actions ? `<div class="modal-foot">${actions}</div>` : ''}</div>`;
     document.body.appendChild(wrap);
     wrap.addEventListener('mousedown', e => {
-      if (e.target === wrap) UI.closeModal();
+      if (e.target === wrap) UI.tryClose();
     });
-    wrap.querySelector('[data-close]').onclick = UI.closeModal;
+    wrap.querySelector('[data-close]').onclick = UI.tryClose;
     document.addEventListener('keydown', UI._esc);
     if (onMount) onMount(wrap);
+    wrap._start = UI.formState(wrap); // to know later whether anything was typed
     const f = wrap.querySelector('input:not([type=hidden]):not([readonly]),select,textarea');
     if (f) setTimeout(() => f.focus(), 30);
     return wrap;
   },
   _esc(e) {
-    if (e.key === 'Escape') UI.closeModal();
+    if (e.key === 'Escape') UI.tryClose();
+  },
+  /* what is typed in the dialog's forms right now */
+  formState(wrap) {
+    return [...wrap.querySelectorAll('.modal-body form input, .modal-body form select, .modal-body form textarea')]
+      .filter(el => el.name && el.type !== 'hidden')
+      .map(el => (el.type === 'checkbox' || el.type === 'radio' ? (el.checked ? 1 : 0) : el.value))
+      .join('\u0001');
+  },
+  modalDirty(wrap) {
+    return !!wrap && wrap._start != null && UI.formState(wrap) !== wrap._start;
+  },
+  /* closing by ✕ / Esc / clicking outside / Cancel: ask first when something was typed */
+  tryClose() {
+    const m = UI.$('#modal');
+    if (!m) return;
+    if (UI.modalDirty(m)) {
+      // the bar is added only now, so it never gets in the way of the dialog's own buttons
+      if (m.querySelector('.unsaved-bar')) return UI.closeModal(); // asked already: a second Esc / ✕ discards
+      const b = document.createElement('div');
+      b.className = 'unsaved-bar';
+      b.innerHTML =
+        'You have changes that are not saved. <span class="grow"></span><button class="btn sm" data-keepedit>Keep editing</button><button class="btn sm danger" data-discard>Discard changes</button>';
+      const body = m.querySelector('.modal-body');
+      body.after(b);
+      b.querySelector('[data-keepedit]').onclick = () => b.remove();
+      b.querySelector('[data-discard]').onclick = () => UI.closeModal();
+      b.querySelector('[data-keepedit]').focus();
+      return;
+    }
+    UI.closeModal();
   },
   closeModal() {
     const m = UI.$('#modal');
@@ -67,3 +139,11 @@ const UI = {
     });
   },
 };
+/* leaving the page with a half-filled form open: the browser asks first */
+window.addEventListener('beforeunload', e => {
+  const m = document.getElementById('modal');
+  if (m && UI.modalDirty(m)) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});

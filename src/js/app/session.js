@@ -1,4 +1,4 @@
-/* DARRIK — Signing in: choosing a person, PINs, switching person. */
+/* MAHAM — Signing in: choosing a person, PINs, switching person. */
 'use strict';
 
 Object.assign(App, {
@@ -146,7 +146,10 @@ Object.assign(App, {
     return ts.includes(last) ? last : ts[0] || 'apps';
   },
   setMe(id) {
-    if (App.me !== id) App.mode = 'analyst';
+    if (App.me !== id) {
+      App.mode = 'analyst';
+      App.restoreView(id);
+    }
     if (App.me && App.me !== id) {
       if (typeof Admin !== 'undefined' && !App.preview)
         try {
@@ -165,3 +168,28 @@ Object.assign(App, {
     Store.rebuild();
   },
 });
+
+/* Remembered filters: each person's page filters, table search and sort are kept on this PC and come back next time */
+App.saveView = U.debounce(() => {
+  if (!App.me || App.preview) return;
+  const ok = v => v == null || ['string', 'number', 'boolean'].includes(typeof v);
+  const ps = {};
+  for (const [pg, o] of Object.entries(App.ps || {})) {
+    if (!o || typeof o !== 'object') continue;
+    const x = {};
+    for (const [k, v] of Object.entries(o)) if (ok(v)) x[k] = v;
+    ps[pg] = x;
+  }
+  const ts = {};
+  for (const [id, st] of Object.entries(App.tableState || {}))
+    if (!id.startsWith('cap:') && st && typeof st === 'object')
+      ts[id] = { q: st.q || '', sort: st.sort == null ? null : st.sort, dir: st.dir || -1 };
+  LS.set('bct.view.' + App.me, { ps, ts });
+}, 600);
+App.restoreView = function (id) {
+  const v = LS.get('bct.view.' + id, null);
+  if (!v || typeof v !== 'object') return;
+  App.ps = v.ps && typeof v.ps === 'object' ? v.ps : {};
+  App.tableState = {};
+  for (const [k, st] of Object.entries(v.ts || {})) App.tableState[k] = { q: st.q || '', sort: st.sort, dir: st.dir || -1, limit: 100 };
+};

@@ -1,4 +1,4 @@
-/* DARRIK — System Check — health of the shared folder and data (super admin only). */
+/* MAHAM — System Check — health of the shared folder and data (super admin only). */
 'use strict';
 
 const COLL_LABEL = {
@@ -178,10 +178,35 @@ P.syscheck = () => {
         )
       : ''
   }
+  ${(() => {
+    // Speed: how big each person's files are and how long opening / refreshing / saving took on this PC
+    const S = Store.stats || {};
+    const mb = n => U.num(n / 1048576, 1) + ' MB';
+    const per = new Map();
+    for (const [k, v] of Object.entries(Store.sources)) {
+      if (!k.startsWith('u:')) continue;
+      const o = Store.fileOwner(k.slice(2));
+      const x = per.get(o) || { main: 0, hd: 0, n: 0 };
+      if (Store.isMainKey(k)) x.main += v.size || 0;
+      else x.hd += v.size || 0;
+      x.n++;
+      per.set(o, x);
+    }
+    const rows = [...per].sort((a, b) => b[1].main + b[1].hd - (a[1].main + a[1].hd)).slice(0, 12);
+    const big = rows.filter(([, x]) => x.main > 8 * 1048576);
+    const ms = v => (v == null ? '–' : v < 1000 ? v + ' ms' : U.num(v / 1000, 1) + ' s');
+    return card(
+      'Speed',
+      `${big.length ? `<div class="insights warnbox"><div>⚠ ${big.map(([o]) => h(Store.memberShort(o))).join(', ')}: main data file over 8 MB — saving may slow down. It shrinks by itself after the year is archived (from February).</div></div>` : ''}
+      <div class="kpis k4">${UI.kpi('Opening', ms(S.openMs), S.openedFrom || '')}${UI.kpi('Refresh (read changes)', ms(S.syncMs), 'last time')}${UI.kpi('Saving', ms(S.saveMs), S.saveFiles ? S.saveFiles + ' file(s) written' : 'nothing saved yet')}${UI.kpi('Records loaded', Store.db.size.toLocaleString(), [...Store.loadYears].length ? 'incl. ' + [...Store.loadYears].join(', ') : 'this year + open work')}</div>
+      <div class="tbl-scroll"><table class="tbl"><thead><tr><th>Person</th><th class="num">Main file</th><th class="num">Help desk + archives (read)</th><th class="num">Files</th></tr></thead><tbody>${rows.map(([o, x]) => `<tr><td>${h(Store.memberShort(o))}</td><td class="num ${x.main > 8 * 1048576 ? 't-bad' : ''}">${mb(x.main)}</td><td class="num">${mb(x.hd)}</td><td class="num">${x.n}</td></tr>`).join('')}</tbody></table></div>
+      <p class="muted small">Archived years: ${Store.archiveYears.size ? [...Store.archiveYears].sort().join(', ') + ' (read when picked in the year box)' : 'none yet'}.</p>`
+    );
+  })()}
   ${card('Backups', `<p class="muted small">Every day the <b>first person who opens the app</b> saves a copy of all data files to <code class="pathcode">${h(Store.paths().backups)}</code> (the last ${Store.backupKeep()} days are kept — change it in Admin → Data). There is no server, so on a day nobody opens the app (e.g. during Eid) no backup is made. For extra safety, download one now and then and keep it somewhere else.</p><div id="bklist"><p class="muted">Loading backups…</p></div><div class="row-btns"><button class="btn" id="bknow">Back up now</button></div>`)}
   ${card(
     'Teams',
-    `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Team</th><th>Manager</th><th>Team leader</th><th class="num">People</th><th class="num">To Do (open)</th><th class="num">Shadow</th><th class="num">Help desk</th><th>ME imported</th><th class="num">Attendance</th><th class="num">Quick wins (to approve)</th><th class="num">Central</th><th class="num">Courses</th><th class="num">Info & SRS</th></tr></thead><tbody>
+    `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Team</th><th>Manager</th><th>Team leader</th><th class="num">People</th><th class="num">To Do (open)</th><th class="num">Shadow</th><th class="num">Help desk</th><th>ME imported</th><th class="num">Attendance</th><th class="num">Quick wins (to approve)</th><th class="num">Central</th><th class="num">Courses</th><th class="num">Info & Dashboards</th></tr></thead><tbody>
     ${T.map(r => `<tr><td><b>${h(r.t.name)}</b></td><td>${r.mgr ? h(r.mgr.name) : '<span class="t-warn">none</span>'}</td><td>${h(r.tl.map(m => m.short || m.name).join(', ')) || '<span class="muted">—</span>'}</td><td class="num">${r.analysts}</td><td class="num">${r.todo} (${r.openTodo})</td><td class="num">${r.shadow}</td><td class="num">${r.hd}</td><td>${r.hdUpd ? (r.hdUpd === today ? UI.badge('Today', 'good') : UI.badge(U.fmtDate(r.hdUpd), 'warn')) : UI.badge('Never', '')}</td><td class="num">${r.att}</td><td class="num">${r.qw} (${r.qwPend})</td><td class="num">${r.riy}</td><td class="num">${r.course}</td><td class="num">${r.srs}</td></tr>`).join('')}
     <tr class="muted"><td><b>${h(Store.orgName())} — director level</b></td><td colspan="12">${Store.all('mgrtask').length} tasks (${Store.all('mgrtask').filter(r => r.status !== 'Done').length} open) · ${Store.all('project').length} projects (${Store.all('project').filter(r => !['Done', 'Canceled'].includes(r.status)).length} active) · ${Store.all('itdir').length} IT directory contacts</td></tr>
     </tbody></table></div>`
@@ -204,7 +229,7 @@ P.syscheck = () => {
           })()}</td><td class="num">${kb(p.src && p.src.size)}</td><td class="num">${p.recs}</td><td>${Store.pinOf(p.m.id) ? '✓' : '<span class="muted">none</span>'}</td><td>${UI.badge(p.st[0], p.st[1])}</td></tr>`
       )
       .join('')}
-    </tbody></table></div><p class="muted small">Each person's work is saved in <b>DARRIK Data/users/&lt;id&gt;.json</b>. "Never saved" = they haven't opened the app and changed anything yet.</p>`
+    </tbody></table></div><p class="muted small">Each person's work is saved in <b>MAHAM Data/users/&lt;id&gt;.json</b>. "Never saved" = they haven't opened the app and changed anything yet.</p>`
   )}
   ${card('Latest changes (all teams)', recent.length ? `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>When</th><th>Who</th><th>What</th><th>Team</th><th>Item</th></tr></thead><tbody>${recent.map(r => `<tr><td class="nw">${U.fmtTs(r._ts)}</td><td>${h(Store.memberName(r._by) || r._by || '')}</td><td>${h(COLL_LABEL[r.c] || r.c)}</td><td>${h(r.team ? Store.teamName(r.team) : '')}</td><td>${h(String(what(r)).slice(0, 90))}</td></tr>`).join('')}</tbody></table></div>` : empty('No changes yet.'))}`;
   return {

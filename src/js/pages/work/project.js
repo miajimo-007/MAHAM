@@ -1,4 +1,4 @@
-/* DARRIK — One project: scrum board, backlog, sprints, team, reports. */
+/* MAHAM — One project: overview, timeline, board, backlog / list, sprints (scrum), risks & issues, status, team, reports. */
 'use strict';
 
 function editMembers(p) {
@@ -71,7 +71,19 @@ P.project = pid => {
     };
   const plan = Scrum.planner(p),
     mem = Scrum.member(p);
-  const tab = ['board', 'backlog', 'sprints', 'team', 'reports'].includes(ps('prj').tab) ? ps('prj').tab : 'board';
+  const scrum = PM.mode(p) === 'scrum';
+  const TABS = [
+    ['overview', 'Overview'],
+    ['timeline', 'Timeline'],
+    ['board', 'Board'],
+    ['backlog', scrum ? 'Backlog' : 'List'],
+    ...(scrum ? [['sprints', 'Sprints']] : []),
+    ['raid', 'Risks & issues'],
+    ['status', 'Status'],
+    ['team', 'Team'],
+    ['reports', 'Reports'],
+  ];
+  const tab = TABS.some(t => t[0] === ps('prj').tab) ? ps('prj').tab : 'overview';
   const items = Scrum.items(pid),
     sprints = Scrum.sprints(pid),
     act = Scrum.active(pid);
@@ -79,12 +91,37 @@ P.project = pid => {
     prog = Scrum.progress(p),
     today = U.todayStr();
   const canAdd = plan || mem;
+  const ctx = { plan, canAdd, items, prog };
   const sprintPts = s => {
     const it = items.filter(t => t.sprint === s.id);
     return { n: it.length, pts: Scrum.pts(it), done: Scrum.pts(it.filter(t => Scrum.isDone(t))) };
   };
   let body;
-  if (tab === 'board') {
+  if (tab === 'overview') body = PMV.overview(p, ctx);
+  else if (tab === 'timeline') body = PMV.timeline(p, ctx);
+  else if (tab === 'raid') body = PMV.raid(p, ctx);
+  else if (tab === 'status') body = PMV.status(p, ctx);
+  else if (tab === 'board' && !scrum) {
+    const mineOnly = ps('prj').mine;
+    const old = U.addDays(today, -30);
+    let it = items.filter(t => !Scrum.isDone(t) || !t.doneDate || t.doneDate >= old);
+    if (mineOnly) it = it.filter(t => t.assignee === App.me);
+    const hidden = items.filter(t => Scrum.isDone(t) && t.doneDate && t.doneDate < old).length;
+    body = `<div class="page-actions"><label class="flt tog"><input type="checkbox" id="mineonly" ${mineOnly ? 'checked' : ''}> Only my tasks</label><span class="grow"></span>${hidden ? `<span class="muted small">${hidden} done more than 30 days ago not shown</span>` : ''}${canAdd ? `<button class="btn primary" id="additem">＋ Add task</button>` : ''}</div>
+      <div class="kanban" style="--cols: ${Scrum.columns(p).length}">${Scrum.columns(p)
+        .map((st, ci) => {
+          const col = it
+            .filter(t => Scrum.colIndex(t) === ci)
+            .sort(
+              (a, b) =>
+                ({ High: 0, Normal: 1, Low: 2 })[a.priority || 'Normal'] - { High: 0, Normal: 1, Low: 2 }[b.priority || 'Normal'] ||
+                (a.due || '9').localeCompare(b.due || '9') ||
+                (a.n || 0) - (b.n || 0)
+            );
+          return `<div class="kcol" data-col="${h(st)}"><div class="kcol-h"><b>${h(st)}</b><span class="count">${col.length}</span></div>${col.map(t => ptCard(t, p)).join('') || '<div class="kempty">—</div>'}</div>`;
+        })
+        .join('')}</div>`;
+  } else if (tab === 'board') {
     const sel = ps('prj').sp && sprints.some(s => s.id === ps('prj').sp) ? ps('prj').sp : act ? act.id : '';
     const sp = sprints.find(s => s.id === sel);
     const mineOnly = ps('prj').mine;
@@ -110,25 +147,27 @@ P.project = pid => {
         })
         .join('')}</div>`;
   } else if (tab === 'backlog') {
-    const groups = [
-      ...sprints.filter(s => s.status === 'Active'),
-      ...sprints.filter(s => s.status === 'Planned'),
-      { id: '', name: 'Backlog', status: '' },
-    ];
+    const groups = scrum
+      ? [
+          ...sprints.filter(s => s.status === 'Active'),
+          ...sprints.filter(s => s.status === 'Planned'),
+          { id: '', name: 'Backlog', status: '' },
+        ]
+      : [{ id: '*', name: 'Open tasks', status: '' }];
     const row = t =>
       `<div class="li click" data-edit="ptask|${h(t.id)}"><span class="pc-type t-${U.lc(t.type || 'task')}">${typeIcon(t.type)}</span><span class="muted small mono" style="width:34px">${h(ptKey(t))}</span><span class="grow">${h(t.title)}${t.carried ? ` <span class="muted small">(carried ×${t.carried})</span>` : ''}</span>${UI.sbadge(t.priority === 'Normal' ? '' : t.priority)}<span class="small">${h(Store.memberShort(t.assignee) || '—')}</span>${UI.sbadge(t.status)}<span class="pts">${h(t.points || 0)}</span>${
-        plan
+        plan && scrum
           ? `<select class="xs" data-tosp="${h(t.id)}" title="Move to sprint"><option value="">Backlog</option>${sprints
               .filter(s => s.status !== 'Completed')
               .map(s => `<option value="${h(s.id)}" ${t.sprint === s.id ? 'selected' : ''}>${h(s.name)}</option>`)
               .join('')}</select>`
           : ''
       }</div>`;
-    body = `<div class="page-actions"><span class="muted small">Planning: put the most important work at the top of the backlog, give it points, then move it into a sprint.</span><span class="grow"></span>${canAdd ? '<button class="btn primary" id="additem">＋ Add to backlog</button>' : ''}</div>
+    body = `<div class="page-actions"><span class="muted small">${scrum ? 'Planning: put the most important work at the top of the backlog, give it points, then move it into a sprint.' : 'Every open task. Give tasks a start and due date to see them on the Timeline.'}</span><span class="grow"></span>${canAdd ? `<button class="btn primary" id="additem">＋ Add ${scrum ? 'to backlog' : 'task'}</button>` : ''}</div>
       ${groups
         .map(g => {
           const it = items
-            .filter(t => (t.sprint || '') === g.id && (g.id || !Scrum.isDone(t)))
+            .filter(t => (g.id === '*' ? !Scrum.isDone(t) : (t.sprint || '') === g.id && (g.id || !Scrum.isDone(t))))
             .sort(
               (a, b) =>
                 ({ High: 0, Normal: 1, Low: 2 })[a.priority || 'Normal'] - { High: 0, Normal: 1, Low: 2 }[b.priority || 'Normal'] ||
@@ -194,27 +233,21 @@ P.project = pid => {
           )
         : empty('No active sprint.')
     )}${card('Velocity (points done per sprint)', vel.length ? UI.barChart(vel, { height: 170, fmt: v => U.num(v, 0) }) : empty('Complete a sprint to see velocity.'))}</div>
+    ${PM2V.hoursCard(items)}
     ${card('Work per member (open points)', Scrum.people(p).length ? UI.hbars(Scrum.people(p).map(id => ({ label: Store.memberShort(id), value: Scrum.pts(items.filter(t => t.assignee === id && !Scrum.isDone(t))) }))) : empty('No members.'))}`;
   }
   const html = `<p><a class="link" href="#/projects">← Projects</a></p>
-  <div class="card phead"><div class="ph-main"><h2>${p.restricted ? '🔒 ' : ''}${h(p.name)}</h2><div class="muted small">${p.category ? UI.badge(p.category, 'cat') + ' ' : ''}${h(Store.teamName(p.team))} · Owner ${h(Store.memberShort(p.manager))}${p.origin === 'team' ? '' : ' · from director'}${p.due ? ' · target ' + U.fmtDate(p.due) : ''} · ${Scrum.people(p).length} member${Scrum.people(p).length === 1 ? '' : 's'}</div>${p.description ? `<p class="small">${h(p.description)}</p>` : ''}</div>
-    <div class="ph-side"><div style="min-width:180px">${UI.bar(prog)}<span class="muted small">${prog}% · ${UI.badge(d.health, healthKind(d.health))} ${Flow.of(p) ? UI.badge(Flow.stageOf(p).name, Flow.stuck(p) ? 'bad' : '') : UI.sbadge(p.status)}</span></div>${App.isSuper() ? `<button class="btn sm ghost" id="projvis">${p.restricted ? '🔒 Hidden · ' + (p.viewers || []).length : '🔓 Who can see it'}</button>` : ''}${plan || App.isDir() ? '<button class="btn sm" id="editproj">Edit project</button>' : ''}</div></div>
+  <div class="card phead"><div class="ph-main"><h2>${p.restricted ? '🔒 ' : ''}${h(p.name)}</h2><div class="muted small">${p.category ? UI.badge(p.category, 'cat') + ' ' : ''}${h(Store.teamName(p.team))} · Owner ${h(Store.memberShort(p.manager))}${p.origin === 'team' ? '' : ' · from director'}${p.due ? ' · target ' + U.fmtDate(p.due) : ''} · ${Scrum.people(p).length} member${Scrum.people(p).length === 1 ? '' : 's'} · ${scrum ? 'Scrum' : 'Kanban'}</div>${p.description ? `<p class="small">${h(p.description)}</p>` : ''}</div>
+    <div class="ph-side"><div style="min-width:180px">${UI.bar(prog)}<span class="muted small">${prog}% · ${PM.light(p, true)} ${Flow.of(p) ? UI.badge(Flow.stageOf(p).name, Flow.stuck(p) ? 'bad' : '') : UI.sbadge(p.status)}</span></div>${App.isSuper() ? `<button class="btn sm ghost" id="projvis">${p.restricted ? '🔒 Hidden · ' + (p.viewers || []).length : '🔓 Who can see it'}</button>` : ''}${plan && PM2.canTemplate() ? '<button class="btn sm ghost" id="savetpl" title="Reuse this project\'s phases and tasks">Save as template</button>' : ''}${plan && !PM2.closed(p) && p.status !== 'Canceled' ? '<button class="btn sm ghost" id="closeout">🏁 Close out</button>' : ''}${plan || App.isDir() ? '<button class="btn sm" id="editproj">Edit project</button>' : ''}</div></div>
   ${Flow.bar(p)}
-  <div class="tabs">${[
-    ['board', 'Board'],
-    ['backlog', 'Backlog'],
-    ['sprints', 'Sprints'],
-    ['team', 'Team'],
-    ['reports', 'Reports'],
-  ]
-    .map(([k, l]) => `<a class="tab ${tab === k ? 'on' : ''}" href="javascript:void 0" data-ptab="${k}">${l}</a>`)
-    .join('')}</div>${body}`;
+  <div class="tabs">${TABS.map(([k, l]) => `<a class="tab ${tab === k ? 'on' : ''}" href="javascript:void 0" data-ptab="${k}">${l}</a>`).join('')}</div>${body}`;
   return {
     title: 'Project',
     html,
     mount(root) {
       bindScrum(root);
       Flow.bind(root, p);
+      PMV.bind(root, p, ctx);
       root.querySelectorAll('[data-ptab]').forEach(
         a =>
           (a.onclick = () => {
@@ -255,7 +288,18 @@ P.project = pid => {
       const pv = root.querySelector('#projvis');
       if (pv) pv.onclick = () => projectVisibility(Store.get(pid));
       const ep = root.querySelector('#editproj');
-      if (ep) ep.onclick = () => UI.editRecord('project', p);
+      if (ep)
+        ep.onclick = () =>
+          UI.editRecord('project', p, {
+            after: out => {
+              const cur = Store.get(pid);
+              if (cur && cur.status === 'Done' && !PM2.closed(cur)) setTimeout(() => PM2V.closeOut(cur), 0);
+            },
+          });
+      const st = root.querySelector('#savetpl');
+      if (st) st.onclick = () => PM2V.saveTemplate(Store.get(pid));
+      const co = root.querySelector('#closeout');
+      if (co) co.onclick = () => PM2V.closeOut(Store.get(pid));
       root.querySelectorAll('[data-spstart]').forEach(
         b =>
           (b.onclick = e => {

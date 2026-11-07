@@ -1,4 +1,4 @@
-/* DARRIK — Employee — one person's scores and activity. */
+/* MAHAM — Employee — one person's scores and activity. */
 'use strict';
 
 P.employee = () => {
@@ -42,9 +42,9 @@ P.employee = () => {
     q =>
       (q.analyst === mid || QS.confirmed(q).includes(mid)) &&
       U.lc(q.approval) === 'accepted' &&
-      yearOf(q.date) === y &&
-      (!mo || monthOf(q.date) === mo)
-  );
+      yearOf(q.expected || q.date) === y &&
+      (!mo || monthOf(q.expected || q.date) === mo)
+  ); // same date the score uses
   const fmtEl = hrs => {
     const d = Math.floor(hrs / 24),
       hh = Math.floor(hrs % 24),
@@ -59,7 +59,7 @@ P.employee = () => {
     ${UI.kpi('Same-day closed', sel.hd ? U.pct(sel.hdSame / sel.hd, 0) : '–', `${sel.hd} requests`)}
     ${UI.kpi('Avg closing', U.num(U.avg(sel.hdHrs), 2) + ' h', `target ≤ ${S.closingTargetHrs} h`)}
     ${UI.kpi('To Do on time', sel.todo ? U.pct(sel.onTime / sel.todo, 0) : '–', `${sel.todo} tasks`)}
-    ${UI.kpi('Quick wins', mo ? sel.qw : Store.all('quickwin').filter(q => q.analyst === mid && U.lc(q.approval) === 'accepted' && yearOf(q.date) === y).length, mo ? 'completed' : 'accepted YTD')}
+    ${UI.kpi('Quick wins', sel.qw, mo ? 'completed this month' : 'completed YTD')}
     ${UI.kpi('Shadow work', U.num(sel.swHrs, 1) + ' h', mo ? 'this month' : 'YTD')}
   </div>
   ${card(

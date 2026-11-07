@@ -1,4 +1,4 @@
-/* DARRIK — Record types: courses, recommended courses, IT / EMR directory, SRS, info. */
+/* MAHAM — Record types: courses, recommended courses, IT / EMR directory, SRS, info. */
 'use strict';
 
 Object.assign(Schemas, {
@@ -94,21 +94,51 @@ Object.assign(Schemas, {
       { key: 'analyst', label: 'Analyst', type: 'member' },
     ],
   },
+  /* Dashboards & Links (was "SRS & E-CTS": the old number / owner are shown as name / responsible) */
   srs: {
-    single: 'SRS / E-CTS',
+    single: 'Dashboard / link',
+    defaults: () => ({ category: 'Dashboard' }),
     fields: [
-      { key: 'number', label: 'SRS / E-CTS no.', type: 'text', required: true },
-      { key: 'owner', label: 'Analyst / owner', type: 'text' },
+      { key: 'name', label: 'Name', type: 'text', required: true, span: 2, placeholder: 'e.g. OR utilisation dashboard' },
+      { key: 'url', label: 'Link', type: 'text', span: 2, placeholder: 'https://…  or  \\\\server\\share\\file' },
+      {
+        key: 'responsible',
+        label: 'Responsible',
+        type: 'list',
+        options: () => [
+          ...new Set(
+            [...Store.activeTeam().map(m => Store.memberShort(m.id)), ...Store.all('srs').map(r => r.responsible || r.owner)].filter(
+              Boolean
+            )
+          ),
+        ],
+        placeholder: 'pick or type a name',
+      },
+      {
+        key: 'category',
+        label: 'Type',
+        type: 'list',
+        options: () => [...new Set(['Dashboard', 'Report', 'Link', ...Store.all('srs').map(r => r.category)].filter(Boolean))],
+      },
       { key: 'notes', label: 'Notes', type: 'textarea', span: 2, rows: 2 },
     ],
+    beforeSave(r) {
+      if (!r.name && r.number) r.name = r.number;
+      if (!r.responsible && r.owner) r.responsible = r.owner;
+      r.url = Links.clean(r.url);
+    },
   },
   info: {
     single: 'Info item',
     fields: [
       { key: 'category', label: 'Category', type: 'list', options: () => [...new Set(Store.all('info').map(r => r.category))] },
       { key: 'title', label: 'Title', type: 'text', required: true },
-      { key: 'value', label: 'Value / details', type: 'textarea', span: 2, rows: 2 },
+      { key: 'value', label: 'Value / details', type: 'textarea', span: 2, rows: 3 },
+      { key: 'url', label: 'Link (optional)', type: 'text', span: 2, placeholder: 'https://…  or  \\\\server\\share\\file' },
     ],
+    beforeSave(r) {
+      r.url = Links.clean(r.url);
+    },
     formNote: 'Avoid storing passwords here — everyone with access to the shared folder can read this data.',
   },
 });

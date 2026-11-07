@@ -1,7 +1,7 @@
-/* DARRIK service worker — lets the app be installed on a phone and open without a connection.
+/* MAHAM service worker — lets the app be installed on a phone and open without a connection.
  * The app files are cached; the data is never cached here (it lives in the shared folder, the device or the database). */
-const CACHE = 'darrik-v1';
-const FILES = ['DARRIK.html', 'darrik.config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const CACHE = 'maham-v1';
+const FILES = ['MAHAM.html', 'maham.config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -22,6 +22,6 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, copy));
         return r;
       })
-      .catch(() => caches.match(e.request).then(r => r || caches.match('DARRIK.html')))
+      .catch(() => caches.match(e.request).then(r => r || caches.match('MAHAM.html')))
   );
 });

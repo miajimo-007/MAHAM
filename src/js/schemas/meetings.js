@@ -1,4 +1,4 @@
-/* DARRIK — Record types: meeting (edited on its own page) and personal task. */
+/* MAHAM — Record types: meeting (edited on its own page) and personal task. */
 'use strict';
 
 Object.assign(Schemas, {
@@ -6,10 +6,13 @@ Object.assign(Schemas, {
   mytask: {
     single: 'Personal task',
     readOnly: r => !!r.id && r.owner !== App.me,
-    defaults: () => ({ owner: App.me, status: 'Open' }),
+    defaults: () => ({ owner: App.me, status: 'Open', priority: 'Normal' }),
     fields: [
       { key: 'title', label: 'Task', type: 'text', required: true, span: 2 },
+      { key: 'plan', label: 'Planned for (the day you will work on it)', type: 'date', hint: 'empty = today' },
       { key: 'due', label: 'Due date', type: 'date' },
+      { key: 'priority', label: 'Priority', type: 'select', options: ['High', 'Medium', 'Normal', 'Low'], blank: false },
+      { key: 'repeat', label: 'Repeat', type: 'select', options: () => PT.REPEAT, blank: false },
       { key: 'status', label: 'Status', type: 'select', options: ['Open', 'Done', 'Canceled'], blank: false },
       {
         key: 'project',
@@ -24,6 +27,7 @@ Object.assign(Schemas, {
       r.owner = r.owner || App.me;
       if (r.status === 'Done' && !r.doneDate) r.doneDate = U.todayStr();
       if (r.status !== 'Done') r.doneDate = '';
+      if (r.due && r.plan && r.due < r.plan) r.due = r.plan;
     },
   },
 });
@@ -66,8 +70,8 @@ Object.assign(Schemas, {
   announcement: {
     single: 'Announcement',
     fields: [],
-    canCreate: () => App.isSuper(),
-    canDelete: () => App.isSuper(),
-    readOnly: () => !App.isSuper(),
+    canCreate: () => Ann.canPost(),
+    canDelete: () => Ann.canPost(),
+    readOnly: () => !Ann.canPost(),
   },
 });

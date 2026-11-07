@@ -1,4 +1,4 @@
-/* DARRIK — App — who is signed in, which team/year is shown, and shortcuts to permissions for the signed-in person. */
+/* MAHAM — App — who is signed in, which team/year is shown, and shortcuts to permissions for the signed-in person. */
 'use strict';
 
 const App = {

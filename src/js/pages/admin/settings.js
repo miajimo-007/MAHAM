@@ -1,4 +1,4 @@
-/* DARRIK — Settings — per-team lists and scoring (super admin only). */
+/* MAHAM — Settings — per-team lists and scoring (super admin only). */
 'use strict';
 
 P.settings = mode => {
@@ -58,7 +58,7 @@ P.settings = mode => {
           UI.toast('Folder connected', 'good');
         } catch (e) {
           if (e.name !== 'AbortError')
-            UI.toast(e.message === 'NOT_APP_FOLDER' ? 'That folder has no "data" folder — pick the DARRIK app folder.' : e.message, 'bad');
+            UI.toast(e.message === 'NOT_APP_FOLDER' ? 'That folder has no "data" folder — pick the MAHAM app folder.' : e.message, 'bad');
         }
       };
       const ea = root.querySelector('#exportall');
@@ -216,6 +216,6 @@ async function exportAll() {
       ],
     };
   });
-  XL.download(await XL.write(sheets), `DARRIK backup ${U.todayStr()}.xlsx`);
+  XL.download(await XL.write(sheets), `MAHAM backup ${U.todayStr()}.xlsx`);
   UI.toast('Backup downloaded', 'good');
 }

@@ -1,4 +1,4 @@
-/* DARRIK — Who may do what. Single place for authorisation rules:
+/* MAHAM — Who may do what. Single place for authorisation rules:
  *  - roles give default permissions (roleDefault); the super admin may override per person (perms)
  *  - each function (page) has a level per team and per person: edit / view / hide
  *  - settings (roles, permissions, lists, scoring) are changed only by the super admin */
@@ -9,11 +9,12 @@ Object.assign(Store, {
      Others may only: record the help-desk import date, lock scores (with permission), and change their OWN PIN. */
   /* announcements: only the super admin posts; a read receipt only for yourself */
   announceAllowed(r) {
-    if (r.c === 'announcement') return Store.isSuper(App.me);
+    if (r.c === 'announcement') return Store.isSuper(App.me) || Store.can(App.me, 'postAnnouncements');
     if (r.c === 'annread') return String(r.id || '').startsWith('annread-' + App.me + '-');
     if (r.c === 'nudge') return r.from === App.me;
     if (r.c === 'adminlog') return Store.isSuper(App.me);
     if (r.c === 'usage') return r.id === 'usage-' + App.me;
+    if (r.c === 'actlog') return String(r.id || '').startsWith('actlog-' + App.me + '-');
     if (r.c === 'userpin') return Store.isSuper(App.me) || r.id === 'userpin-' + App.me;
     return true;
   },
@@ -88,7 +89,10 @@ Object.assign(Store, {
     const k = Store.COLL_PAGE[c];
     return !k || Store.pageLevel(id, k, team) === 'edit';
   }, // only the super admin may change these for a person
+  /* powers nobody has until the administrator gives them (per person, or per team and role in Admin → Team rules) */
+  ADMIN_GIVEN: ['editHelpdeskByHand', 'postAnnouncements', 'useLab'],
   roleDefault(role, key) {
+    if (Store.ADMIN_GIVEN.includes(key)) return false;
     if (role === 'director' || role === 'aed') return true;
     if (key === 'seeNames') return true;
     if (key === 'assignToManagers') return false; // director / AED only (handled above)
@@ -141,7 +145,18 @@ Object.assign(Store, {
     // acting for a manager on leave: also has that manager's permissions (never director-level ones)
     if (!_depth && key !== 'assignToManagers' && Store.actingFor(id).some(mid => Store.can(mid, key, 1))) return true;
     if (m.perms && typeof m.perms[key] === 'boolean') return m.perms[key];
-    return Store.roleDefault(m.role || 'analyst', key);
+    return Store.teamRoleDefault(m, key);
+  },
+  /* the default for a person's role in their team: Admin → Team rules, else the app's built-in role default */
+  teamRoleDefault(m, key) {
+    if (!m) return false;
+    const role = m.role || 'analyst';
+    if (!Store.topRole(role)) {
+      const t = Store.teams().find(x => x.id === (m.team || 'apps'));
+      const v = t && t.roleDefaults && t.roleDefaults[role] && t.roleDefaults[role][key];
+      if (typeof v === 'boolean') return v;
+    }
+    return Store.roleDefault(role, key);
   },
   /* ---- manager leave: delegations (set by the super admin only; stored in settings-delegations) ---- */
   delegations() {

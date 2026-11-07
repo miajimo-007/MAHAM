@@ -1,4 +1,4 @@
-/* DARRIK — Navigation: which pages a person may open, URL hash routing, rendering a page. */
+/* MAHAM — Navigation: which pages a person may open, URL hash routing, rendering a page. */
 'use strict';
 
 Object.assign(App, {
@@ -32,6 +32,7 @@ Object.assign(App, {
         (Meetings.canRun() || Store.all('meeting').some(m => (m.attendees || []).includes(App.me)))
       );
     if (k === 'about' || k === 'feedback') return true;
+    if (k === 'usage') return Admin.canSee(); // Admin decides (permission "See usage")
     if (k === 'perf') return PERF_TABS.some(([x]) => App.pageAllowed(x));
     if (k === 'oneonone' || k === 'overview') return App.isDir() || App.isSuper();
     if (Store.dirHidden(App.me, k)) return false;
@@ -49,21 +50,25 @@ Object.assign(App, {
       } catch (e) {
         console.error(e);
       } // usage (Admin → Home)
-    UI.$$('[data-nav]').forEach(a =>
-      a.classList.toggle(
-        'on',
-        a.dataset.nav ===
-          ({
-            project: 'projects',
-            meeting: 'meetings',
-            dashboard: 'perf',
-            employee: 'perf',
-            performance: 'perf',
-            lazy: 'perf',
-            projperf: 'perf',
-          }[App.page] || App.page)
-      )
-    );
+    const navKey =
+      App.page === 'oncall'
+        ? App.sub === 'goodcatch'
+          ? 'goodcatch'
+          : 'oncall'
+        : App.page === 'helpdesk' && App.sub === 'import' && UI.$('nav [data-nav="hdimport"]')
+          ? 'hdimport'
+          : {
+              project: 'projects',
+              adminperson: 'admin',
+              meeting: 'meetings',
+              dashboard: 'perf',
+              employee: 'perf',
+              performance: 'perf',
+              lazy: 'perf',
+              projperf: 'perf',
+            }[App.page] || App.page;
+    UI.$$('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === navKey));
+    App.navSections();
     App.render();
     UI.$('#main').scrollTop = 0;
     window.scrollTo(0, 0);
@@ -74,6 +79,7 @@ Object.assign(App, {
     const sy = window.scrollY,
       my = main.scrollTop;
     LS.set('bct.ps', App.ps);
+    if (App.saveView) App.saveView();
     let pg;
     try {
       pg = App.pageAllowed(App.page)
@@ -100,7 +106,14 @@ Object.assign(App, {
       (lvl === 'view'
         ? '<div class="insights viewonly"><div>👁 <b>View only</b> — you can look at this page but not change anything.</div></div>'
         : '') + pg.html;
+    main.insertAdjacentHTML('afterbegin', App.secTabs()); // the section's pages as tabs
     if (pg.mount) pg.mount(main);
+    if (typeof Admin !== 'undefined' && Admin.afterRender)
+      try {
+        Admin.afterRender(main);
+      } catch (e) {
+        /* usage only */
+      }
     bindFilters(main);
     bindAdd(main);
     App.bindCopy(main);
@@ -111,6 +124,15 @@ Object.assign(App, {
       })
     );
     if (typeof bindMineActions === 'function') bindMineActions(main);
+    if (typeof PT !== 'undefined') PT.bind(main);
+    main.querySelectorAll('[data-capmore]').forEach(
+      a =>
+        (a.onclick = e => {
+          e.preventDefault();
+          App.tableState['cap:' + a.dataset.capmore] = true;
+          App.render(true);
+        })
+    ); // personal tasks: Done, Give to…, Accept / Decline, ＋ Personal task
     main.querySelectorAll('[data-proj]').forEach(el =>
       el.addEventListener('click', e => {
         if (e.target.closest('button')) return;
@@ -176,3 +198,56 @@ Object.assign(App, {
     }
   },
 });
+
+/* Side menu = sections. The section of the open page is highlighted; each section link goes to the page last used in it
+ * (remembered per person on this PC); a section's count is the sum of its pages' counts. */
+App.secOf = function () {
+  const on = document.querySelector('nav .nav-items a.on');
+  return on ? on.closest('.nav-items').previousElementSibling : null;
+};
+App.navSections = function () {
+  const nav = document.querySelector('aside nav') || document.querySelector('nav');
+  if (!nav) return;
+  const cur = App.secOf();
+  const key = 'bct.seclast.' + (App.me || '');
+  let last = {};
+  try {
+    last = JSON.parse(localStorage.getItem(key) || '{}');
+  } catch (e) {
+    last = {};
+  }
+  if (cur && location.hash) {
+    last[cur.dataset.sec] = location.hash;
+    try {
+      localStorage.setItem(key, JSON.stringify(last));
+    } catch (e) {
+      /* private window */
+    }
+  }
+  nav.querySelectorAll('a.sec').forEach(s => {
+    s.classList.toggle('on', s === cur);
+    if (s === cur) s.setAttribute('aria-current', 'page');
+    else s.removeAttribute('aria-current');
+    const box = s.nextElementSibling;
+    const links = box ? [...box.querySelectorAll('a[href]')] : [];
+    const want = last[s.dataset.sec];
+    const ok = want && links.some(l => want.startsWith(l.getAttribute('href').split('/').slice(0, 2).join('/')));
+    s.setAttribute('href', ok ? want : links[0] ? links[0].getAttribute('href') : '#/home');
+    const n = links.reduce((t, l) => t + [...l.querySelectorAll('.count')].reduce((x, c) => x + (parseInt(c.textContent, 10) || 0), 0), 0);
+    const b = s.querySelector('.sec-n');
+    if (b) {
+      b.hidden = !n;
+      b.textContent = n || '';
+    }
+  });
+  const host = document.querySelector('#main .sec-tabs');
+  if (host) host.outerHTML = App.secTabs();
+};
+/* the tabs of the section at the top of the page (copies of the section's links, with their counts) */
+App.secTabs = function () {
+  const s = App.secOf();
+  if (!s) return '';
+  const links = [...s.nextElementSibling.querySelectorAll('a[href]')];
+  if (links.length < 2) return '<div class="sec-tabs" hidden></div>';
+  return `<div class="sec-tabs" role="tablist" aria-label="${U.h(s.querySelector('.sec-l').textContent)}">${links.map(l => `<a href="${l.getAttribute('href')}" class="sec-tab ${l.classList.contains('on') ? 'on' : ''}" data-tab="${U.h(l.dataset.nav)}">${l.innerHTML}</a>`).join('')}</div>`;
+};

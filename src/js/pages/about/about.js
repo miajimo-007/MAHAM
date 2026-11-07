@@ -1,4 +1,4 @@
-/* DARRIK — About DARRIK (everyone can open it: menu → About DARRIK).
+/* MAHAM — About MAHAM (everyone can open it: menu → About MAHAM).
  * The text lives in the settings record 'settings-about' so the super admin can edit it in the app
  * (✎ Edit page). Until it is edited the built-in text below is shown. */
 'use strict';
@@ -7,18 +7,18 @@ const About = {
   ID: 'settings-about',
   DEFAULT: {
     tagline: 'Every Effort Matters.',
-    aboutTitle: 'About DARRIK',
+    aboutTitle: 'About MAHAM',
     about: `Every Effort Matters.
 
 Behind every successful organization are countless efforts that often go unnoticed.
 
 Tasks completed behind the scenes, challenges resolved, and contributions made every day. Yet, not all of this work is captured, measured, or connected to organizational goals.
 
-DARRIK was created with one belief:
+MAHAM was created with one belief:
 
 > Every effort deserves to be seen, every contribution deserves to be recognized and every action should have a purpose.
 
-Inspired by a Saudi colloquial expression meaning to catch something before it slips away and hold onto it firmly, DARRIK is an Effort-to-Impact Platform designed to connect work, people, performance, and strategy.
+Inspired by a Saudi colloquial expression meaning to catch something before it slips away and hold onto it firmly, MAHAM is an Effort-to-Impact Platform designed to connect work, people, performance, and strategy.
 
 Our goal is to transform everyday efforts into measurable organizational impact.`,
     peopleTitle: '',
@@ -29,7 +29,7 @@ Our goal is to transform everyday efforts into measurable organizational impact.
     philosophyTitle: 'Our Philosophy',
     philosophy:
       "We're not building another task management tool.\n\nWe're building a better way to understand work, recognize contributions, and turn everyday efforts into meaningful results.",
-    footer: 'DARRIK — Every Effort Matters.',
+    footer: 'MAHAM — Every Effort Matters.',
     footer2: 'From Effort to Impact.',
   },
   get() {
@@ -158,7 +158,7 @@ P.about = () => {
     `<section class="ab-person">${x.role ? `<div class="ab-role">${h(x.role)}</div>` : ''}<h3>${h(x.name)}</h3>${About.paras(x.text)}</section>`;
   const html = `<div class="about">
   ${canEdit ? '<div class="ab-tools"><button class="btn sm" id="abedit">✎ Edit page</button></div>' : ''}
-  <header class="ab-hero">${Store.appLogo() ? `<img class="ab-logo" src="${h(Store.appLogo())}" alt="">` : '<div class="ab-mark">D</div>'}<h1>${h(Store.appName ? Store.appName() : 'DARRIK')}</h1>${A.tagline ? `<p class="ab-tag">${h(A.tagline)}</p>` : ''}</header>
+  <header class="ab-hero">${Store.appLogo() ? `<img class="ab-logo" src="${h(Store.appLogo())}" alt="">` : `<div class="ab-mark">${APP_MARK}</div>`}<h1>${h(Store.appName ? Store.appName() : 'MAHAM')}</h1>${A.tagline ? `<p class="ab-tag">${h(A.tagline)}</p>` : ''}</header>
 
   ${A.about ? `<section class="card ab-block">${A.aboutTitle ? `<h2>${h(A.aboutTitle)}</h2>` : ''}${About.paras(A.about, true)}</section>` : ''}
 
@@ -171,7 +171,7 @@ P.about = () => {
   ${A.footer || A.footer2 ? `<footer class="ab-foot"><b>${h(A.footer)}</b><span>${h(A.footer2)}</span></footer>` : ''}
   </div>`;
   return {
-    title: 'About ' + (Store.appName ? Store.appName() : 'DARRIK'),
+    title: 'About ' + (Store.appName ? Store.appName() : 'MAHAM'),
     html,
     mount(root) {
       const b = root.querySelector('#abedit');

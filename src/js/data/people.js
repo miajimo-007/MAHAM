@@ -1,4 +1,4 @@
-/* DARRIK — People and teams (from the settings-team / settings-teams records), plus anonymised names. */
+/* MAHAM — People and teams (from the settings-team / settings-teams records), plus anonymised names. */
 'use strict';
 
 Object.assign(Store, {
@@ -57,8 +57,8 @@ Object.assign(Store, {
   /* app name and logo (settings-features.appName / .logo = small PNG data URL) */
   appName() {
     const r = Store.get && Store.get('settings-features');
-    if (r) return r.appName || 'DARRIK';
-    return LS.get('bct.brand', {}).name || 'DARRIK';
+    if (r) return r.appName || 'MAHAM';
+    return LS.get('bct.brand', {}).name || 'MAHAM';
   }, // the shared setting wins; this computer's copy only before the folder is open
   appLogo() {
     return (
@@ -69,7 +69,7 @@ Object.assign(Store, {
     const l = Store.appLogo();
     return l
       ? `<span class="logo img ${cls || ''}" id="brandlogo"><img src="${U.h(l)}" alt=""></span>`
-      : `<span class="logo ${cls || ''}" id="brandlogo">${U.h(letter || Store.appName().slice(0, 1).toUpperCase())}</span>`;
+      : `<span class="logo mark ${cls || ''}" id="brandlogo" aria-hidden="true">${U.h(letter || APP_MARK)}</span>`;
   },
   /* run fn as if this super admin were in analyst mode (Admin pages show what they can do there) */
   asAnalyst(id, fn) {
@@ -95,7 +95,7 @@ Object.assign(Store, {
     return h ? h.name || 'Holiday' : '';
   },
   depts() {
-    if (Store._deptV === Store.db && Store._depts) return Store._depts;
+    if (Store._deptV === Store.ver && Store._depts) return Store._depts;
     const ids = Store.teams().map(t => t.id);
     const saved = Store.setting('settings-depts', 'list', null);
     const list =
@@ -113,7 +113,7 @@ Object.assign(Store, {
     const loose = ids.filter(t => !placed.has(t));
     if (loose.length) list[0] = Object.assign({}, list[0], { teams: list[0].teams.concat(loose) }); // a new team joins the first department
     Store._depts = list;
-    Store._deptV = Store.db;
+    Store._deptV = Store.ver;
     return list;
   },
   deptOfTeam(t) {
@@ -219,9 +219,9 @@ Object.assign(Store, {
     const nk = x => U.lc(x).replace(/[,.]/g, ' ').replace(/\s+/g, ' ').trim();
     const k = nk(name);
     if (!k) return null;
-    if (!Store._meIdx || Store._meIdxV !== Store.db) {
+    if (!Store._meIdx || Store._meIdxV !== Store.ver) {
       Store._meIdx = {};
-      Store._meIdxV = Store.db;
+      Store._meIdxV = Store.ver;
       for (const m of Store.members()) for (const a of [m.me, m.name, m.short, ...(m.aliases || [])]) if (a) Store._meIdx[nk(a)] = m.id;
     }
     return Store._meIdx[k] || null;

@@ -1,4 +1,4 @@
-/* DARRIK — Reports: weekly, monthly, yearly (or any dates) team report with charts — printable / PDF / Excel.
+/* MAHAM — Reports: weekly, monthly, yearly (or any dates) team report with charts — printable / PDF / Excel.
  * A function (Admin → Functions → "Reports"): hidden for everyone until the administrator gives it to a team or person. */
 'use strict';
 
@@ -257,7 +257,9 @@ const Rep = {
       `<div class="rep-tile"><div class="kpi-label">${h(label)}</div><div class="kpi-val">${v == null ? '–' : fmt(v)} ${Rep.arrow(v, pv, goodUp)}</div><div class="kpi-sub">${sub || ''}${pv != null ? ` <span class="muted">· before ${fmt(pv)}</span>` : ''}</div></div>`;
     const pct = x => (x == null ? '–' : Math.round(x * 100) + '%');
     const list = (rows, empty_) =>
-      rows.length ? `<table class="tbl rep-tbl">${rows.join('')}</table>` : `<p class="muted small">${h(empty_)}</p>`;
+      rows.length
+        ? `<table class="tbl rep-tbl">${rows.slice(0, 100).join('')}</table>${rows.length > 100 ? `<p class="muted small">… and ${rows.length - 100} more — the full list is in the Excel export.</p>` : ''}`
+        : `<p class="muted small">${h(empty_)}</p>`;
     const sec = (k, title, body) => (on(k) ? `<section class="rep-sec"><h3>${title}</h3>${body}</section>` : '');
     const B = Rep.buckets(r);
     const tr = B.map(b => ({
@@ -608,6 +610,9 @@ P.reports = () => {
     title: 'Reports',
     html,
     mount(root) {
+      Store.ensureYears(Rep.years(r).concat(Rep.years(r.prev))).then(l => {
+        if (l) App.render(true);
+      }); // a period in an archived year: read it, then show
       root.querySelectorAll('[data-rk]').forEach(
         a =>
           (a.onclick = () => {

@@ -1,4 +1,4 @@
-/* DARRIK — Page registry (P) and helpers shared by all pages: filters, cards, add buttons, empty states. */
+/* MAHAM — Page registry (P) and helpers shared by all pages: filters, cards, add buttons, empty states. */
 'use strict';
 
 const P = {}; // page registry: P.name = () => ({ title, html, mount })
@@ -27,10 +27,30 @@ function filterBar(page, defs) {
       })
       .join('')}</select></label>`;
   });
-  return `<div class="filters">${parts.join('')}</div>`;
+  FLT_DEFS[page] = defs;
+  const set = defs.some(d => {
+    const v = s[d.key];
+    return v != null && v !== '' && v !== false && String(v) !== String(d.dflt != null ? d.dflt : '');
+  });
+  return `<div class="filters">${parts.join('')}${set ? `<button type="button" class="btn xs ghost flt-clear" data-fltclear="${h(page)}">✕ Clear filters</button>` : ''}</div>`;
 }
+const FLT_DEFS = {};
+/* does a date (YYYY-MM-DD…) fall in the chosen month (1–12, '' = all) of the chosen year? */
+const inMonth = (d, mo) => !mo || (!!d && +String(d).slice(5, 7) === +mo);
 
 function bindFilters(root) {
+  root.querySelectorAll('[data-fltclear]').forEach(
+    b =>
+      (b.onclick = () => {
+        const page = b.dataset.fltclear;
+        const s = ps(page);
+        for (const d of FLT_DEFS[page] || []) {
+          if (d.dflt != null) s[d.key] = d.dflt;
+          else delete s[d.key];
+        }
+        App.render();
+      })
+  );
   root.querySelectorAll('[data-flt]').forEach(
     el =>
       (el.onchange = () => {

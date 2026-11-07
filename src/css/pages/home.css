@@ -1,4 +1,4 @@
-/* DARRIK — My Day. */
+/* MAHAM — My Day. */
 .hello {
   display: flex;
   justify-content: space-between;
@@ -41,4 +41,25 @@
 }
 .today-list .li {
   justify-content: space-between;
+}
+
+/* My Day — this month at a glance */
+.glance {
+  display: grid;
+  gap: 6px;
+}
+.glance .gl-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 64px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.gl-row b {
+  text-align: right;
+}
+.glance-h {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: var(--ink2);
 }

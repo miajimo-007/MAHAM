@@ -1,9 +1,9 @@
-"""Score months (not counted / set score), Convert, Help Desk admin-only, Feedback, folded admin tabs, DARRIK.html."""
+"""Score months (not counted / set score), Convert, Help Desk admin-only, Feedback, folded admin tabs, MAHAM.html."""
 import os
 from harness import app_session, Check, run, SHOTS, APP
 async def main():
     c = Check('months · convert · help desk · feedback')
-    c('app file is DARRIK.html', os.path.isfile(os.path.join(APP, 'DARRIK.html')))
+    c('app file is MAHAM.html', os.path.isfile(os.path.join(APP, 'MAHAM.html')))
     async with app_session() as s:
         pg = s.page; J = s.js
         y = await J("App.year")

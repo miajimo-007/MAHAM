@@ -5,6 +5,7 @@ async def main():
     c = Check('ManageEngine import')
     async with app_session() as s:
         pg = s.page
+        await s.js("Store.save(Object.assign({}, Store.get('settings-custom') || {id:'settings-custom', c:'settings'}, {hdOpen: 60}))")   # the fixture's months are older than the default 3 open months
         await s.js("Store.save(Object.assign({}, Store.get('settings-team'), {members: Store.members().map(m => m.id==='yousef' ? Object.assign({}, m, {role:'teamleader'}) : m)}))"); await pg.wait_for_timeout(400)
         await s.sign_in_as('yousef'); await s.go('#/helpdesk/import')
         await pg.set_input_files('#impfile', os.path.join(FIX, 'me_test.xlsx')); await pg.wait_for_selector('#impgo', timeout=30000)
@@ -31,7 +32,7 @@ async def main():
         await s.js("Store.flush()"); await pg.wait_for_timeout(300)
         await s.sign_in_as('apps-mgr'); await s.js("Store.save(Object.assign({}, Store.get('hd-1490329'), {status: 'Closed'}))"); await s.js("Store.flush()"); await pg.wait_for_timeout(300)
         await s.sign_in_as('adam'); await s.js("Store.sync(true)"); await pg.wait_for_timeout(300)
-        c('older copy detected', await s.js("Store.staleHelpdesk().some(x => x.file === 'yousef.json' && x.id === 'hd-1490329')"))
+        c('older copy detected', await s.js("Store.staleHelpdesk().some(x => x.file.startsWith('yousef.') && x.id === 'hd-1490329')"))
         t = await s.go('#/admin/data', 500); c('Admin → Data shows help-desk storage', 'Older copies in other files' in t)
         await pg.click('#hdcompact'); await pg.click('[data-yes]'); await pg.wait_for_timeout(1500)
         c('older copies removed, request still there', await s.js("Store.staleHelpdesk().length") == 0 and await s.js("Store.get('hd-1490329').status") == 'Closed')

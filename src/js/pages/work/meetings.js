@@ -1,4 +1,4 @@
-/* DARRIK — Meetings & minutes, follow-up of actions, decision log, personal tasks, 1:1 preparation. */
+/* MAHAM — Meetings & minutes, follow-up of actions, decision log, personal tasks, 1:1 preparation. */
 'use strict';
 
 const actStatusBadge = t => {
@@ -112,8 +112,13 @@ function myTaskDialog(t) {
 P.meetings = sub => {
   if (!App.pageAllowed('meetings')) return { title: 'Meetings', html: empty('Not available.') };
   const tab = ['list', 'follow', 'decisions', 'mine'].includes(sub) ? sub : 'list';
-  const ms = Meetings.all();
   const today = U.todayStr();
+  const fm = ps('meet');
+  const ms = Meetings.all().filter(
+    m =>
+      tab !== 'list' ||
+      ((!fm.month || inMonth(m.date, fm.month)) && (!fm.owner || m.owner === fm.owner) && (!fm.type || (m.type || '') === fm.type))
+  );
   let body;
   if (tab === 'list') {
     const row = m => {
@@ -122,7 +127,21 @@ P.meetings = sub => {
       const fu = Meetings.followUps(m).filter(Meetings.isOpen).length;
       return `<tr class="click" data-meet="${h(m.id)}"><td class="nw">${U.fmtDate(m.date)}</td><td><b>${h(m.title)}</b>${m.date >= today ? ' ' + UI.badge(m.date === today ? 'today' : 'upcoming', 'warn') : ''}</td><td>${h(m.type || '')}</td><td>${h(Store.memberShort(m.owner))}</td><td class="num">${(m.attendees || []).length}</td><td class="num">${acts.length}${open ? ` <span class="t-warn">(${open} open)</span>` : ''}</td><td class="num">${fu || ''}</td></tr>`;
     };
-    body = `<div class="page-actions"><span class="muted small">Write the minutes, give actions, and follow them up at the next meeting.</span><span class="grow"></span>${Meetings.canRun() ? '<button class="btn primary" id="newmeet">＋ New meeting</button>' : ''}</div>
+    body = `<div class="page-actions">${filterBar('meet', [
+      { key: 'month', type: 'month' },
+      { key: 'owner', type: 'member', label: 'Chaired by' },
+      {
+        key: 'type',
+        label: 'Type',
+        options: () => [
+          ...new Set(
+            Meetings.all()
+              .map(m => m.type)
+              .filter(Boolean)
+          ),
+        ],
+      },
+    ])}<span class="grow"></span>${Meetings.canRun() ? '<button class="btn primary" id="newmeet">＋ New meeting</button>' : ''}</div>
       ${ms.length ? `<div class="card"><div class="tbl-scroll"><table class="tbl"><thead><tr><th>Date</th><th>Meeting</th><th>Type</th><th>Owner</th><th class="num">People</th><th class="num">Actions</th><th class="num">Follow-ups</th></tr></thead><tbody>${ms.map(row).join('')}</tbody></table></div></div>` : empty('No meetings yet.')}`;
   } else if (tab === 'follow') {
     const mine = ms.filter(m => m.owner === App.me);
@@ -175,14 +194,10 @@ P.meetings = sub => {
           .join('') || empty('—')
       )}`;
   }
+  // "My tasks" lives under My Work → Personal tasks (kept here only for people without that page)
   const tabs = [
     ['list', 'Meetings'],
-    ...(Meetings.canRun()
-      ? [
-          ['follow', 'Open actions'],
-          ['mine', 'My tasks'],
-        ]
-      : []),
+    ...(Meetings.canRun() ? [['follow', 'Open actions'], ...(App.pageAllowed('mytasks') ? [] : [['mine', 'My tasks']])] : []),
     ['decisions', 'Decision log'],
   ];
   return {
@@ -444,6 +459,7 @@ function bindMineActions(root) {
         e.stopPropagation();
         const t = Store.get(b.dataset.mineok);
         if (!t) return;
+        if (t.c === 'mytask' && typeof PT !== 'undefined') return PT.done(t);
         Meetings.mineDone(t);
         UI.toast(
           Store.get(t.id) && Store.get(t.id).status === 'Ready for review' ? 'Done — waiting for your manager to confirm' : 'Marked done ✓',

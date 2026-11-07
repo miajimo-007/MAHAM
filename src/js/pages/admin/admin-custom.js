@@ -1,5 +1,5 @@
-/* DARRIK — Admin → Customize: name, logo, tagline, colours, menu, words, targets, weekend,
- * sign-in message, report header, start pages, My Day tiles, backup. Only the super admin sees it (and only a
+/* MAHAM — Admin → Customize: name, logo, tagline, colours, menu, words, targets, weekend,
+ * sign-in message, report header, start pages, Analyst Desk tiles, backup. Only the super admin sees it (and only a
  * super admin's settings are accepted by everyone's app — access/trust.js). Values live in Custom (domain/custom.js). */
 'use strict';
 
@@ -18,14 +18,14 @@ function adminCustom() {
     'Name, logo, tagline and colour',
     `<div class="brandset"><div class="brand-prev">${Store.logoHtml('', 'big')}<div><b>${h(A)}</b><div class="muted small">${h(Custom.tagline())}</div></div></div>
     <form class="grid-form" id="cz-look">
-      ${UI.field({ key: 'appName', label: 'App name', type: 'text', placeholder: 'DARRIK', hint: 'menu, sign-in screen, browser tab, About, reports' }, Store.setting('settings-features', 'appName', '') || 'DARRIK')}
+      ${UI.field({ key: 'appName', label: 'App name', type: 'text', placeholder: 'MAHAM', hint: 'menu, sign-in screen, browser tab, About, reports' }, Store.setting('settings-features', 'appName', '') || 'MAHAM')}
       ${UI.field({ key: 'tagline', label: 'Tagline', type: 'text', placeholder: 'Every Effort Matters.', hint: 'under the name on the sign-in screen and About' }, C.tagline || '')}
       <div class="fld span2"><label>Logo (PNG, JPG or SVG — square works best)</label><input type="file" id="logofile" accept="image/png,image/jpeg,image/svg+xml,image/webp"></div>
       <div class="fld span2"><label>Colour</label><div class="cz-colors">${Object.entries(Custom.COLORS)
         .map(([k, p]) => sw(k, p))
         .join('')}
         <label class="cz-sw ${/^#/.test(cur) ? 'on' : ''}"><input type="radio" name="color" value="custom" ${/^#/.test(cur) ? 'checked' : ''}><input type="color" id="cz-hex" value="${h(/^#/.test(cur) ? cur : pal.accent)}"> Your own</label></div>
-        <div class="muted small">Buttons, links, highlights and the menu. The file name stays DARRIK.html so desktop links keep working.</div></div>
+        <div class="muted small">Buttons, links, highlights and the menu. The file name stays MAHAM.html so desktop links keep working.</div></div>
     </form>
     ${saveRow('look', Store.appLogo() ? '<button class="btn ghost sm" id="logooff">Remove logo</button>' : '')}</div>`
   );
@@ -107,7 +107,7 @@ function adminCustom() {
 
   const S = Custom.get('start', {});
   const pages = [
-    ['', 'Normal (My Day / their desk)'],
+    ['', 'Normal (Analyst Desk / their desk)'],
     ...Config.NAV.flatMap(([, it]) => it.filter(x => x[0] !== 'home').map(x => [x[0], Custom.navLabel(x[0], x[1])])),
     ['projects', 'Projects'],
     ['meetings', 'Meetings'],
@@ -130,8 +130,8 @@ function adminCustom() {
   );
 
   const tiles = card(
-    'My Day tiles',
-    `<p class="muted small">Which boxes analysts see at the top of My Day.</p>
+    'Analyst Desk tiles',
+    `<p class="muted small">Which boxes analysts see at the top of Analyst Desk.</p>
     <div class="pick" id="cz-tiles">${Custom.TILES.map(([k, l]) => `<label class="check"><input type="checkbox" value="${k}" ${Custom.tile(k) ? 'checked' : ''}> ${h(l)}</label>`).join('')}</div>${saveRow('tiles')}`
   );
 
@@ -208,7 +208,7 @@ function adminCustom() {
           const f = root.querySelector('#cz-look');
           const c = f.querySelector('[name=color]:checked');
           const col = !c ? 'teal' : c.value === 'custom' ? root.querySelector('#cz-hex').value : c.value;
-          const p = { appName: f.querySelector('[name=appName]').value.trim() || 'DARRIK' };
+          const p = { appName: f.querySelector('[name=appName]').value.trim() || 'MAHAM' };
           if (newLogo) p.logo = newLogo;
           feat(p);
           Custom.save({ tagline: f.querySelector('[name=tagline]').value.trim() || undefined, color: col === 'teal' ? undefined : col });
@@ -290,7 +290,7 @@ function adminCustom() {
             if (!i.checked) t[i.value] = false;
           });
           Custom.save({ tiles: t });
-          return 'My Day tiles saved';
+          return 'Analyst Desk tiles saved';
         },
       };
       const DEF = {
@@ -319,7 +319,7 @@ function adminCustom() {
           (b.onclick = () =>
             UI.confirm(
               b.dataset.cdef === 'look'
-                ? 'Go back to the original name (DARRIK), no logo, the original tagline and colour?'
+                ? 'Go back to the original name (MAHAM), no logo, the original tagline and colour?'
                 : 'Go back to the original for this section?',
               () => {
                 DEF[b.dataset.cdef]();
@@ -355,7 +355,7 @@ function adminCustom() {
         let b;
         try {
           b = JSON.parse(await f.text());
-          if (b.kind !== 'darrik-customize') throw new Error();
+          if (b.kind !== 'maham-customize') throw new Error();
         } catch (err) {
           UI.toast('That is not a customize file', 'bad');
           return;

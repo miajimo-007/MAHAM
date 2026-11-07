@@ -1,4 +1,4 @@
-/* DARRIK — Cards, KPI tiles, grids, badges, score colours, tables, lists, notices. */
+/* MAHAM — Cards, KPI tiles, grids, badges, score colours, tables, lists, notices. */
 .card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -1326,4 +1326,169 @@ a.btn.primary {
 }
 .cz-words input {
   width: 100%;
+}
+/* Info & Links */
+.info-item {
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--line2);
+  min-width: 0;
+}
+.info-item:last-child {
+  border-bottom: 0;
+}
+.info-item.click:hover {
+  background: #f5fafb;
+}
+.info-item .li-top {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.info-val {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  color: var(--ink2);
+  margin-top: 2px;
+}
+.info-link {
+  margin-top: 4px;
+}
+.info-item b,
+.info-item a {
+  overflow-wrap: anywhere;
+}
+
+/* Manager Desk — "Needs you" line */
+.needs-you {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin: 0 0 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--warn);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+.needs-you > b {
+  margin-right: 6px;
+}
+.needs-you.ok {
+  border-left-color: var(--good);
+  color: var(--good);
+  font-weight: 600;
+}
+.ny-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: var(--warn-soft);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+}
+.ny-chip:hover {
+  background: #ffe7bf;
+}
+.ny-chip .n {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--warn);
+  color: #fff;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.card.flash {
+  box-shadow: 0 0 0 3px var(--accent);
+  transition: box-shadow 0.3s;
+}
+
+/* big tables: the header row stays visible while you scroll the table */
+.tbl-wrap .tbl-scroll {
+  max-height: calc(100vh - 170px);
+  overflow: auto;
+}
+.tbl-wrap .tbl th {
+  z-index: 1;
+}
+/* tick boxes + bulk actions */
+.tbl th.sel,
+.tbl td.sel {
+  width: 30px;
+  padding-right: 0;
+  text-align: center;
+}
+.tbl tr[data-sel] td {
+  background: var(--accent-soft);
+}
+.bulk-bar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin-left: 8px;
+  background: var(--accent-soft);
+  border: 1px solid #bfe3e6;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.bulk-bar b {
+  margin-right: 4px;
+  color: var(--accent2);
+}
+.bulk-bar .btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* change right in the table */
+.tbl .inl {
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  max-width: 150px;
+  cursor: pointer;
+}
+.tbl .inl:hover,
+.tbl .inl:focus {
+  border-color: var(--line);
+  background: #fff;
+}
+/* forms: every missing required field is marked */
+.fld.fld-err input,
+.fld.fld-err select,
+.fld.fld-err textarea {
+  border-color: var(--bad) !important;
+  background: var(--bad-soft);
+}
+.fld .err-msg {
+  color: var(--bad);
+  font-weight: 600;
+}
+.cols2 > div > .card,
+.cols2 > .card {
+  overflow-x: auto;
+  min-width: 0;
+}
+.cols2 > div {
+  min-width: 0;
+}
+.tbl select.inl {
+  min-width: 96px;
+  max-width: 170px;
+  padding: 3px 24px 3px 6px;
+  height: auto;
 }

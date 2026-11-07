@@ -1,4 +1,4 @@
-/* DARRIK — General helpers (HTML escaping, numbers, ids, collections). `h` is the HTML-escape shorthand used in templates. */
+/* MAHAM — General helpers (HTML escaping, numbers, ids, collections). `h` is the HTML-escape shorthand used in templates. */
 'use strict';
 
 const U = {

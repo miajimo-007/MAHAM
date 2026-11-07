@@ -1,4 +1,4 @@
-/* DARRIK — Online storage (Supabase: Postgres + sign-in), used when darrik.config.js says storage: 'cloud'.
+/* MAHAM — Online storage (Supabase: Postgres + sign-in), used when maham.config.js says storage: 'cloud'.
  * Plain fetch calls to Supabase's REST API — no library to download. The database side is in supabase/schema.sql:
  * table "files" keeps each person's JSON file per company; row-level security lets everyone in the company read,
  * and each person write only their own file (the company owner may write any; anyone may write backups).
@@ -15,7 +15,7 @@ const CloudBackend = {
   },
   init(cfg) {
     CloudBackend.cfg = Object.assign({ table: 'files' }, cfg);
-    CloudBackend.session = LS.get('darrik.cloud.session', null);
+    CloudBackend.session = LS.get('maham.cloud.session', null);
   },
   base() {
     return CloudBackend.cfg.url.replace(/\/+$/, '');
@@ -59,12 +59,12 @@ const CloudBackend = {
   },
   keep(j) {
     CloudBackend.session = { access_token: j.access_token, refresh_token: j.refresh_token, user: j.user };
-    LS.set('darrik.cloud.session', CloudBackend.session);
+    LS.set('maham.cloud.session', CloudBackend.session);
   },
   signOut() {
     CloudBackend.session = null;
     CloudBackend.company = null;
-    LS.set('darrik.cloud.session', null);
+    LS.set('maham.cloud.session', null);
   },
   /* which company and which person in the app this account is (table company_members) */
   async membership() {

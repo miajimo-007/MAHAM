@@ -1,4 +1,4 @@
-/* DARRIK — Tasks from the director: forward to analysts, follow the chain, review & close. */
+/* MAHAM — Tasks from the director: forward to analysts, follow the chain, review & close. */
 'use strict';
 
 const chainBadge = st =>
@@ -37,6 +37,7 @@ P.mgrtasks = () => {
   let rows = mineOrAll(Store.all('mgrtask')).map(mtDerive);
   if (s.mgr) rows = rows.filter(x => x.r.manager === s.mgr);
   if (s.st) rows = rows.filter(x => x.st === s.st);
+  if (s.month) rows = rows.filter(x => inMonth(x.r.date, s.month) || inMonth(x.r.due, s.month));
   rows.sort(
     (a, b) => !a.open - !b.open || (b.st === Chain.ST.REVIEW) - (a.st === Chain.ST.REVIEW) || (b.r.date || '').localeCompare(a.r.date || '')
   );
@@ -57,6 +58,7 @@ P.mgrtasks = () => {
         ]
       : []),
     { key: 'st', label: 'Status', options: UI.statusOpts(Object.values(Chain.ST)) },
+    { key: 'month', type: 'month' },
   ];
   const html = `<div class="page-actions">${filterBar('mgr', flt)}${top ? `<label class="flt tog"><input type="checkbox" id="mgrgrp" ${s.grouped !== false ? 'checked' : ''}> One row per task sent to several managers</label>` : ''}${top ? `<button class="btn primary" id="asgnew">＋ Assign to managers</button>` : addBtn('mgrtask', 'New task')}</div>
   ${UI.table({
@@ -192,7 +194,7 @@ function forwardTask(id) {
         ${UI.field({ key: 'due', label: 'Due date for new analysts', type: 'date' }, mt.due && mt.due >= today ? mt.due : '')}
         ${UI.field({ key: 'fu', label: 'Follow-up (FU)', type: 'bool', checkLabel: 'Needs follow-up' }, false)}
         ${UI.field({ key: 'instruction', label: 'Instruction to the analyst', type: 'textarea', span: 2, rows: 2 }, mt.comment || '')}
-      </form><p class="muted small">Analysts get it in their To Do list and My Day. When everyone is done it becomes <b>Ready for review</b> and you close it for the director.</p>`,
+      </form><p class="muted small">Analysts get it in their To Do list and Analyst Desk. When everyone is done it becomes <b>Ready for review</b> and you close it for the director.</p>`,
     actions: `<span class="grow"></span><button class="btn" data-c>Cancel</button><button class="btn primary" data-ok>Save</button>`,
     onMount: w => {
       w.querySelector('[data-c]').onclick = UI.closeModal;

@@ -1,4 +1,4 @@
-/* DARRIK — Performance — monthly metrics per person. */
+/* MAHAM — Performance — monthly metrics per person. */
 'use strict';
 
 P.performance = () => {
@@ -23,6 +23,7 @@ P.performance = () => {
     ['hd', 'Help desk'],
     ['shadow', 'Shadow work'],
     ['qw', 'Quick wins'],
+    ['gc', 'Good catches'],
   ];
   let body = '';
   if (tab === 'overview') {
@@ -97,6 +98,15 @@ P.performance = () => {
         1
       ) +
       `<div class="cols2">${team.map(m => card(h(Store.memberShort(m.id)), `<table class="tbl perf"><thead><tr><th>Category</th>${U.MONTHS.map(x => `<th class="num">${x}</th>`).join('')}<th class="num">YTD</th></tr></thead><tbody>${cats.map(c => `<tr><td>${c}</td>${[...Array(12)].map((_, i) => `<td class="num">${U.num(PF.members[m.id][i + 1].swCat[c] || 0, 1).replace(/^0$/, '')}</td>`).join('')}<td class="num strong">${U.num(PF.members[m.id].ytd.swCat[c] || 0, 1)}</td></tr>`).join('')}</tbody></table>`)).join('')}</div>`;
+  } else if (tab === 'gc') {
+    const ppl = Store.visible().filter(m => m.active !== false && !Store.topRole(m.role) && (m.team || 'apps') === App.viewTeam);
+    const rows = ppl.map(m => Object.assign({ m }, GC.counts(m.id, y))).sort((a, b) => b.found + b.resolved - (a.found + a.resolved));
+    body = card(
+      `Good catches ${y} — recognition, not scored`,
+      rows.some(r => r.found || r.resolved)
+        ? `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Person</th><th class="num">Found</th><th class="num">Resolved</th></tr></thead><tbody>${rows.map(r => `<tr><td>${h(Store.memberShort(r.m.id))}</td><td class="num">${r.found || ''}</td><td class="num">${r.resolved || ''}</td></tr>`).join('')}</tbody></table></div>`
+        : empty('No good catches yet this year.')
+    );
   } else if (tab === 'qw') {
     body = tbl(
       'Quick wins completed (by expected-date month)',

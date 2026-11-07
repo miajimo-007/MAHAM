@@ -1,4 +1,4 @@
-/* DARRIK — Small screens and printing — keep this file last. */
+/* MAHAM — Small screens and printing — keep this file last. */
 @media (max-width: 1280px) {
   .kpis.k6 {
     grid-template-columns: repeat(3, 1fr);

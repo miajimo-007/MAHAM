@@ -1,12 +1,13 @@
-/* DARRIK — App-wide constants: version, roles, permissions, functions (pages), menu, default scoring.
+/* MAHAM — App-wide constants: version, roles, permissions, functions (pages), menu, default scoring.
  * Change behaviour here rather than in the code that uses it. */
 'use strict';
 
-const APP_VERSION = '2026.10.30.10';
+const APP_VERSION = '2026.11.07.1';
+const APP_MARK = '🧭'; // the app's mark when no logo picture is set
 
 /* folder & polling */
 const Config = {
-  DATA_FOLDER: 'DARRIK Data',
+  DATA_FOLDER: 'MAHAM Data',
   USERS_FOLDER: 'users',
   BACKUP_FOLDER: 'Backups', // inside the data folder
   BACKUP_KEEP: 30, // daily backups kept
@@ -14,7 +15,8 @@ const Config = {
   SAVE_DEBOUNCE_MS: 400, // wait this long after an edit before writing
   DEFAULT_TEAM: 'apps',
   SELF_BACKDATE_DAYS: 7, // analysts may log their own shadow work this many days back
-  FAIR_SINCE: Date.parse('2026-10-23T00:00:00+03:00'), // fairness rules apply to changes saved from this version on
+  FAIR_SINCE: Date.parse('2026-10-23T00:00:00+03:00'),
+  OWN_SINCE: Date.parse('2026-11-03T00:00:00+03:00'), // "only the owner or someone with Change others' items" applies to changes saved from this version on   // fairness rules apply to changes saved from this version on
   /* starting values for lists the super admin can edit in Settings (per team) */
   DEFAULT_LISTS: {
     projectCategories: [
@@ -43,6 +45,11 @@ const Config = {
     ['viewDashboards', 'See team dashboards', 'Team Dashboard, Performance, Lazy Days'],
     ['viewOthers', "See other people's records", 'To Do, shadow work, attendance, scores of teammates'],
     ['editAttendanceOthers', 'Mark attendance for others', ''],
+    [
+      'editOthers',
+      "Change or delete other people's items",
+      'Shadow work, follow-ups, on-call, courses, attendance, info and dashboard entries added by others (To Dos and quick wins keep their own rules)',
+    ],
     ['assignTodo', 'Assign / edit / delete To Dos', ''],
     ['approveQW', 'Approve quick wins', 'Give QW IDs, approve or reject'],
     ['importME', 'Import ManageEngine data', 'and edit help desk records'],
@@ -56,12 +63,29 @@ const Config = {
       'Vacation, permission and other requests from the team (manager step; directors do the final step)',
     ],
     ['createProjects', 'Create and lead team projects', 'Owner plans sprints, picks the project team and assigns tasks'],
+    ['seePortfolio', 'See the projects portfolio', 'Projects → Portfolio: every project of their teams with its health light'],
+    [
+      'editHelpdeskByHand',
+      'Add, delete and fix help desk requests by hand',
+      'Off for everyone until given — normally only the daily import changes them',
+    ],
+    ['postAnnouncements', 'Post announcements', 'Off for everyone until given'],
+    [
+      'useLab',
+      'Open the MAHAM Lab',
+      'The separate MAHAM-Lab.html (quick win ideas and patterns, read-only). People insights stay super admin only',
+    ],
+    ['seeUsage', 'See usage', 'When people saw / opened their To Dos, and the Usage report: screens, functions and time per person'],
+    ['seeWorkload', 'See project workload', 'Projects → Workload: open project tasks per person and week'],
+    ['decideProjectRequests', 'Decide project suggestions', 'Approve (turn into a project), hold or reject what the team suggests'],
+    ['manageTemplates', 'Manage project templates', 'Save a project as a template, delete templates'],
     ['seeNames', "See other people's names", 'Off = others appear as Member 1, 2, … in dashboards and lists'],
   ],
   SUPER_ONLY: ['assignTodo'],
   SUPER_ADMIN_ONLY: ['importOld'], // abilities nobody but the super admin has, and that cannot be granted
   PAGES: [
     ['todo', 'To Do List'],
+    ['mytasks', 'My Tasks'],
     ['shadow', 'Shadow Works'],
     ['helpdesk', 'IT Help Desk'],
     ['attendance', 'Attendance'],
@@ -72,10 +96,10 @@ const Config = {
     ['projperf', 'Project Performance'],
     ['quickwins', 'Quick Wins'],
     ['central', 'Central Follow-up'],
-    ['oncall', 'On-Call'],
+    ['oncall', 'On-Call / Good Catch'],
     ['courses', 'Courses'],
     ['directory', 'Directory'],
-    ['info', 'Info & SRS'],
+    ['info', 'Info & Dashboards'],
     ['projects', 'Projects'],
     ['mgrtasks', 'Tasks from above'],
     ['requests', 'Requests & Approvals'],
@@ -101,6 +125,8 @@ const Config = {
     quickwin: 'quickwins',
     central: 'central',
     oncall: 'oncall',
+    gcatch: 'oncall',
+    gcupdate: 'oncall',
     course: 'courses',
     reccourse: 'courses',
     itdir: 'directory',
@@ -114,7 +140,13 @@ const Config = {
     mgrtask: 'mgrtasks',
     request: 'requests',
     meeting: 'meetings',
-    mytask: 'meetings',
+    mytask: 'mytasks',
+    pphase: 'projects',
+    praid: 'projects',
+    pstatus: 'projects',
+    pcomment: 'projects',
+    ptemplate: 'projects',
+    preq: 'projects',
     action: 'meetings',
   }, // announcement / annread: no function level (always visible)
   /* team scoping: these lists belong to one team; records without a team are APPS (original data) */
@@ -141,17 +173,36 @@ const Config = {
     ['director', 'Director'],
     ['aed', 'AED'],
   ],
+  /* the menu: 7 headings. A heading with one item shows as a plain link; Home's name follows the person's desk.
+   * item = [page key, label, icon, { href, page, mgr }] — page = whose permission it follows, mgr = managers / super admin only */
   NAV: [
+    ['Home', [['home', 'Analyst Desk', '☀']]],
     [
       'Work',
       [
-        ['home', 'My Day', '☀'],
         ['todo', 'To Do List', '☑'],
+        ['mytasks', 'Personal tasks', '✔'],
         ['shadow', 'Shadow Works', '◐'],
         ['helpdesk', 'IT Help Desk', '✉'],
+      ],
+    ],
+    ['Projects', [['projects', 'Projects', '◈']]],
+    [
+      'Follow-up',
+      [
+        ['quickwins', 'Quick Wins', '⚡'],
+        ['central', 'Central Follow-up', '↗'],
+        ['goodcatch', 'Good Catch', '🎯', { href: '#/oncall/goodcatch', page: 'oncall' }],
+        ['mgrtasks', 'Tasks from Director', '✦', { mgr: true }],
+      ],
+    ],
+    [
+      'Team',
+      [
+        ['requests', 'Requests & Approvals', '✋'],
         ['attendance', 'Attendance', '▦'],
-        ['requests', 'Requests', '✋'],
         ['meetings', 'Meetings', '🗓'],
+        ['oncall', 'On-Call sheet', '☎', { href: '#/oncall/sheet' }],
         ['announcements', 'Announcements', '📢'],
       ],
     ],
@@ -160,25 +211,21 @@ const Config = {
       [
         ['perf', 'Performance', '◆'],
         ['reports', 'Reports', '📄'],
-      ],
-    ], // one page with tabs: Team Dashboard · Employee · Details · Lazy Days · Projects
-    [
-      'Follow-up',
-      [
-        ['quickwins', 'Quick Wins', '⚡'],
-        ['central', 'Central Follow-up', '↗'],
-        ['oncall', 'On-Call', '☎'],
+        ['usage', 'Usage', '◷'],
+        ['overview', 'All Teams Overview', '▤', { superOnly: true }],
       ],
     ],
     [
       'Reference',
       [
-        ['courses', 'Courses', '✎'],
+        ['info', 'Info & Dashboards', 'ⓘ'],
         ['directory', 'Directory', '☰'],
-        ['info', 'Info & SRS', 'ⓘ'],
+        ['courses', 'Courses', '✎'],
       ],
     ],
   ],
+  NAV_NAMES: { Home: 'Analyst Desk', Work: 'WorkList', Team: 'Team & Time' },
+  NAV_ICONS: { Home: '☀', Work: '☑', 'Follow-up': '⚡', Team: '👥', Performance: '◆', Reference: '📚', Admin: '⚙', Projects: '◈' }, // shown names of the headings (Admin → Customize can rename them)
   DEFAULT_SCORING: {
     weights: { todo: 35, helpdesk: 35, attendance: 15, quickwins: 10, shadow: 5 },
     helpdeskSplit: { closing: 70, requests: 30 },

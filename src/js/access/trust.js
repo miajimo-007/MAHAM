@@ -1,4 +1,4 @@
-/* DARRIK — Trust check when files are read.
+/* MAHAM — Trust check when files are read.
  * The data files are plain JSON in the shared folder, so someone could edit one by hand. When files are merged,
  * a record is accepted only if the person who wrote it was entitled to:
  *   1. a record in users/<id>.json must carry _by = <id>            (nobody writes under someone else's name)
@@ -13,8 +13,8 @@
 Object.assign(Store, {
   rejected: [], // [{ file, id, c, by, why }] — shown in System Check
   ownerOf(sourceKey) {
-    return sourceKey.startsWith('u:') ? sourceKey.slice(2, -5) : null;
-  }, // 'seed' → null (shipped with the app)
+    return sourceKey.startsWith('u:') ? Store.fileOwner(sourceKey.slice(2)) : null;
+  }, // users/<id>.json and <id>.hd-…/.y… files belong to <id>   // 'seed' → null (shipped with the app)
 
   /* every version of every record we have, with where it came from */
   candidates() {
@@ -167,7 +167,16 @@ Object.assign(Store, {
           if (r.c === 'adminlog')
             return Store.isSuper(by) || (bad(x, 'admin change log written by someone who is not the administrator'), false);
           if (r.c === 'usage') return r.id === 'usage-' + by || (bad(x, 'usage written for someone else'), false);
-          if (r.c === 'announcement') return Store.isSuper(by) || (bad(x, 'only the administrator can post announcements'), false);
+          if (r.c === 'actlog')
+            return (
+              (String(r.id).startsWith('actlog-' + by + '-') && r.who === by) || (bad(x, 'activity log written for someone else'), false)
+            );
+          if (r.c === 'announcement')
+            return (
+              Store.isSuper(by) ||
+              Store.privileged(by, 'postAnnouncements', x.r._ts) ||
+              (bad(x, 'announcement posted without the "Post announcements" permission'), false)
+            );
           if (r.c === 'annread')
             return String(r.id).startsWith('annread-' + by + '-') || (bad(x, 'read receipt written for someone else'), false);
           // meeting action: the chair, the chair's minute-taker, or the person it belongs to

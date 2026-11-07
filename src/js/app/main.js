@@ -1,4 +1,4 @@
-/* DARRIK — Entry point. */
+/* MAHAM — Entry point. */
 'use strict';
 
 window.addEventListener('DOMContentLoaded', () => App.boot());

@@ -1,6 +1,6 @@
-# Hosting DARRIK (website, phones and the online database)
+# Hosting MAHAM (website, phones and the online database)
 
-DARRIK runs in three ways from the same build. Choose one in **`darrik.config.js`** (next to `DARRIK.html`):
+MAHAM runs in three ways from the same build. Choose one in **`maham.config.js`** (next to `MAHAM.html`):
 
 | `storage`          | Where the data is                                                                | Good for                               |
 | ------------------ | -------------------------------------------------------------------------------- | -------------------------------------- |
@@ -13,10 +13,10 @@ No rebuild is needed after changing the settings file: edit it and refresh the p
 
 ## 1. Put the app on the web (GitHub Pages)
 
-1. Build: `npm run build` → `dist/DARRIK/` holds `DARRIK.html`, `darrik.config.js`, `manifest.webmanifest`, `sw.js`, `icons/`.
-2. Publish the **contents** of `dist/DARRIK/` — for example to a `gh-pages` branch, or any static host (Cloudflare Pages,
+1. Build: `npm run build` → `dist/MAHAM/` holds `MAHAM.html`, `maham.config.js`, `manifest.webmanifest`, `sw.js`, `icons/`.
+2. Publish the **contents** of `dist/MAHAM/` — for example to a `gh-pages` branch, or any static host (Cloudflare Pages,
    Netlify, your own server). HTTPS is required for phones to install it.
-3. Open `https://<you>.github.io/<repo>/DARRIK.html`. On a phone: **Share → Add to Home Screen** (iPhone) or
+3. Open `https://<you>.github.io/<repo>/MAHAM.html`. On a phone: **Share → Add to Home Screen** (iPhone) or
    **⋮ → Install app** (Android).
 
 Until the database is set up, phones keep their data on the phone (`'auto'` / `'device'`).
@@ -36,7 +36,7 @@ Until the database is set up, phones keep their data on the phone (`'auto'` / `'
 
 ## 3. Connect the app
 
-Edit `darrik.config.js` on the website:
+Edit `maham.config.js` on the website:
 
 ```js
 storage: 'cloud',
@@ -64,4 +64,4 @@ They sign in on any phone or PC. "Switch person" becomes **Sign out**.
 ## Backups
 
 Supabase makes daily database backups on paid plans. The app's own backups (Admin → Data) are also saved in the
-database under `DARRIK Data/Backups/`.
+database under `MAHAM Data/Backups/`.

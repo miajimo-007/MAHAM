@@ -1,4 +1,4 @@
-/* DARRIK — Requests & approvals (vacation, permission, training, overtime, other).
+/* MAHAM — Requests & approvals (vacation, permission, training, overtime, other).
  * Flow: analyst → manager (or acting manager / anyone with approveRequests in that team) → director when the
  * type needs it (or when a manager is the requester). Approved leave / permission is written to Attendance. */
 'use strict';
@@ -41,8 +41,17 @@ const Requests = {
     return [
       Object.assign({}, r, { status: Requests.ST.X, canceledBy: App.me, canceledOn: U.todayStr(), cancelNote: note || '' }),
       ...Store.all('attendance', '*')
-        .filter(a => a.fromRequest === r.id)
-        .map(a => Object.assign({}, a, { _del: true })),
+        .filter(a => a.fromRequest === r.id || (a.permReqs || []).includes(r.id))
+        .map(a => {
+          if (Requests.type(r.type).kind !== 'hours') return Object.assign({}, a, { _del: true });
+          // a permission: take only its hours off the day (the day itself and other permissions stay)
+          const left = (a.permReqs || []).filter(x => x !== r.id);
+          return Object.assign({}, a, {
+            permHrs: Math.max(0, U.r2((+a.permHrs || 0) - (+r.hours || 0))),
+            permReqs: left,
+            fromRequest: left.length ? a.fromRequest : '',
+          });
+        }),
     ];
   },
   /* director step needed? the type says so, or the requester is a manager */
@@ -101,10 +110,15 @@ const Requests = {
       );
     if (t.kind === 'days') return Requests.days(r).map(d => mk(d, { status: 'OFF', leave: r.leaveType || 'Annual', permHrs: 0 }));
     if (t.kind === 'hours' && r.from) {
+      // never turn a leave day back into a working day; a second permission the same day adds its hours
       const cur = Store.get(`att-${r.from}-${r.requester}`);
       if (cur && cur.status === 'OFF') return [];
-      return [mk(r.from, { status: 'ON', leave: '', permHrs: +r.hours || 0 })];
-    } // never turn a leave day back into a working day
+      const done = (cur && cur.permReqs) || [];
+      if (done.includes(r.id)) return [];
+      return [
+        mk(r.from, { status: 'ON', leave: '', permHrs: U.r2((cur ? +cur.permHrs || 0 : 0) + (+r.hours || 0)), permReqs: [...done, r.id] }),
+      ];
+    }
     return [];
   },
   /* things a request can be about: my open To Dos and project tasks */

@@ -1,4 +1,4 @@
-/* DARRIK — CSV / TSV parser for pasted rows and .csv exports. */
+/* MAHAM — CSV / TSV parser for pasted rows and .csv exports. */
 'use strict';
 
 /* CSV / TSV parser (for pasted data or .csv exports) */

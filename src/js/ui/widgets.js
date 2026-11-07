@@ -1,4 +1,4 @@
-/* DARRIK — Small display widgets: badges, KPI tiles, progress bars, bar charts. */
+/* MAHAM — Small display widgets: badges, KPI tiles, progress bars, bar charts. */
 'use strict';
 
 Object.assign(UI, {
@@ -54,6 +54,15 @@ Object.assign(UI, {
     if (v >= 85) return 'sc-c';
     if (v >= 75) return 'sc-d';
     return 'sc-e';
+  },
+  /* long lists in a box: the first n, then "Show all N" (remembered while the app is open) */
+  cap(id, list, n = 30) {
+    return App.tableState['cap:' + id] ? list : list.slice(0, n);
+  },
+  capMore(id, total, n = 30) {
+    return total > n && !App.tableState['cap:' + id]
+      ? `<p class="small cap-more"><a href="#" class="link" data-capmore="${h(id)}">Show all ${total}</a> <span class="muted">· showing the first ${n}</span></p>`
+      : '';
   },
   kpi(label, value, sub, kind) {
     return `<div class="kpi ${kind || ''}"><div class="kpi-label">${h(label)}</div><div class="kpi-val">${value}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;

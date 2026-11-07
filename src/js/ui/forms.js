@@ -1,4 +1,4 @@
-/* DARRIK — Form fields and the generic record editor (driven by Schemas). */
+/* MAHAM — Form fields and the generic record editor (driven by Schemas). */
 'use strict';
 
 Object.assign(UI, {
@@ -177,16 +177,56 @@ Object.assign(UI, {
   },
 
   /* generic record editor */
+  /* could this field be changed in the edit form, for this record, by me? (the same rules as editRecord) — used for changes made right in a table */
+  canEditField(coll, rec, key) {
+    const S = Schemas[coll];
+    if (!S || !rec || !rec.id) return false;
+    if (!App.canEdit(coll) || (S.readOnly && S.readOnly(rec))) return false;
+    if (Store.FAIR_COLLS.has(coll) && !App.can('lockScores')) {
+      const ym = Store.recMonth(rec);
+      if (ym && Store.lockMap()[`${rec.team || App.viewTeam || 'apps'}|${ym}`]) return false;
+    }
+    if (Store.mayChange && !Store.mayChange(rec)) return false;
+    const f = S.fields.find(x => x.key === key);
+    if (!f || (f.showIf && !f.showIf(rec)) || f.type === 'readonly') return false;
+    const mgr = S.mgrOk ? S.mgrOk(rec) : App.can(S.mgrPerm || 'manageTeam');
+    const dir = S.fullEdit ? S.fullEdit(rec) : (App.isDir() || App.isSuper()) && App.can('assignToManagers');
+    if ((f.mgr && !mgr) || (f.dir && !dir)) return false;
+    if (!mgr && S.lockedFields && S.lockedFields(rec).includes(key)) return false;
+    return true;
+  },
+  /* save one field changed right in a table (same checks as the form; Undo on the message) */
+  saveField(coll, rec, key, val, label) {
+    const S = Schemas[coll];
+    const cur = Store.get(rec.id) || rec;
+    const out = Object.assign({}, cur, { [key]: val });
+    if (S.beforeSave) S.beforeSave(out, cur);
+    const why = Store.whyNotFair(out);
+    if (why) {
+      UI.toast(why, 'bad');
+      App.render(true);
+      return;
+    }
+    UI.saveUndo([out, ...(S.cascade ? S.cascade(out, cur, false) : [])], `${label || 'Changed'}`);
+    App.render(true);
+  },
   editRecord(coll, rec, opts = {}) {
     const S = Schemas[coll];
     const isNew = !rec || !rec.id;
+    if (coll === 'todo' && !isNew && rec.analyst === App.me && typeof Admin !== 'undefined' && Admin.todoMark)
+      try {
+        Admin.todoMark([rec.id], 'o');
+      } catch (e) {
+        /* usage only */
+      }
     UI._recProject = (rec && rec.project) || ''; // defaults() of project tasks need to know the project
     const base = Object.assign({ c: coll }, S.defaults ? S.defaults() : {}, rec || {});
     UI._recProject = base.project || '';
     UI._recBase = base;
     const lockYm = !isNew && Store.FAIR_COLLS.has(coll) && !App.can('lockScores') ? Store.recMonth(base) : '';
     const lockedMonth = !!(lockYm && Store.lockMap()[`${base.team || App.viewTeam || 'apps'}|${lockYm}`]);
-    const ro = !App.canEdit(coll) || !!(S.readOnly && S.readOnly(base)) || lockedMonth;
+    const notMine = !isNew && Store.mayChange && !Store.mayChange(base); // someone else's item, and no "Change or delete other people's items"
+    const ro = !App.canEdit(coll) || !!(S.readOnly && S.readOnly(base)) || lockedMonth || notMine;
     const mgr = (S.mgrOk ? S.mgrOk(base) : App.can(S.mgrPerm || 'manageTeam')) && !ro;
     const dir = (S.fullEdit ? S.fullEdit(base) : (App.isDir() || App.isSuper()) && App.can('assignToManagers')) && !ro;
     const lockedNow = !mgr && S.lockedFields ? S.lockedFields(base) : [];
@@ -194,7 +234,11 @@ Object.assign(UI, {
       .filter(f => !f.showIf || f.showIf(base))
       .map(f =>
         ro || (f.mgr && !mgr) || (f.dir && !dir) || lockedNow.includes(f.key)
-          ? Object.assign({}, f, { type: 'readonly', label: f.label + (f.dir ? ' (director)' : ' (manager)'), _orig: f })
+          ? Object.assign({}, f, {
+              type: 'readonly',
+              label: f.label + (f.roSuffix !== undefined ? f.roSuffix : f.dir ? ' (director)' : ' (manager)'),
+              _orig: f,
+            })
           : f
       );
     const roVal = (f, v) => {
@@ -214,7 +258,7 @@ Object.assign(UI, {
     UI.modal({
       title: opts.title || (ro ? 'View ' : isNew ? 'New ' : 'Edit ') + S.single,
       wide: fields.length > 6,
-      body: `${isNew && Store.TEAM_SCOPED.has(coll) && App.viewTeam && App.viewTeam !== ((Store.member(App.me) || {}).team || 'apps') ? `<div class="insights addto"><div>➕ Adding to <b>${h(Store.teamName(App.viewTeam))}</b> — switch team at the top to add it somewhere else.</div></div>` : ''}<form id="recform" class="grid-form" novalidate>${UI.groupFlags(fields, f => UI.field(f, roVal(f, base[f.key])))}</form>${lockedMonth ? `<p class="note">🔒 ${h(Store.monthLabel(lockYm))} is locked — scores for this month are final, so only your manager can change it.</p>` : ''}${lockedNow.length ? '<p class="note">🔒 Approved — the details are locked. Your manager can still change them.</p>' : ''}${S.formNote ? `<p class="note">${S.formNote}</p>` : ''}${!isNew && S.formExtra ? S.formExtra(base) : ''}${typeof Conv !== 'undefined' ? Conv.note(base) : ''}${meta}`,
+      body: `${isNew && Store.TEAM_SCOPED.has(coll) && App.viewTeam && App.viewTeam !== ((Store.member(App.me) || {}).team || 'apps') ? `<div class="insights addto"><div>➕ Adding to <b>${h(Store.teamName(App.viewTeam))}</b> — switch team at the top to add it somewhere else.</div></div>` : ''}<form id="recform" class="grid-form" novalidate>${UI.groupFlags(fields, f => UI.field(f, roVal(f, base[f.key])))}</form>${notMine && !lockedMonth ? `<p class="note">🔒 Belongs to <b>${h(Store.memberShort(Store.recOwner(Store.db.get(base.id) || base)))}</b> — only they, or someone given “Change or delete other people's items”, can change or delete it.</p>` : ''}${lockedMonth ? `<p class="note">🔒 ${h(Store.monthLabel(lockYm))} is locked — scores for this month are final, so only your manager can change it.</p>` : ''}${lockedNow.length ? '<p class="note">🔒 Approved — the details are locked. Your manager can still change them.</p>' : ''}${S.formNote ? `<p class="note">${S.formNote}</p>` : ''}${!isNew && S.formExtra ? S.formExtra(base) : ''}${typeof Conv !== 'undefined' ? Conv.note(base) : ''}${coll === 'todo' && !isNew && base.analyst !== App.me && typeof Admin !== 'undefined' && Admin.canSee && Admin.canSee() ? `<div class="meta">Given ${U.fmtDate(base.assigned)} to ${h(Store.memberShort(base.analyst))} · ${Admin.seenLabel(base, true)}</div>` : ''}${meta}`,
       actions: `${canDel ? '<button class="btn danger ghost" data-del>Delete</button>' : ''}${!isNew && !ro && typeof Conv !== 'undefined' && Conv.KINDS[coll] && Object.keys(Conv.KINDS).some(k => k !== coll && !Conv.why(base, k)) ? '<button class="btn ghost" data-convert>⇄ Convert to…</button>' : ''}<span class="grow"></span><button class="btn" data-cancel>${ro ? 'Close' : 'Cancel'}</button>${ro ? '' : `<button class="btn primary" data-save>${isNew ? 'Add' : 'Save'}</button>`}`,
       onMount: w => {
         const form = w.querySelector('#recform');
@@ -226,7 +270,15 @@ Object.assign(UI, {
             })
         );
         if (S.onFormMount) S.onFormMount(form, base);
-        w.querySelector('[data-cancel]').onclick = UI.closeModal;
+        w.querySelector('[data-cancel]').onclick = UI.tryClose;
+        form.addEventListener('input', e => {
+          const f = e.target.closest('.fld');
+          if (f && f.classList.contains('fld-err')) {
+            f.classList.remove('fld-err');
+            const m = f.querySelector('.err-msg');
+            if (m) m.remove();
+          }
+        });
         const cv = w.querySelector('[data-convert]');
         if (cv)
           cv.onclick = () => {
@@ -248,8 +300,7 @@ Object.assign(UI, {
             UI.confirm(
               `Delete this ${S.single.toLowerCase()}?${extra.length ? ` ${extra.length} open To Do${extra.length > 1 ? 's' : ''} forwarded from it will be canceled.` : ''}`,
               () => {
-                Store.saveMany([Object.assign({}, Store.db.get(base.id) || base, { _del: true }), ...extra]);
-                UI.toast('Deleted');
+                UI.saveUndo([Object.assign({}, Store.db.get(base.id) || base, { _del: true }), ...extra], 'Deleted', '');
                 App.render();
               }
             );
@@ -263,21 +314,40 @@ Object.assign(UI, {
           } // keep the form open
           const extra = S.cascade ? S.cascade(out, base, false) : []; // records that follow this one (see schemas)
           const more = opts.with ? opts.with(out) : [];
-          Store.saveMany([out, ...extra, ...more]);
           if (extra.length) msg = (msg || 'Saved') + ` — ${extra.length} forwarded To Do${extra.length > 1 ? 's' : ''} updated`;
           UI.closeModal();
-          UI.toast(msg || opts.savedMsg || (isNew ? `${S.single} added` : 'Saved'), 'good');
+          UI.saveUndo([out, ...extra, ...more], msg || opts.savedMsg || (isNew ? `${S.single} added` : 'Saved'));
           if (opts.after) opts.after(out);
           App.render();
         };
         const save = async () => {
           const vals = UI.readForm(form, fields);
-          for (const f of fields)
-            if (f.required && f.type !== 'readonly' && (vals[f.key] === '' || vals[f.key] == null)) {
-              UI.toast(`"${f.label}" is required`, 'bad');
-              form.querySelector(`[name="${f.key}"]`).focus();
-              return;
+          const missing = fields.filter(
+            f =>
+              f.required &&
+              f.type !== 'readonly' &&
+              (vals[f.key] === '' || vals[f.key] == null || (Array.isArray(vals[f.key]) && !vals[f.key].length))
+          );
+          if (missing.length) {
+            // mark every missing field, not just the first
+            for (const f of missing) {
+              const el = form.querySelector(`[name="${f.key}"]`);
+              const box = el && el.closest('.fld');
+              if (box && !box.classList.contains('fld-err')) {
+                box.classList.add('fld-err');
+                box.insertAdjacentHTML('beforeend', '<small class="err-msg">Required</small>');
+              }
             }
+            UI.toast(
+              missing.length === 1
+                ? `"${missing[0].label}" is required`
+                : `${missing.length} required fields are empty: ${missing.map(f => f.label).join(', ')}`,
+              'bad'
+            );
+            const first = form.querySelector(`[name="${missing[0].key}"]`);
+            if (first) first.focus();
+            return;
+          }
           if (isNew) return commit(Object.assign({}, base, vals));
           // did someone else change this record while I was editing? (fetch their latest saves first)
           try {

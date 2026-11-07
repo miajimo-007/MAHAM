@@ -14,7 +14,7 @@
 
 1. Create `src/js/pages/<name>.js`:
    ```js
-   /* DARRIK — <what the page is for>. */
+   /* MAHAM — <what the page is for>. */
    'use strict';
    P.mypage = () => ({
      title: 'My page',
@@ -46,5 +46,5 @@ No code change: Admin → Teams → _Add team_, then add its manager in Admin �
 ## Release
 
 Bump `APP_VERSION` → `CHANGELOG.md` → `python tools/build.py` → `python tests/run_all.py` →
-try in a test folder with a copy of the data → replace `DARRIK.html` in the live folder.
+try in a test folder with a copy of the data → replace `MAHAM.html` in the live folder.
 People who have the app open get an "update available" bar.

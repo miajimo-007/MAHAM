@@ -1,4 +1,4 @@
-/* DARRIK — Director helpers: "Needs your attention", ask-for-update nudges, escalations, workload, timeline.
+/* MAHAM — Director helpers: "Needs your attention", ask-for-update nudges, escalations, workload, timeline.
  *   nudge { to, from, about (record id), kind: 'update' | 'import' | 'decision', text, at }  — written by the sender only
  *   escalation on a director task / project: { by, note, on, at, answer: { by, note, on } }   — "Needs the director's decision"
  * A nudge disappears by itself when it is answered: the task / project was updated by someone else after it was sent

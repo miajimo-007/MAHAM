@@ -1,4 +1,4 @@
-/* DARRIK — Record types: Central follow-up, quick win, on-call log. */
+/* MAHAM — Record types: Central follow-up, quick win, on-call log. */
 'use strict';
 
 Object.assign(Schemas, {
@@ -60,4 +60,91 @@ Object.assign(Schemas, {
       { key: 'action', label: 'Action taken', type: 'textarea', span: 2, rows: 2 },
     ],
   },
+  /* Good Catch (On-Call / Good Catch → Good Catch tab) */
+  gcatch: {
+    single: 'Good catch',
+    canCreate: () => true,
+    canDelete: r => GC.canAll(r),
+    mgrOk: r => !r.id || GC.canAll(r),
+    readOnly: r => !!r.id && !GC.canWork(r),
+    defaults: () => ({ kind: 'Issue', impact: 'Medium', status: 'New', found: U.todayStr() }),
+    formNote: '🔒 No patient names, MRNs or other details that identify a patient.',
+    onFormMount: (form, base) => GC.panel(form, base),
+    fields: [
+      { mgr: true, roSuffix: '', key: 'title', label: 'What you saw', type: 'text', required: true, span: 2 },
+      { mgr: true, roSuffix: '', key: 'kind', label: 'Type', type: 'select', options: () => GC.KINDS, blank: false },
+      { mgr: true, roSuffix: '', key: 'impact', label: 'Impact', type: 'select', options: ['High', 'Medium', 'Low'], blank: false },
+      {
+        mgr: true,
+        roSuffix: '',
+        key: 'system',
+        label: 'System / module',
+        type: 'list',
+        options: () => [
+          ...new Set(
+            GC.all()
+              .map(g => g.system)
+              .filter(Boolean)
+          ),
+        ],
+        placeholder: 'e.g. EHR order entry',
+      },
+      {
+        mgr: true,
+        roSuffix: '',
+        key: 'where',
+        label: 'Department / location',
+        type: 'list',
+        options: () => [
+          ...new Set(
+            GC.all()
+              .map(g => g.where)
+              .filter(Boolean)
+          ),
+        ],
+      },
+      { mgr: true, roSuffix: '', key: 'found', label: 'Found on', type: 'date', required: true },
+      { mgr: true, roSuffix: '', key: 'ref', label: 'Request ID / reference', type: 'text' },
+      { mgr: true, roSuffix: '', key: 'details', label: 'Details', type: 'textarea', span: 2, rows: 3 },
+      {
+        mgr: true,
+        roSuffix: '',
+        key: 'action',
+        label: 'What I did about it',
+        type: 'textarea',
+        span: 2,
+        rows: 2,
+        hint: 'e.g. called the user, raised a ManageEngine request, temporary workaround',
+      },
+      { key: 'status', label: 'Status', type: 'select', options: () => Object.values(GC.ST), blank: false },
+      {
+        key: 'taker',
+        label: 'Taken by',
+        type: 'select',
+        options: () =>
+          Store.visible()
+            .filter(m => m.active !== false)
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(m => [m.id, Store.memberName(m.id)]),
+        blank: '— nobody yet —',
+      },
+      { key: 'resolution', label: 'Resolution (what fixed it / why not)', type: 'textarea', span: 2, rows: 2 },
+    ],
+    beforeSave(r, before) {
+      if (!r.createdBy) r.createdBy = (before && before.createdBy) || App.me;
+      if (!r.team) {
+        const m = Store.member(r.createdBy);
+        r.team = (m && !Store.topRole(m.role) && m.team) || App.viewTeam || 'apps';
+      }
+      if (r.taker && r.status === GC.ST.N) r.status = GC.ST.P;
+      if (!GC.isOpen(r)) {
+        if (!r.resolvedOn) r.resolvedOn = U.todayStr();
+        if (!r.resolvedBy) r.resolvedBy = App.me;
+      } else {
+        r.resolvedOn = '';
+        r.resolvedBy = '';
+      }
+    },
+  },
+  gcupdate: { single: 'Good catch update', canCreate: () => true, fields: [{ key: 'text', label: 'Update', type: 'textarea', span: 2 }] },
 });

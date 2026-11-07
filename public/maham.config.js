@@ -1,6 +1,6 @@
-/* DARRIK settings for a hosted copy. Edit this file next to DARRIK.html — no rebuild needed.
+/* MAHAM settings for a hosted copy. Edit this file next to MAHAM.html — no rebuild needed.
  * Full guide: docs/HOSTING.md */
-window.DARRIK_CONFIG = {
+window.MAHAM_CONFIG = {
   /* Where the data is kept:
    *   'auto'   — the shared folder on desktop Chrome / Edge, this device on phones and other browsers (default)
    *   'folder' — always the shared folder (desktop Chrome / Edge)

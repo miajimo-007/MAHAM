@@ -1,18 +1,18 @@
-/* DARRIK — Where the data lives. Set in darrik.config.js (next to DARRIK.html):
+/* MAHAM — Where the data lives. Set in maham.config.js (next to MAHAM.html):
  *   'auto'   — the shared folder in desktop Chrome / Edge; this device everywhere else (phones, Safari, Firefox)
  *   'folder' — always the shared folder (desktop Chrome / Edge only)
  *   'device' — this browser only (a phone, a demo, one person)
- *   'cloud'  — the online database (fill in the "cloud" part of darrik.config.js — see docs/HOSTING.md)
- * App.boot() asks DarrikStorage.boot() first: 'folder' means "carry on with the shared folder as usual". */
+ *   'cloud'  — the online database (fill in the "cloud" part of maham.config.js — see docs/HOSTING.md)
+ * App.boot() asks MahamStorage.boot() first: 'folder' means "carry on with the shared folder as usual". */
 'use strict';
 
-const DarrikStorage = {
+const MahamStorage = {
   mode: 'folder',
   cfg() {
-    return window.DARRIK_CONFIG || {};
+    return window.MAHAM_CONFIG || {};
   },
   choose() {
-    const want = LS.get('darrik.storage', '') || this.cfg().storage || 'auto'; // the person's own choice on this browser wins
+    const want = LS.get('maham.storage', '') || this.cfg().storage || 'auto'; // the person's own choice on this browser wins
     if (want === 'auto') return 'showDirectoryPicker' in window ? 'folder' : 'device';
     if (want === 'folder' && !('showDirectoryPicker' in window)) return 'device';
     return ['folder', 'device', 'cloud'].includes(want) ? want : 'folder';
@@ -38,7 +38,7 @@ const DarrikStorage = {
     await App.start();
   },
   use(mode) {
-    LS.set('darrik.storage', mode);
+    LS.set('maham.storage', mode);
     location.reload();
   },
   /* the shared-folder screen gets a way to try the app without a folder */
@@ -63,7 +63,7 @@ const DarrikStorage = {
     const c = this.cfg().cloud || {};
     if (!CloudBackend.configured(c)) {
       App.screen(
-        `<h1>Online storage is not set up yet</h1><p>Fill in <code>cloud.url</code> and <code>cloud.anonKey</code> in <b>darrik.config.js</b> (see docs/HOSTING.md), or use the app on this device for now.</p><div class="row-btns"><button class="btn primary" id="cl-dev">Use this device</button></div>`
+        `<h1>Online storage is not set up yet</h1><p>Fill in <code>cloud.url</code> and <code>cloud.anonKey</code> in <b>maham.config.js</b> (see docs/HOSTING.md), or use the app on this device for now.</p><div class="row-btns"><button class="btn primary" id="cl-dev">Use this device</button></div>`
       );
       UI.$('#cl-dev').onclick = () => this.use('device');
       return;
@@ -121,7 +121,7 @@ const DarrikStorage = {
         location.reload();
       });
     };
-    await this.open(VFS.root(CloudBackend, 'DARRIK'), (this.cfg().cloud || {}).companyName || 'online');
+    await this.open(VFS.root(CloudBackend, 'MAHAM'), (this.cfg().cloud || {}).companyName || 'online');
   },
   /* ---------- phone: "Add to Home Screen" (works when the app is served over https, e.g. GitHub Pages) ---------- */
   installable() {
@@ -149,7 +149,7 @@ const DarrikStorage = {
     if (a)
       a.onclick = e => {
         e.preventDefault();
-        DarrikStorage.use('folder');
+        MahamStorage.use('folder');
       };
   };
 })();

@@ -1,4 +1,4 @@
-/* DARRIK — Project workflows (set up by the super admin in Admin → Workflows).
+/* MAHAM — Project workflows (set up by the super admin in Admin → Workflows).
  *   settings-workflows.list = [{ id, name, team ('' = every team), start, statuses: [{ id, name, color, group, alert }],
  *                                moves: [{ from, to, who: [roles], approver: '' | role | 'm:<id>', conds: [keys] }] }]
  * A project that uses a workflow keeps:  workflow, stage (status id), stageSince (ms), history [{ from, to, by, at, note,

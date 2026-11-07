@@ -1,4 +1,4 @@
-/* DARRIK — One-off import of the old per-sheet Excel files (detects each sheet by its headers; stable ids so re-import never duplicates). */
+/* MAHAM — One-off import of the old per-sheet Excel files (detects each sheet by its headers; stable ids so re-import never duplicates). */
 'use strict';
 
 const Importer = {

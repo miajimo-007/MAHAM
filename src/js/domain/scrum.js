@@ -1,4 +1,4 @@
-/* DARRIK — Scrum rules for projects: planners, members, sprints, story points, progress. */
+/* MAHAM — Scrum rules for projects: planners, members, sprints, story points, progress. */
 'use strict';
 
 /* ---------- Scrum: who may do what in a project ---------- */
@@ -63,8 +63,8 @@ const Scrum = {
   },
   /* may create projects: managers (and acting), team leaders / analysts with the permission, directors, super admin */
   canCreate() {
-    return App.isSuper() || App.isDir() || App.isMgr() || App.isActing() || App.can('createProjects');
-  },
+    return App.isSuper() || App.can('createProjects');
+  }, // managers and directors have it by default; Admin can take it away
   involved() {
     return Store.all('project').some(p => Scrum.onProject(p));
   },

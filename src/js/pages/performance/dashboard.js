@@ -1,4 +1,4 @@
-/* DARRIK — Team Dashboard — team score, monthly heat map, score locking. */
+/* MAHAM — Team Dashboard — team score, monthly heat map, score locking. */
 'use strict';
 
 P.dashboard = () => {

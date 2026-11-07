@@ -1,4 +1,4 @@
-/* DARRIK — Requests & Approvals: raise a request, approve / reject, team leave. */
+/* MAHAM — Requests & Approvals: raise a request, approve / reject, team leave. */
 'use strict';
 
 const reqBadge = r =>
@@ -271,6 +271,8 @@ P.requests = sub => {
     let rows = Requests.visible().filter(r => r.requester !== App.me || App.isSuper());
     if (s.st) rows = rows.filter(r => r.status === s.st);
     if (s.type) rows = rows.filter(r => r.type === s.type);
+    if (s.who) rows = rows.filter(r => r.requester === s.who);
+    if (s.month) rows = rows.filter(r => inMonth(r.from || r.created, s.month));
     rows.sort((a, b) => Requests.isPending(b) - Requests.isPending(a) || (b.from || '').localeCompare(a.from || ''));
     body = `${card(
       `Waiting for you <span class="count">${Requests.waitingForMe().length}</span>`,
@@ -279,6 +281,8 @@ P.requests = sub => {
         .join('') || empty('Nothing waiting for your decision.')
     )}
       <div class="page-actions">${filterBar('rq', [
+        { key: 'who', type: 'member', label: 'Person' },
+        { key: 'month', type: 'month' },
         { key: 'st', label: 'Status', options: Object.values(Requests.ST) },
         { key: 'type', label: 'Type', options: Requests.types().map(t => [t.id, t.label]) },
       ])}</div>

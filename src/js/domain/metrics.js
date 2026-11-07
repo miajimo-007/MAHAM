@@ -1,4 +1,4 @@
-/* DARRIK — Derived values per record (due dates, delays, closing hours, auto comments). Results are memoised per team until data changes. */
+/* MAHAM — Derived values per record (due dates, delays, closing hours, auto comments). Results are memoised per team until data changes. */
 'use strict';
 
 const Calc = {

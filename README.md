@@ -1,6 +1,6 @@
 # MAHAM
 
-**From effort to impact.** DARRIK is a team work-tracking and performance app that runs as **one HTML file** —
+**From effort to impact.** MAHAM is a team work-tracking and performance app that runs as **one HTML file** —
 no server, no installation, no internet connection. A team keeps the file and its data in a shared network folder;
 each person opens it in their browser and works from there.
 
@@ -8,19 +8,19 @@ each person opens it in their browser and works from there.
 
 ## What it does
 
-| Area            | Features                                                                                                                                                                                                                                      |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Daily work**  | My Day, To Do list with priorities, follow-up and milestone flags, manager confirmation, shadow work log, IT help-desk import (ManageEngine), attendance (present unless marked), requests and approvals, meetings and actions, announcements |
-| **Desks**       | Manager desk, director desk (all teams), tasks from the director with a manager → analyst chain, team activity                                                                                                                                |
-| **Projects**    | Scrum boards, sprints, customizable project workflows with approvals                                                                                                                                                                          |
-| **Performance** | Dynamic monthly scoring per team, heat map, employee breakdown, lazy days, weekly / monthly / yearly reports (print, PDF, Excel)                                                                                                              |
-| **Admin**       | People, teams and departments, page-level permissions, functions, workflows, scoring rules, feedback inbox, data tools, change log, and **Customize** (name, logo, colours, menu, words, targets, weekend, start pages …)                     |
+| Area            | Features                                                                                                                                                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Daily work**  | Analyst Desk, To Do list with priorities, follow-up and milestone flags, manager confirmation, shadow work log, IT help-desk import (ManageEngine), attendance (present unless marked), requests and approvals, meetings and actions, announcements |
+| **Desks**       | Manager desk, director desk (all teams), tasks from the director with a manager → analyst chain, team activity                                                                                                                                      |
+| **Projects**    | Scrum boards, sprints, customizable project workflows with approvals                                                                                                                                                                                |
+| **Performance** | Dynamic monthly scoring per team, heat map, employee breakdown, lazy days, weekly / monthly / yearly reports (print, PDF, Excel)                                                                                                                    |
+| **Admin**       | People, teams and departments, page-level permissions, functions, workflows, scoring rules, feedback inbox, data tools, change log, and **Customize** (name, logo, colours, menu, words, targets, weekend, start pages …)                           |
 
 ## How it works
 
-- **Single file.** `tools/build.py` inlines every stylesheet and script into `dist/DARRIK/DARRIK.html`.
+- **Single file.** `tools/build.py` inlines every stylesheet and script into `dist/MAHAM/MAHAM.html`.
 - **Shared folder as the database.** The app uses the browser's File System Access API. Each person writes only
-  their own file (`DARRIK Data/users/<id>.json`); everyone reads all files and the newest version of each record wins.
+  their own file (`MAHAM Data/users/<id>.json`); everyone reads all files and the newest version of each record wins.
 - **Trust rules.** Settings are accepted only from a super admin; records only from the people allowed to change them
   (`src/js/access/trust.js`). Changes that break the rules are ignored and listed in System Check.
 - **Offline by design.** Nothing is sent anywhere. There are no external requests, analytics or CDNs.
@@ -34,7 +34,7 @@ More detail: [Hosting, phones and database](docs/HOSTING.md) · [Architecture](d
 - **Phones:** the layout adapts to small screens, and when the app is served over https (for example GitHub Pages)
   it can be installed with _Add to Home Screen_. Without a shared folder (phones, Safari, Firefox) the data is kept
   on the device.
-- **Online database:** ready but off. Fill in `darrik.config.js` (next to `DARRIK.html`) and run
+- **Online database:** ready but off. Fill in `maham.config.js` (next to `MAHAM.html`) and run
   `supabase/schema.sql` — every step is in [docs/HOSTING.md](docs/HOSTING.md). The database enforces who may read
   and write (row-level security); the app does not need a rebuild.
 
@@ -47,11 +47,31 @@ More detail: [Hosting, phones and database](docs/HOSTING.md) · [Architecture](d
 ## Quick start
 
 ```bash
-python3 tools/build.py          # → dist/DARRIK/DARRIK.html and dist/DARRIK_App_<version>.zip
+python3 tools/build.py          # → dist/MAHAM/MAHAM.html and dist/MAHAM_App_<version>.zip
 ```
 
-Open `dist/DARRIK/DARRIK.html` in Edge or Chrome, choose the `dist/DARRIK` folder when asked, and pick a name.
+Open `dist/MAHAM/MAHAM.html` in Edge or Chrome, choose the `dist/MAHAM` folder when asked, and pick a name.
 The sample data contains fictional people only.
+
+## MAHAM Lab — the analysis app
+
+`lab/` is a second single-file app for analysts. It reads the team's shared folder **read-only** (it never writes
+there) and adds:
+
+- **Team insights** from the shared data: quick-win ideas from repeated help-desk requests, an auto-tagger, late-risk
+  scoring, forecasts and snapshots.
+- **Studio** — load an Excel / CSV file (or a folder of them) and build multi-page dashboards from 51 chart types,
+  drawn by its own engine (no chart library, nothing online). Patient identifiers are found and removed or coded
+  before anything is kept, and counts under 5 are hidden. Data and dashboards stay in that browser (IndexedDB).
+- **Experimenting:** recorded data steps with refresh, formulas, ranges, value lists, hospital calendar columns,
+  linking two datasets, saved measures, drill-down, compare periods, "why did it change", ask in words, before / after
+  a go-live, what drives a number, patterns over time (weekday, hour, Ramadan / peak season), what-if, a findings
+  notebook and a findings file the main app can import (Admin → Data).
+
+```bash
+python3 lab/tools/build.py      # → lab/dist/MAHAM-Lab.html
+python3 lab/tests/test_lab.py   # end-to-end test on a made-up shared folder
+```
 
 ## Development
 
@@ -83,9 +103,10 @@ src/
     pages/              one file per screen, grouped by area
       admin/ desks/ work/ performance/ follow-up/ reference/ about/
     app/                state, router, shell (menu and top bar), sign-in, connect, mode
-public/                 served next to the app as is: darrik.config.js (settings), manifest, service worker, icons
+public/                 served next to the app as is: maham.config.js (settings), manifest, service worker, icons
 supabase/schema.sql     the online database: tables and security rules
 tools/build.py          checks and bundles everything into one HTML file
+lab/                    the analysis app: lab.html, js/, css/, tools/build.py, tests/
 tests/                  end-to-end tests (Playwright) and fixtures with fictional data
 docs/                   architecture, data model, permissions, development notes
 ```
@@ -99,7 +120,7 @@ docs/                   architecture, data model, permissions, development notes
 
 ## Versioning
 
-Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.10.30.10**. See [CHANGELOG](CHANGELOG.md).
+Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.11.07.1**. See [CHANGELOG](CHANGELOG.md).
 
 ## License
 

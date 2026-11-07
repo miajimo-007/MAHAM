@@ -1,4 +1,4 @@
-/* DARRIK — All-teams overview (directors, AED, super admin): what the director needs to see in every team,
+/* MAHAM — All-teams overview (directors, AED, super admin): what the director needs to see in every team,
  * as an agenda — tasks between director and managers (whoever gave them, incl. actions from meetings), team and
  * director projects, requests waiting for the director, and upcoming meetings — grouped Overdue · each day of the
  * next two weeks · Later · No date. Not the teams' daily work (manager → analyst To Dos, project tasks).

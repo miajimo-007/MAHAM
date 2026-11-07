@@ -1,10 +1,10 @@
-/* DARRIK — Virtual folder.
+/* MAHAM — Virtual folder.
  * The app reads and writes through folder / file handles (the browser's File System Access API). This file gives it
  * the same kind of handles over any storage "backend", so the app runs unchanged on a phone (this device) or on an
  * online database. Only what the app uses is implemented: getDirectoryHandle, getFileHandle, entries, values,
  * removeEntry, getFile, createWritable, queryPermission, requestPermission.
  *
- * A backend has five async methods (paths use "/" and are relative to the root, e.g. "DARRIK Data/users/ana.json"):
+ * A backend has five async methods (paths use "/" and are relative to the root, e.g. "MAHAM Data/users/ana.json"):
  *   list(dir)            → [{ name, kind: 'file' | 'directory', size, mtime }]   direct children only
  *   read(path)           → { data: string | Blob, size, mtime }  or null when missing
  *   write(path, data)    → { size, mtime }                         data is a string or a Blob
@@ -23,7 +23,7 @@ const VFS = {
     return dir ? dir + '/' + name : name;
   },
   root(backend, name) {
-    return new VFS.Dir(backend, '', name || 'DARRIK');
+    return new VFS.Dir(backend, '', name || 'MAHAM');
   },
 };
 
@@ -122,7 +122,7 @@ VFS.File = class {
 
 /* This device: everything in the browser's own database (IndexedDB). Used on phones and when there is no shared folder. */
 const DeviceBackend = {
-  DB: 'darrik-device',
+  DB: 'maham-device',
   STORE: 'files',
   _db: null,
   open() {

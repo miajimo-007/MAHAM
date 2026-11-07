@@ -1,4 +1,4 @@
-/* DARRIK — To Do List. */
+/* MAHAM — To Do List. */
 'use strict';
 
 P.todo = () => {
@@ -28,6 +28,7 @@ P.todo = () => {
     rows,
     exportName: 'To Do List',
     onRow: true,
+    bulk: todoBulk(),
     cols: [
       { key: 'status', label: 'Status', html: t => UI.sbadge(t.status), get: t => t.status },
       {
@@ -37,7 +38,19 @@ P.todo = () => {
           `<b>${h(t.r.task)}</b>${UI.flagTags(t.r, { noPri: true })}${Conv.tag(t.r)}${t.r.instruction ? `<div class="muted small">📝 ${h(t.r.instruction)}</div>` : ''}${t.r.comment ? `<div class="muted small">💬 ${h(t.r.comment)}</div>` : ''}`,
         get: t => t.r.task + ' ' + (t.r.instruction || '') + ' ' + (t.r.comment || ''),
       },
-      { key: 'pri', label: 'Priority', get: t => t.r.priority || 'Normal', sortVal: t => UI.PRI_RANK[t.r.priority || 'Normal'] },
+      {
+        key: 'pri',
+        label: 'Priority',
+        get: t => t.r.priority || 'Normal',
+        sortVal: t => UI.PRI_RANK[t.r.priority || 'Normal'],
+        edit: {
+          type: 'select',
+          options: ['High', 'Medium', 'Normal', 'Low'],
+          ok: t => t.status === 'In Progress' && UI.canEditField('todo', t.r, 'priority'),
+          value: t => t.r.priority || 'Normal',
+          save: (t, v) => UI.saveField('todo', t.r, 'priority', v, 'Priority changed to ' + v),
+        },
+      },
       { key: 'fu', label: 'FU', get: t => (t.r.fu ? 'Y' : '') },
       { key: 'analyst', label: 'Assigned to', get: t => Store.memberShort(t.r.analyst) },
       { key: 'assigned', label: 'Assigned', get: t => U.fmtDate(t.r.assigned), sortVal: t => t.r.assigned || '' },
@@ -45,6 +58,19 @@ P.todo = () => {
       { key: 'finish', label: 'Finished', get: t => U.fmtDate(t.r.finish), sortVal: t => t.r.finish || '' },
       { key: 'days', label: 'Days', cls: 'num', get: t => (t.days == null ? '' : t.days), sortVal: t => t.days || 0 },
       { key: 'timing', label: 'Timing', html: t => UI.sbadge(t.timing), get: t => t.timing },
+      ...(Admin.canSee()
+        ? [
+            {
+              key: 'seen',
+              label: '👁',
+              html: t => (t.r.analyst === App.me ? '' : Admin.seenLabel(t.r)),
+              get: t => {
+                const x = Admin.todoSeen(t.r);
+                return x ? (x.o ? 'opened' : 'seen') : 'not seen';
+              },
+            },
+          ]
+        : []),
       {
         key: 'act',
         label: '',
@@ -140,4 +166,82 @@ function todoDone(id) {
   if (now && now.finish)
     UI.toast(now.status === 'Ready for review' ? 'Done — waiting for your manager to confirm' : 'Done and confirmed', 'good');
   App.render();
+}
+
+/* To Do list: tick several rows and act on them together */
+function todoBulk() {
+  const today = U.todayStr();
+  const n = (k, w) => `${k} To Do${k === 1 ? '' : 's'} ${w}`;
+  const mgrOk = t => t.status === 'In Progress' && App.can('assignTodo') && App.canEdit('todo') && Store.mayChange(t.r);
+  return [
+    {
+      label: '✓ Mark done',
+      ok: t => t.status === 'In Progress' && App.canEdit('todo') && Store.canFinishTodo(t.r, App.me),
+      run: rows => {
+        const list = rows.map(t => {
+          const x = Object.assign({}, t.r, { finish: today });
+          Schemas.todo.beforeSave(x);
+          return x;
+        });
+        UI.saveUndo(list, n(list.length, 'marked done'));
+        App.render(true);
+      },
+    },
+    {
+      label: '✓ Confirm',
+      ok: t => App.canEdit('todo') && Store.canConfirmTodo(t.r, App.me),
+      run: rows => {
+        UI.saveUndo(
+          rows.map(t => Object.assign({}, t.r, { status: 'Resolved', reviewedBy: App.me, reviewedOn: today })),
+          n(rows.length, 'confirmed')
+        );
+        App.render(true);
+      },
+    },
+    {
+      label: '👤 Reassign…',
+      ok: mgrOk,
+      run: (rows, done) => {
+        UI.modal({
+          title: `Reassign ${n(rows.length, '')}`.trim(),
+          body: `<form class="grid-form" id="rsf">${UI.field({ key: 'who', label: 'Give to', type: 'select', options: Store.scoredTeam().map(m => [m.id, Store.memberShort(m.id)]), required: true }, '')}</form>`,
+          actions: `<span class="grow"></span><button class="btn" data-c>Cancel</button><button class="btn primary" data-ok>Reassign</button>`,
+          onMount: w => {
+            w.querySelector('[data-c]').onclick = UI.closeModal;
+            w.querySelector('[data-ok]').onclick = () => {
+              const who = w.querySelector('[name=who]').value;
+              if (!who) return UI.toast('Pick a person', 'bad');
+              UI.closeModal();
+              done();
+              UI.saveUndo(
+                rows.map(t =>
+                  Object.assign({}, t.r, { analyst: who, team: (Store.member(who) || {}).team || t.r.team, reassignedFrom: t.r.analyst })
+                ),
+                `${n(rows.length, 'given to')} ${Store.memberShort(who)}`
+              );
+              App.render(true);
+            };
+          },
+        });
+        return false;
+      },
+    },
+    {
+      label: '✕ Cancel…',
+      cls: 'ghost',
+      ok: mgrOk,
+      run: (rows, done) => {
+        UI.confirm(`Cancel ${n(rows.length, '')}? They stay in the list as Canceled.`, () => {
+          done();
+          UI.saveUndo(
+            rows.map(t => Object.assign({}, t.r, { status: 'Canceled' })),
+            n(rows.length, 'canceled'),
+            ''
+          );
+          App.render(true);
+        });
+        return false;
+      },
+    },
+  ];
 }

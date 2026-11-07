@@ -1,4 +1,4 @@
-/* DARRIK — Milestones: a ⭐ flag on To Dos, shadow work, quick wins, project tasks, meeting actions and director
+/* MAHAM — Milestones: a ⭐ flag on To Dos, shadow work, quick wins, project tasks, meeting actions and director
  * tasks. Anyone marks their own work; managers mark or unmark anyone's. A milestone counts only once it is done. */
 'use strict';
 

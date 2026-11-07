@@ -6,7 +6,7 @@ async def main():
         pg = s.page
         async def tab(k): await pg.click(f'[data-ptab="{k}"]'); await pg.wait_for_timeout(300); return await pg.inner_text('#main')
         await s.sign_in_as('apps-mgr'); await s.go('#/projects'); await pg.click('[data-add="project"]'); await pg.wait_for_selector('#recform')
-        await pg.fill('#recform [name=name]', 'OR Direct Booking'); await pg.click('[data-save]'); await pg.wait_for_timeout(300)
+        await pg.fill('#recform [name=name]', 'OR Direct Booking'); await pg.select_option('#recform [name=mode]', 'scrum'); await pg.click('[data-save]'); await pg.wait_for_timeout(300)
         pid = await s.js("Store.all('project').find(p => p.name === 'OR Direct Booking').id")
         c('manager-created project belongs to his team', await s.js(f"(p => p.manager === 'apps-mgr' && p.team === 'apps')(Store.get('{pid}'))"))
         await pg.click('#main tbody tr'); await pg.wait_for_timeout(400); c('row opens the board', (await s.js('location.hash')).startswith('#/project/'))

@@ -1,4 +1,4 @@
-/* DARRIK — small rules applied to every record just before it is saved (Store.saveMany → Store.normalize). */
+/* MAHAM — small rules applied to every record just before it is saved (Store.saveMany → Store.normalize). */
 'use strict';
 
 Object.assign(Store, {

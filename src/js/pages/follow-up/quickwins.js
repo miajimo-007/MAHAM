@@ -1,4 +1,4 @@
-/* DARRIK — Quick Wins — list, approval and rejection. */
+/* MAHAM — Quick Wins — list, approval and rejection. */
 'use strict';
 
 P.quickwins = () => {
@@ -11,6 +11,7 @@ P.quickwins = () => {
   if (!s.hist && s.ap !== 'Rejected') rows = rows.filter(x => !qwHistory(x.r, true));
   if (s.analyst) rows = rows.filter(x => x.r.analyst === s.analyst || QS.confirmed(x.r).includes(s.analyst));
   if (s.st) rows = rows.filter(x => x.r.status === s.st);
+  if (s.month) rows = rows.filter(x => inMonth(x.r.date, s.month) || inMonth(x.r.expected, s.month));
   if (s.ap) rows = rows.filter(x => (x.r.approval || 'Pending') === s.ap);
   if (s.ms) rows = rows.filter(x => x.r.milestone);
   rows.sort((a, b) => (b.r.qwId || '').localeCompare(a.r.qwId || '') || (b.r.date || '').localeCompare(a.r.date || ''));
@@ -20,6 +21,7 @@ P.quickwins = () => {
   ${card(`Quick wins completed by month — ${y}`, UI.barChart(monthly, { height: 130, width: 1100, fmt: v => U.num(v, 0), emptyText: 'No quick wins completed yet this year.' }))}
   <div class="page-actions">${filterBar('qw', [
     { key: 'analyst', type: 'member' },
+    { key: 'month', type: 'month' },
     { key: 'st', label: 'Status', options: Store.list('qwStatus') },
     { key: 'ap', label: 'Approval', options: ['Accepted', 'Rejected', 'Pending'] },
     { key: 'ms', type: 'toggle', label: '⭐ Milestones only' },
@@ -30,6 +32,7 @@ P.quickwins = () => {
     rows,
     exportName: 'Quick Wins',
     onRow: true,
+    bulk: qwBulk(),
     cols: [
       { key: 'date', label: 'Date', get: x => U.fmtDate(x.r.date), sortVal: x => x.r.date || '' },
       { key: 'qwId', label: 'ID', get: x => x.r.qwId },
@@ -42,8 +45,31 @@ P.quickwins = () => {
         get: x => x.r.subject,
       },
       { key: 'type', label: 'Type', get: x => x.r.type },
-      { key: 'status', label: 'Status', html: x => UI.sbadge(x.r.status), get: x => x.r.status },
-      { key: 'expected', label: 'Expected', get: x => U.fmtDate(x.r.expected), sortVal: x => x.r.expected || '' },
+      {
+        key: 'status',
+        label: 'Status',
+        html: x => UI.sbadge(x.r.status),
+        get: x => x.r.status,
+        edit: {
+          type: 'select',
+          options: () => [['', '—'], ...Store.list('qwStatus')],
+          ok: x => UI.canEditField('quickwin', x.r, 'status'),
+          value: x => x.r.status || '',
+          save: (x, v) => UI.saveField('quickwin', x.r, 'status', v, 'Status changed'),
+        },
+      },
+      {
+        key: 'expected',
+        label: 'Expected',
+        get: x => U.fmtDate(x.r.expected),
+        sortVal: x => x.r.expected || '',
+        edit: {
+          type: 'date',
+          ok: x => UI.canEditField('quickwin', x.r, 'expected'),
+          value: x => x.r.expected || '',
+          save: (x, v) => UI.saveField('quickwin', x.r, 'expected', v, 'Expected date changed'),
+        },
+      },
       {
         key: 'approval',
         label: 'Approval',
@@ -100,4 +126,39 @@ function decideQW(id, approve) {
       };
     },
   });
+}
+
+/* Quick wins list: approve or reject several at once (QW IDs are given automatically on approval) */
+function qwBulk() {
+  const ok = x => !x.r.approval && App.can('approveQW') && App.canEdit('quickwin');
+  return [
+    {
+      label: '✓ Approve',
+      ok,
+      run: rows => {
+        UI.saveUndo(
+          rows.map(x => Object.assign({}, x.r, { approval: 'Accepted' })),
+          `${rows.length} quick win${rows.length > 1 ? 's' : ''} approved`
+        );
+        App.render(true);
+      },
+    },
+    {
+      label: '✕ Reject',
+      cls: 'ghost',
+      ok,
+      run: (rows, done) => {
+        UI.confirm(`Reject ${rows.length} quick win${rows.length > 1 ? 's' : ''}?`, () => {
+          done();
+          UI.saveUndo(
+            rows.map(x => Object.assign({}, x.r, { approval: 'Rejected' })),
+            `${rows.length} rejected`,
+            ''
+          );
+          App.render(true);
+        });
+        return false;
+      },
+    },
+  ];
 }

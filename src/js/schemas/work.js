@@ -1,4 +1,4 @@
-/* DARRIK — Record types: To Do, shadow work, help desk request, attendance. */
+/* MAHAM — Record types: To Do, shadow work, help desk request, attendance. */
 'use strict';
 
 Object.assign(Schemas, {
@@ -102,7 +102,12 @@ Object.assign(Schemas, {
     mgrDelete: true,
     mgrAll: true,
     mgrPerm: 'importME',
-    canDelete: () => App.isSuper(), // adding / deleting by hand: the administrator only (the daily import does the rest)
+    canDelete: r => (App.isSuper() || App.can('editHelpdeskByHand')) && !HDLock.locked(r), // adding / deleting by hand: the administrator only (the daily import does the rest)
+    readOnly: r => !!r.id && HDLock.locked(r),
+    formExtra: r =>
+      r.id && HDLock.locked(r)
+        ? `<p class="muted small">🔒 ${HDLock.label(HDLock.monthOf(r))} is locked by the admin — its numbers stay as reported. ${App.isSuper() ? 'Unlock it in Admin → Customize → Help desk months to change it.' : ''}</p>`
+        : '',
     fields: [
       { key: 'reqId', label: 'Request ID', type: 'number', required: true },
       {
