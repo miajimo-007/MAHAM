@@ -6,7 +6,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # a system the pinned Playwright supports
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
