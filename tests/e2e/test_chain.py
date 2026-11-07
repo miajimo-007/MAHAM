@@ -37,7 +37,8 @@ async def main():
         # director changes due date + instruction → flows down to open To Dos only
         await s.sign_in_as('khalid'); await J(f"UI.editRecord('mgrtask', Store.get('{await mid()}'))"); await pg.wait_for_selector('#recform')
         c('director sees who is working on it in the task form', 'Who is working on it' in await pg.inner_text('#modal'))
-        await pg.fill('#recform [name=due]', d5); await pg.fill('#recform [name=comment]', 'Focus on ICU order sets first'); await pg.click('[data-save]'); await pg.wait_for_timeout(500)
+        await pg.fill('#recform [name=due]', d5); await pg.fill('#recform [name=comment]', 'Focus on ICU order sets first'); await pg.click('[data-save]')
+        await pg.wait_for_function("Store.all('todo', '*').some(t => t.analyst === 'layla' && t.task === 'Audit order sets' && t.dirNote === 'Focus on ICU order sets first')", timeout=10000)   # wait for the save, not a fixed time (slower machines)
         k = await todo('layla'); a = await todo('yousef')
         c("open To Do follows the new due date + director note", await J(f"U.addDays('{k['assigned']}', {k['duration']})") == d5 and k.get('dirNote') == 'Focus on ICU order sets first')
         c('finished To Do is left alone', not a.get('dirNote'))

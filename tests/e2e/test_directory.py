@@ -63,7 +63,10 @@ async def main():
         await s.go('#/home', 200); await s.go('#/directory/it', 400); await pg.click('[data-dimp="itdir"]'); await pg.wait_for_selector('#dimpz')
         await pg.set_input_files('#dimpf', os.path.join(os.path.dirname(__file__), 'it_blocks.xlsx')); await pg.wait_for_selector('[data-gteam="0"]')
         c('two teams found', await pg.locator('[data-gteam]').count() == 2 and 'Faisal Mansour' in await pg.inner_text('.modal'))
-        await pg.fill('[data-gteam="0"]', 'APPS'); await pg.fill('[data-gteam="1"]', 'LAB'); await pg.click('.modal [data-ok]'); await pg.wait_for_timeout(600)
+        await pg.fill('[data-gteam="0"]', 'APPS'); await pg.fill('[data-gteam="1"]', 'LAB'); await pg.click('.modal [data-ok]')
+        for _ in range(40):   # wait for the import to be saved (slower machines), not a fixed time
+            if await J("Store.all('itdir').some(r => r.name === 'Khalid Al Shehri' && r.team === 'APPS')"): break
+            await pg.wait_for_timeout(250)
         g = await J("(() => { const by = n => Store.all('itdir').find(r => r.name === n) || {}; return { h: by('Faisal Mansour'), t: by('Khalid Al Shehri'), m: by('Adam Nasr'), f: by('Tariq Hamdan'), a: by('Hind Saleh') }; })()")
         c('first name = manager, others report to him', g['t'].get('reportsTo') == g['h'].get('id') and g['m'].get('reportsTo') == g['h'].get('id') and g['a'].get('reportsTo') == g['f'].get('id'))
         c('team names applied', g['t'].get('team') == 'APPS' and g['a'].get('team') == 'LAB')
