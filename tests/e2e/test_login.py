@@ -59,9 +59,9 @@ async def main():
         await J("UI.closeModal()")
         # change my PIN needs the current one
         await J("App.setPin()"); await pg.wait_for_selector('#pinf [name=c]')
-        await pg.fill('#pinf [name=c]', '9999'); await pg.fill('#pinf [name=a]', '2468'); await pg.fill('#pinf [name=b]', '2468'); await pg.click('#modal [data-ok]'); await pg.wait_for_timeout(300)
+        await pg.fill('#pinf [name=c]', '9999'); await pg.fill('#pinf [name=a]', '2468'); await pg.fill('#pinf [name=b]', '2468'); await pg.click('#modal [data-ok]'); await pg.wait_for_selector('#toasts :text("current PIN is not right")', timeout=15000)
         c('changing the PIN needs the current PIN', await J("App.verifyPin('1111', App.pinFor('layla'))"))
-        await pg.fill('#pinf [name=c]', '1111'); await pg.click('#modal [data-ok]'); await pg.wait_for_timeout(400)
+        await pg.fill('#pinf [name=c]', '1111'); await pg.click('#modal [data-ok]'); await pg.wait_for_selector('#pinf', state='detached', timeout=15000)   # the PIN is stretched 150,000 times: slower machines need a moment
         c('PIN changed', await J("App.verifyPin('2468', App.pinFor('layla'))"))
         await J("App.signOut()"); await pg.wait_for_selector('#loginf')
         # a retired person cannot sign in
