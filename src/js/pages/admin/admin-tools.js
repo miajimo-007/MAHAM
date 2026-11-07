@@ -25,6 +25,7 @@ function adminHome() {
   const html = `<div class="adm-tiles">${tiles.map(t => `<a class="adm-tile ${t.n && t.n !== '—' ? (t.bad ? 'bad' : 'warn') : 'ok'} ${t.warn ? 'warn' : ''}" href="${h(t.href)}" data-tile="${t.k}"><div class="kpi-label">${h(t.label)}</div><div class="kpi-val">${t.n === 0 ? '✓' : h(String(t.n))}${t.unit ? ` <small>${h(t.unit)}</small>` : ''}</div><div class="kpi-sub">${h(t.sub || '')}</div>${t.act || ''}</a>`).join('')}
     <a class="adm-tile" href="#/syscheck" id="bktile"><div class="kpi-label">Last automatic backup</div><div class="kpi-val">…</div><div class="kpi-sub">checking</div></a></div>
   <div class="cols2">
+    ${App.recoveryOf(App.me) ? '' : card('🔑 Make a recovery code', `<p class="muted small">If you forget your PIN, a recovery code lets you set a new one from the login page. Without one, only another super admin could reset it.</p><div class="row-btns"><button class="btn primary" id="rcmake">Make my recovery code</button></div>`)}
     ${card(
       'Daily checklist',
       Admin.checklist()
@@ -74,6 +75,10 @@ function adminHome() {
   return {
     html,
     mount(root) {
+      {
+        const rcm = root.querySelector('#rcmake');
+        if (rcm) rcm.onclick = () => App.recoveryDialog();
+      }
       const remind = k => {
         if (k === 'pin')
           sendReminder(

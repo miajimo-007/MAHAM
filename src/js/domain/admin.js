@@ -255,6 +255,7 @@ const Admin = {
     const steps = [
       ['Added to the app', true],
       ['Team and role set', Store.topRole(m.role) || !!m.team],
+      ['Employee ID', !!m.empId],
       ['PIN set', !!Store.pinOf(m.id)],
       ['Opened the app and saved', !!file],
     ];

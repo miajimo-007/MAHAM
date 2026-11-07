@@ -29,7 +29,7 @@ const LabUI = {
     UI.$('#labreload').onclick = async () => { LabUI.busy('Reading the shared folder…'); await Lab.load(); LabUI.invalidate(); LabUI.go(location.hash.slice(1) || LabUI.page); UI.toast('Data reloaded', 'good'); };
     UI.$('#labmonths').onchange = async e => { await Lab.saveSettings({ months: +e.target.value }); LabUI.invalidate(); LabUI.go(location.hash.slice(1) || LabUI.page); };
     UI.$('#labteam').onchange = async e => { await Lab.saveSettings({ team: e.target.value }); LabUI.invalidate(); LabUI.go(location.hash.slice(1) || LabUI.page); };
-    UI.$('#labout').onclick = e => { e.preventDefault(); try { sessionStorage.removeItem('maham.lab.me'); } catch (err) { /* */ } location.reload(); };
+    UI.$('#labout').onclick = e => { e.preventDefault(); try { localStorage.removeItem('maham.lab.me'); sessionStorage.removeItem('maham.lab.me'); } catch (err) { /* */ } location.reload(); };
     window.onhashchange = () => LabUI.go(location.hash.slice(1) || 'month');
     LabUI.go(location.hash.slice(1) || 'month');
   },

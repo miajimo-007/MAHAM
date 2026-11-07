@@ -11,7 +11,7 @@ async def main():
         await s.go('#/adminperson/layla', 500); await pg.fill('#pcf [name=title]', 'Senior Analyst'); await pg.click('#pcsave'); await pg.wait_for_timeout(400)
         c('custom title saved', await s.js("Store.titleOf('layla')") == 'Senior Analyst')
         await s.sign_in_as('layla'); c('shown in her menu', 'Senior Analyst' in await pg.inner_text('.side-foot'))
-        await s.js("App.chooseMe(true)"); await pg.wait_for_timeout(300)
+        await s.sign_in_as('adam'); await s.js("App.chooseMe(true)"); await pg.wait_for_timeout(300)   # only the super admin can switch person
         btn = await pg.inner_text('[data-me="adam"]'); c('Switch person list shows Admin under my name', 'Admin' in btn, btn)
         btn = await pg.inner_text('[data-me="layla"]'); c('and custom titles', 'Senior Analyst' in btn, btn)
         c.done(s)

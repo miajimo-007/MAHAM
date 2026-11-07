@@ -2,7 +2,7 @@
 the main pages fit the screen, and the phone install files are served."""
 import os, subprocess, sys, time
 from playwright.async_api import async_playwright
-from harness import APP, SHOTS, Check, free_port, run
+from harness import APP, SHOTS, Check, free_port, run, sign_in_page
 
 NO_FOLDER = "delete Window.prototype.showDirectoryPicker; delete window.showDirectoryPicker;"
 
@@ -18,9 +18,9 @@ async def main():
             await ctx.add_init_script(NO_FOLDER)
             pg = await ctx.new_page(); errors = []; pg.on('pageerror', lambda e: errors.append(str(e)))
             url = f'http://127.0.0.1:{port}/MAHAM.html'
-            await pg.goto(url); await pg.wait_for_selector('[data-me]', timeout=15000)
-            c('no folder support → straight to "who are you" (this device)', await pg.evaluate("Store.storageMode") == 'device')
-            await pg.click('[data-me="yousef"]'); await pg.wait_for_selector('#main .kpis')
+            await pg.goto(url); await pg.wait_for_selector('#loginf', timeout=15000)
+            c('no folder support → straight to the login page (this device)', await pg.evaluate("Store.storageMode") == 'device')
+            await sign_in_page(pg, 'yousef'); await pg.wait_for_selector('#main .kpis')
             c('note under the name: saved on this device', 'this device' in await pg.inner_text('.side-foot'))
             await pg.evaluate("(async () => { Store.save({ c: 'shadow', id: 'phone-sw', analyst: 'yousef', team: 'apps', date: U.todayStr(), taskType: 'TRAINING >> x', source: 'Call', subject: 'Logged on the phone', minutes: 30 }); await Store.flush(); })()")
             await pg.wait_for_timeout(600)

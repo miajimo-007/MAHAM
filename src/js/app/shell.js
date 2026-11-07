@@ -22,7 +22,7 @@ Object.assign(App, {
     UI.$('#app').innerHTML =
       `<aside class="side"><div class="brand">${Store.logoHtml()}<div><b id="brandapp">${U.h(Store.appName())}</b><small id="brandteam">${U.h(Store.teamName(App.viewTeam))}</small></div></div>
       ${App.navHtml()}
-      <div class="side-foot"><button class="me" id="mebtn" title="Switch person"><span class="av">${U.h(Store.memberShort(App.me).slice(0, 1))}</span><span><b>${U.h(Store.memberShort(App.me))}</b><small>${U.h(Store.titleOf(App.me))} · switch · PIN</small></span></button></div></aside>
+      <div class="side-foot"><button class="me" id="mebtn" title="My PIN · sign out"><span class="av">${U.h(Store.memberShort(App.me).slice(0, 1))}</span><span><b>${U.h(Store.memberShort(App.me))}</b><small>${U.h(Store.titleOf(App.me))} · PIN · sign out</small></span></button></div></aside>
       <div class="mainwrap"><header class="top"><button class="icon-btn menu" id="menubtn" aria-label="Menu">☰</button><h1 id="ptitle"></h1><span class="grow"></span>
         ${
           App.isDir() || App.isSuper() || App.myTeams().length > 1
@@ -37,13 +37,25 @@ Object.assign(App, {
     UI.$('#mebtn').onclick = () =>
       UI.modal({
         title: Store.memberName(App.me),
-        body: `<p class="muted small">${U.h(Store.titleOf(Store.member(App.me) || {}))} · ${U.h(Store.teamName(App.viewTeam))}</p><div class="row-btns"><button class="btn" id="m_switch">Switch person</button><button class="btn" id="m_pin">${Store.pinOf(App.me) ? 'Change my PIN' : 'Set my PIN'}</button></div><p class="muted small">Set a PIN so nobody else can open the app as you.</p>`,
+        body: `<p class="muted small">${U.h(Store.titleOf(Store.member(App.me) || {}))} · ${U.h(Store.teamName(App.viewTeam))}</p><div class="row-btns">${App.isSuper() && !App.preview ? '<button class="btn" id="m_switch">Switch person</button>' : ''}<button class="btn" id="m_pin">${App.pinFor(App.me) ? 'Change my PIN' : 'Set my PIN'}</button>${App.isSuper() && !App.preview ? `<button class="btn" id="m_rc">🔑 Recovery code${App.recoveryOf(App.me) ? '' : ' ⚠'}</button>` : ''}<span class="grow"></span><button class="btn" id="m_out">⎋ Sign out</button></div><p class="muted small">You stay signed in on this PC until you sign out.</p>`,
         onMount: w => {
           App.bindCopy(w);
-          w.querySelector('#m_switch').onclick = () => {
+          const sw = w.querySelector('#m_switch');
+          if (sw)
+            sw.onclick = () => {
+              UI.closeModal();
+              App.chooseMe(true);
+            };
+          w.querySelector('#m_out').onclick = () => {
             UI.closeModal();
-            App.chooseMe(true);
+            App.signOut();
           };
+          const rc = w.querySelector('#m_rc');
+          if (rc)
+            rc.onclick = () => {
+              UI.closeModal();
+              App.recoveryDialog();
+            };
           w.querySelector('#m_pin').onclick = () => {
             UI.closeModal();
             App.setPin();

@@ -49,7 +49,9 @@ P.settings = mode => {
     title: 'Settings',
     html,
     mount(root) {
-      (root.querySelector('#switchme') || {}).onclick = () => App.chooseMe(true);
+      (root.querySelector('#switchme') || {}).onclick = () => {
+        if (App.isSuper()) App.chooseMe(true);
+      };
       (root.querySelector('#pickfolder') || {}).onclick = async () => {
         try {
           await Store.pick();

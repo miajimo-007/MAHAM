@@ -282,7 +282,7 @@ function adminPeople() {
       a.name.localeCompare(b.name)
   );
   const onb = Admin.notOnboarded();
-  const html = `<div class="insights"><div>⛨ <b>Super admin</b> — only you can see this page. Nobody else can see that you are super admin. Hidden people are invisible to everyone but you; their data is kept and they sign in with “Not listed? Sign in by name” + PIN. Click a name for the person's card (open work, onboarding, offboarding, view as).</div></div>
+  const html = `<div class="insights"><div>⛨ <b>Super admin</b> — only you can see this page. Nobody else can see that you are super admin. Hidden people are invisible to everyone but you; their data is kept and they sign in like everyone else, with their employee ID and PIN. Click a name for the person's card (open work, onboarding, offboarding, view as).</div></div>
   ${
     onb.length
       ? card(
@@ -314,17 +314,22 @@ function adminPeople() {
         .join('')}</optgroup>
         <optgroup label="Switches"><option value="active:1">Active</option><option value="active:0">Retire (not active)</option><option value="scored:1">Scored</option><option value="scored:0">Not scored</option><option value="hidden:1">Hidden</option><option value="hidden:0">Not hidden</option></optgroup></select>
       <button class="btn sm" id="bulkapply">Apply</button><span class="muted small">Changes the rows below — then press <b>Save people</b>.</span></div>
-    <div class="tbl-scroll"><table class="tbl admin"><thead><tr><th class="ctr"><input type="checkbox" id="selall" aria-label="Select all"></th><th>Full name</th><th>Short</th><th>Name in ManageEngine</th><th>Team</th><th>Role</th><th class="ctr">Scored</th><th class="ctr">Active</th><th class="ctr">Hidden</th><th class="ctr">Super admin</th><th>PIN</th><th>Access</th></tr></thead><tbody id="adminrows">
+    <div class="tbl-scroll"><table class="tbl admin"><thead><tr><th class="ctr"><input type="checkbox" id="selall" aria-label="Select all"></th><th>Full name</th><th>Short</th><th title="Used to sign in">Employee ID</th><th>Name in ManageEngine</th><th>Team</th><th>Role</th><th class="ctr">Scored</th><th class="ctr">Active</th><th class="ctr">Hidden</th><th class="ctr">Super admin</th><th>PIN</th><th>Access</th></tr></thead><tbody id="adminrows">
     ${sorted
       .map(
-        m => `<tr data-id="${h(m.id)}" class="${m.hidden ? 'hid' : ''}"><td class="ctr"><input type="checkbox" data-sel aria-label="Select ${h(m.name)}"></td><td class="nw"><input value="${h(m.name)}" data-k="name"> <a class="link small" href="#/adminperson/${h(m.id)}" title="Open card">card →</a></td><td><input value="${h(m.short || '')}" data-k="short"></td><td><input value="${h(m.me || '')}" data-k="me"></td><td>${teamSel(m)}</td><td>${roleSel(m)}</td>
+        m => `<tr data-id="${h(m.id)}" class="${m.hidden ? 'hid' : ''}"><td class="ctr"><input type="checkbox" data-sel aria-label="Select ${h(m.name)}"></td><td class="nw"><input value="${h(m.name)}" data-k="name"> <a class="link small" href="#/adminperson/${h(m.id)}" title="Open card">card →</a></td><td><input value="${h(m.short || '')}" data-k="short"></td><td><input value="${h(m.empId || '')}" data-k="empId" class="empid" placeholder="${h(m.id)}" title="Employee ID — used to sign in${m.empId ? '' : ' (until it is filled, they sign in with ' + h(m.id) + ')'}"></td><td><input value="${h(m.me || '')}" data-k="me"></td><td>${teamSel(m)}</td><td>${roleSel(m)}</td>
       <td class="ctr"><input type="checkbox" data-k="scored" ${m.scored ? 'checked' : ''}></td><td class="ctr"><input type="checkbox" data-k="active" ${m.active !== false ? 'checked' : ''}></td><td class="ctr"><input type="checkbox" data-k="hidden" ${m.hidden ? 'checked' : ''}></td>
       <td class="ctr"><input type="checkbox" data-k="superAdmin" ${m.superAdmin ? 'checked' : ''} ${m.id === App.me ? 'disabled title="You cannot remove your own super admin"' : ''}></td>
       <td>${Store.pinOf(m.id) ? `<button class="btn xs ghost" data-rpin="${h(m.id)}">reset</button>` : '<span class="muted small">none</span>'}</td><td class="nw"><button class="btn xs" data-perm="${h(m.id)}">Permissions</button> <button class="btn xs ${m.pages && Object.keys(m.pages).length ? 'primary' : ''}" data-pfun="${h(m.id)}">Functions</button></td></tr>`
       )
       .join('')}
     </tbody></table></div>
-    <div class="row-btns"><button class="btn" id="addperson">＋ Add person</button><button class="btn" id="bulkadd">＋ Add several</button><span class="grow"></span><button class="btn primary" id="savepeople">Save people</button></div>
+    <div class="row-btns"><button class="btn" id="addperson">＋ Add person</button><button class="btn" id="bulkadd">＋ Add several</button>${(() => {
+      const n = empFromDir().length;
+      return n
+        ? `<button class="btn ghost" id="empfill" title="Badge numbers from the IT directory, matched by name">🪪 Fill ${n} employee ID${n > 1 ? 's' : ''} from the IT directory</button>`
+        : '';
+    })()}<span class="grow"></span><button class="btn primary" id="savepeople">Save people</button></div>
     <p class="muted small">Untick <b>Active</b> to retire someone (their past data stays) — better: use <b>Offboard</b> on their card to hand over their open work first. Directors see all teams and only the tasks they gave. "Scored" = included in team scores. A highlighted Functions button = this person has exceptions.</p>`
   )}`;
   return {
@@ -371,6 +376,16 @@ function adminPeople() {
             e[inp.dataset.k] = inp.type === 'checkbox' ? inp.checked : inp.value.trim();
           });
         });
+        const ids = {};
+        for (const [mid, e] of Object.entries(edits)) {
+          const k = App.normId(e.empId);
+          if (!k) continue;
+          if (ids[k])
+            return UI.toast(`Employee ID ${e.empId} is used twice (${Store.memberName(ids[k])} and ${Store.memberName(mid)})`, 'bad');
+          ids[k] = mid;
+        }
+        const clash = Store.members().find(m => !edits[m.id] && m.empId && ids[App.normId(m.empId)]);
+        if (clash) return UI.toast(`Employee ID ${clash.empId} already belongs to ${clash.name}`, 'bad');
         const list = Store.members().map(m => {
           const e = edits[m.id];
           if (!e) return m;
@@ -386,6 +401,21 @@ function adminPeople() {
         saveMembersChecked(list, 'People saved');
       };
       root.querySelector('#addperson').onclick = () => addPersonDialog();
+      const ef = root.querySelector('#empfill');
+      if (ef)
+        ef.onclick = () => {
+          const f = empFromDir();
+          UI.confirm(
+            `Fill the employee ID of ${f.map(x => `${x.m.short || x.m.name} (${x.bn})`).join(', ')}? They then sign in with it.`,
+            () => {
+              const by = Object.fromEntries(f.map(x => [x.m.id, x.bn]));
+              saveMembersChecked(
+                Store.members().map(m => (by[m.id] ? Object.assign({}, m, { empId: by[m.id] }) : m)),
+                `${f.length} employee ID${f.length > 1 ? 's' : ''} filled`
+              );
+            }
+          );
+        };
       root.querySelector('#bulkadd').onclick = () => bulkAddDialog();
       root.querySelectorAll('[data-perm]').forEach(b => (b.onclick = () => editPerms(b.dataset.perm)));
       root.querySelectorAll('[data-pfun]').forEach(b => (b.onclick = () => editPersonFunctions(b.dataset.pfun)));
@@ -394,7 +424,7 @@ function adminPeople() {
   };
 }
 function resetPin(id) {
-  UI.confirm(`Remove the PIN for ${Store.memberName(id)}?`, () => {
+  UI.confirm(`Remove the PIN for ${Store.memberName(id)}? They choose a new one the next time they sign in.`, () => {
     Store.save({ id: 'userpin-' + id, c: 'userpin', member: id, pin: '' });
     if ((Store.member(id) || {}).pin)
       saveMembersAll(
@@ -430,22 +460,51 @@ function newPerson(v) {
     aliases: [],
   };
 }
+/* people without an employee ID whose name is in the IT directory with a badge number (and the badge is not someone else's) */
+function empFromDir() {
+  const n = v =>
+    U.lc(
+      String(v || '')
+        .replace(/[^a-z\u0600-\u06ff ]/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    );
+  const taken = new Set(
+    Store.members()
+      .map(m => App.normId(m.empId))
+      .filter(Boolean)
+  );
+  const dir = Store.all('itdir', '*').filter(r => !r._del && String(r.bn || '').trim());
+  const out = [];
+  for (const m of Store.members()) {
+    if (m.empId || m.active === false) continue;
+    const names = [m.name, m.short, ...(m.aliases || [])].map(n).filter(x => x.length > 3);
+    const hit = dir.filter(r => names.includes(n(r.name)));
+    if (hit.length !== 1) continue;
+    const bn = String(hit[0].bn).trim();
+    if (taken.has(App.normId(bn))) continue;
+    taken.add(App.normId(bn));
+    out.push({ m, bn });
+  }
+  return out;
+}
 function addPersonDialog() {
   UI.modal({
     title: 'Add person',
     body: `<form class="grid-form" id="npf">
       ${UI.field({ key: 'name', label: 'Full name', type: 'text', required: true }, '')}${UI.field({ key: 'short', label: 'Short name', type: 'text', required: true }, '')}
-      ${UI.field({ key: 'me', label: 'Name in ManageEngine (Technician)', type: 'text' }, '')}
+      ${UI.field({ key: 'empId', label: 'Employee ID (to sign in)', type: 'text' }, '')}${UI.field({ key: 'me', label: 'Name in ManageEngine (Technician)', type: 'text' }, '')}
       ${UI.field({ key: 'role', label: 'Role', type: 'select', options: Store.rolesFor('analyst'), blank: false }, 'analyst')}
       ${UI.field({ key: 'team', label: 'Team (not for directors)', type: 'select', options: Store.teams().map(t => [t.id, t.name]), blank: false }, App.viewTeam)}
       ${UI.field({ key: 'scored', label: 'Include in scoring (analysts)', type: 'bool' }, true)}${UI.field({ key: 'hidden', label: 'Hidden from others', type: 'bool' }, false)}</form>
-      <p class="muted small">Next: they open the app, pick their name and set a PIN. Their card shows what is still missing.</p>`,
+      <p class="muted small">Next: they open the app, sign in with their employee ID and choose a PIN. Their card shows what is still missing.</p>`,
     actions: `<span class="grow"></span><button class="btn primary" data-ok>Add</button>`,
     onMount: w =>
       (w.querySelector('[data-ok]').onclick = () => {
         const v = UI.readForm(w.querySelector('#npf'), [
           { key: 'name' },
           { key: 'short' },
+          { key: 'empId' },
           { key: 'me' },
           { key: 'role' },
           { key: 'team' },
@@ -453,6 +512,8 @@ function addPersonDialog() {
           { key: 'hidden', type: 'bool' },
         ]);
         if (!v.name || !v.short) return UI.toast('Full name and short name are needed', 'bad');
+        if (v.empId && Store.members().some(m => App.normId(m.empId) === App.normId(v.empId)))
+          return UI.toast(`Employee ID ${v.empId} already belongs to someone`, 'bad');
         const p = newPerson(v);
         UI.closeModal();
         saveMembersAll(Store.members().concat([p]), `${v.name} added`);

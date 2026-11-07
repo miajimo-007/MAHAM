@@ -2,6 +2,17 @@
 
 Versions are dates (`YYYY.MM.DD.n`).
 
+## 2026.11.07.2
+
+- Login page (same look as the Lab): employee ID + PIN. Existing PINs keep working and are re-stored as salted
+  PBKDF2 at the next sign-in; a first sign-in (or after a reset) chooses a PIN; 5 wrong PINs lock that account on
+  that PC for 15 minutes; people stay signed in until **Sign out**.
+- Only the super admin can switch person; everyone else has Change my PIN and Sign out.
+- Employee IDs in Admin → People (typed, or filled from the IT directory's badge numbers).
+- Recovery code for super admins: a one-time code that sets a new PIN from the login page.
+- The Lab signs in with the same accounts.
+- With the online database, the online account is the sign-in (no PIN page on top).
+
 ## 2026.11.07.1
 
 - Renamed to MAHAM for the public source.

@@ -87,7 +87,7 @@ function bindPerms(root) {
   root.querySelectorAll('[data-resetpin]').forEach(
     b =>
       (b.onclick = () =>
-        UI.confirm(`Remove the PIN for ${Store.memberName(b.dataset.resetpin)}? They can set a new one in Settings.`, () => {
+        UI.confirm(`Remove the PIN for ${Store.memberName(b.dataset.resetpin)}? They choose a new one the next time they sign in.`, () => {
           Store.save({ id: 'userpin-' + b.dataset.resetpin, c: 'userpin', member: b.dataset.resetpin, pin: '' });
           saveMembers(m => {
             if (m.id === b.dataset.resetpin) delete m.pin;

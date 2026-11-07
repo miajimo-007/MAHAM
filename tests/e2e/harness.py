@@ -25,6 +25,12 @@ class Session:
     async def go(self, hsh, wait=350): await self.js(f"location.hash='{hsh}'"); await self.page.wait_for_timeout(wait); return await self.page.inner_text('#main')
     async def sign_in_as(self, member_id, mode='admin'): await self.js(f"App.setMe('{member_id}'); App.mode = '{mode}'; App.launch()"); await self.page.wait_for_timeout(350)
 
+async def sign_in_page(page, member_id, pin='1234'):
+    """the login page: employee ID (or the user name, while no employee ID is set) + PIN; a first sign-in chooses the PIN"""
+    await page.fill('#lid', member_id); await page.fill('#lpin', pin); await page.click('#lgo')
+    await page.wait_for_selector('#lnew, #main', timeout=15000)
+    if await page.locator('#lnew').count(): await page.fill('#lnew', pin); await page.fill('#lnew2', pin); await page.click('#lset')
+
 @contextlib.asynccontextmanager
 async def app_session(first_user='adam'):
     if not os.path.isfile(os.path.join(APP, 'MAHAM.html')): sys.exit('Build first: python tools/build.py')
@@ -35,8 +41,8 @@ async def app_session(first_user='adam'):
         async with async_playwright() as p:
             b = await p.chromium.launch(); ctx = await b.new_context(viewport={'width': 1440, 'height': 900}); await ctx.add_init_script(INIT)
             page = await ctx.new_page(); s = Session(page)
-            await page.goto(f'http://127.0.0.1:{port}/MAHAM.html'); await page.click('#pick'); await page.wait_for_selector('[data-me]')
-            await page.click(f'[data-me="{first_user}"]'); await page.wait_for_selector('#main .kpis')
+            await page.goto(f'http://127.0.0.1:{port}/MAHAM.html'); await page.click('#pick'); await page.wait_for_selector('#loginf')
+            await sign_in_page(page, first_user); await page.wait_for_selector('#main .kpis')
             await page.evaluate("App.mode = 'admin'; App.launch()"); await page.wait_for_timeout(300)   # tests start with the super admin in Admin mode
             yield s
             await b.close()

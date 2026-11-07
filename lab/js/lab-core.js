@@ -7,7 +7,7 @@
  * every result can be downloaded as Excel. */
 'use strict';
 
-const LAB_VERSION = '2026.11.07-lab.7';
+const LAB_VERSION = '2026.11.07-lab.8';
 
 /* ---------- 1. MAHAM's writing switched off ---------- */
 (() => {
@@ -94,5 +94,5 @@ const Lab = {
   /* who may open the Lab: the super admin, and anyone given "Open the MAHAM Lab" in MAHAM (Admin → Permissions) */
   allowed(id) { const m = Store.member(id); return !!m && m.active !== false && (m.superAdmin || Store.can(id, 'useLab')); },
   people() { return Store.members().filter(m => Lab.allowed(m.id)).sort((a, b) => (b.superAdmin ? 1 : 0) - (a.superAdmin ? 1 : 0) || a.name.localeCompare(b.name)); },
-  async checkPin(id, pin) { const want = Store.pinOf(id); if (!want) return 'nopin'; return (await App.hash(pin)) === want ? 'ok' : 'bad'; },
+  async checkPin(id, pin) { const want = App.pinFor(id); if (!want) return 'nopin'; return (await App.verifyPin(pin, want)) ? 'ok' : 'bad'; },
 };

@@ -55,9 +55,9 @@ async def main():
         # analyst view
         await s.sign_in_as('yousef'); await pg.wait_for_timeout(300)
         c('settings apply for an analyst too', await J("Store.appName()") == 'MAHAMMI' and await J("Custom.target('teamScore')") == 90)
-        await J("App.chooseMe(true)"); await pg.wait_for_timeout(300)
-        c('sign-in message shown', 'Log your shadow work before 3 pm.' in await J("document.body.innerText"))
-        await J("UI.closeModal()")
+        await J("App.loginScreen()"); await pg.wait_for_timeout(300)
+        c('sign-in message shown on the login page', 'Log your shadow work before 3 pm.' in await J("document.body.innerText"))
+        await J("App.launch()"); await pg.wait_for_timeout(300)
         await J("history.replaceState(null,'','#/'); App.start ? 0 : 0")
         sp = await J("Custom.startPage('yousef')"); c('analyst start page = To Do list', sp == 'todo', sp)
         t = await s.go('#/home', 500)

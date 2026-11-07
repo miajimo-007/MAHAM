@@ -169,7 +169,7 @@ Object.assign(App, {
     App.screen('<p class="muted">Loading team data…</p>');
     if (App.year && App.year < Store.archiveCut()) Store.loadYears.add(App.year); // last chosen year was a past one: read its archive too
     // fast opening: show this PC's copy of the data at once, then read only what changed in the shared folder
-    if (!App.preview && App.me && (await Store.useSnapshot()) && Store.get('settings-team') && Store.member(App.me)) {
+    if (!App.preview && App.me && (await Store.useSnapshot()) && Store.get('settings-team') && Store.member(App.me) && App.signedIn()) {
       App.setViewTeam(App.teamFor(App.me));
       {
         const sp = Custom.startPage(App.me);
@@ -204,10 +204,10 @@ Object.assign(App, {
       const sp = Store.sharedPath();
       if (sp) LS.set('bct.sharedPath', sp);
     } // remembered for the connect screen next time
-    if (!App.me || !Store.member(App.me)) {
-      App.chooseMe();
+    if (!App.me || !Store.member(App.me) || !App.signedIn()) {
+      App.loginScreen();
       return;
-    }
+    } // the login page: employee ID + PIN
     App.setViewTeam(App.teamFor(App.me));
     {
       const sp = Custom.startPage(App.me);

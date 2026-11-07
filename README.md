@@ -16,6 +16,14 @@ each person opens it in their browser and works from there.
 | **Performance** | Dynamic monthly scoring per team, heat map, employee breakdown, lazy days, weekly / monthly / yearly reports (print, PDF, Excel)                                                                                                                    |
 | **Admin**       | People, teams and departments, page-level permissions, functions, workflows, scoring rules, feedback inbox, data tools, change log, and **Customize** (name, logo, colours, menu, words, targets, weekend, start pages …)                           |
 
+## Signing in
+
+The app opens on a login page: **employee ID + PIN** (the user name works until the admin fills the employee ID).
+PINs are stored salted and stretched (PBKDF2, 150,000 rounds); a first sign-in chooses one; 5 wrong tries lock the
+account on that PC for 15 minutes. People stay signed in until they sign out. Super admins can make a one-time
+**recovery code** for a forgotten PIN. This controls who uses the app; files in the shared folder are protected by the
+folder's own permissions.
+
 ## How it works
 
 - **Single file.** `tools/build.py` inlines every stylesheet and script into `dist/MAHAM/MAHAM.html`.
@@ -120,7 +128,7 @@ docs/                   architecture, data model, permissions, development notes
 
 ## Versioning
 
-Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.11.07.1**. See [CHANGELOG](CHANGELOG.md).
+Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.11.07.2**. See [CHANGELOG](CHANGELOG.md).
 
 ## License
 

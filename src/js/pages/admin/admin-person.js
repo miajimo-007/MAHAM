@@ -64,7 +64,7 @@ P.adminperson = id => {
       'Details',
       `<form class="grid-form" id="pcf">
       ${UI.field({ key: 'name', label: 'Full name', type: 'text', required: true }, m.name)}${UI.field({ key: 'short', label: 'Short name', type: 'text' }, m.short || '')}
-      ${UI.field({ key: 'me', label: 'Name in ManageEngine', type: 'text' }, m.me || '')}${UI.field({ key: 'aliases', label: 'Other names (comma separated)', type: 'text' }, (m.aliases || []).join(', '))}
+      ${UI.field({ key: 'empId', label: 'Employee ID (to sign in)', type: 'text', placeholder: m.id, hint: m.empId ? '' : `Until it is filled, they sign in with “${m.id}”` }, m.empId || '')}${UI.field({ key: 'me', label: 'Name in ManageEngine', type: 'text' }, m.me || '')}${UI.field({ key: 'aliases', label: 'Other names (comma separated)', type: 'text' }, (m.aliases || []).join(', '))}
       ${UI.field({ key: 'role', label: 'Role', type: 'select', options: Store.rolesFor(m.role || 'analyst'), blank: false }, m.role || 'analyst')}${UI.field({ key: 'title', label: 'Title shown to everyone (optional)', type: 'text', placeholder: m.superAdmin ? 'Admin' : Store.roleLabel(m.role), hint: 'Shown next to their name instead of the role — e.g. Admin, Senior Analyst' }, m.title || '')}
       ${Store.topRole(m.role) ? '' : UI.field({ key: 'team', label: 'Team', type: 'select', options: teams.map(t => [t.id, t.name]), blank: false }, m.team || 'apps')}
       ${UI.field({ key: 'scored', label: 'Scored', type: 'bool' }, !!m.scored)}${UI.field({ key: 'hidden', label: 'Hidden from others', type: 'bool' }, !!m.hidden)}</form>
@@ -142,6 +142,7 @@ P.adminperson = id => {
         const v = UI.readForm(root.querySelector('#pcf'), [
           { key: 'name' },
           { key: 'short' },
+          { key: 'empId' },
           { key: 'me' },
           { key: 'aliases' },
           { key: 'role' },
@@ -151,6 +152,10 @@ P.adminperson = id => {
           { key: 'hidden', type: 'bool' },
         ]);
         if (!v.name) return UI.toast('Full name is needed', 'bad');
+        {
+          const o = v.empId && Store.members().find(x => x.id !== id && App.normId(x.empId) === App.normId(v.empId));
+          if (o) return UI.toast(`Employee ID ${v.empId} already belongs to ${o.name}`, 'bad');
+        }
         const x = Object.assign({}, m, v, {
           aliases: String(v.aliases || '')
             .split(',')

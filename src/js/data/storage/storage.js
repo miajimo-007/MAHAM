@@ -104,6 +104,19 @@ const MahamStorage = {
   async cloudStart(m) {
     App.me = m.member_id;
     LS.set('bct.me', m.member_id);
+    // the online account (email + password) is the sign-in: no employee ID / PIN page on top of it, and "Sign out" leaves the account
+    LS.set('bct.session', { me: m.member_id, at: Date.now() });
+    App.signOut = async () => {
+      try {
+        if (Store.dirty) await Store.flush();
+      } catch (e) {
+        /* */
+      }
+      LS.set('bct.session', null);
+      CloudBackend.signOut();
+      location.reload();
+    };
+    App.loginScreen = () => App.chooseMe();
     // one account = one person: "switch person" signs out instead of listing everyone
     App.chooseMe = () => {
       if (!Store.member(App.me)) {
