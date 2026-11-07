@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install playwright==1.56.0 openpyxl   # the version the tests are written and checked with
+      - run: pip install playwright==1.56.0 openpyxl # the version the tests are written and checked with
       - run: python -m playwright install --with-deps chromium
       - run: npm run build
       - run: npm test
