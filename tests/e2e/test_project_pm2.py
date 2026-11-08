@@ -68,7 +68,10 @@ async def main():
         # close-out
         await s.js(f"Store.save({{c:'praid', project:'{pid}', kind:'Risk', title:'Printer driver', status:'Open', impact:'2', likelihood:'2', team:'apps'}})")
         await s.go(f'#/project/{pid}'); await pg.click('#closeout'); await pg.wait_for_selector('#cof')
-        await pg.fill('#cof [name=impact]', '200 reprints a month saved'); await pg.fill('#cof [name=doBetter]', 'Ask the vendor for the API early'); await pg.click('.modal [data-ok]'); await pg.wait_for_timeout(400)
+        await pg.fill('#cof [name=impact]', '200 reprints a month saved'); await pg.fill('#cof [name=doBetter]', 'Ask the vendor for the API early'); await pg.click('.modal [data-ok]')
+        try: await pg.wait_for_function(f"(() => {{ const p = Store.get('{pid}'); return p && p.status === 'Done' && !!p.closeout; }})()", timeout=15000)   # slower machines (CI)
+        except Exception: pass
+        await pg.wait_for_timeout(300)
         c('closed out: Done, lessons kept, risk closed, open task canceled', await s.js(f"(p => p.status === 'Done' && p.closeout.doBetter.includes('vendor'))(Store.get('{pid}'))") and await s.js(f"PM.raid('{pid}').every(r => r.status === 'Closed')") and await s.js(f"Store.get('{t2}').status") == 'Canceled')
         await s.go('#/projects/lessons'); c('lessons learned list', 'Ask the vendor for the API early' in await pg.inner_text('#main'))
         await s.go(f'#/project/{np}'); await tab('overview'); c('similar project shows the lesson', 'Lessons from similar projects' in await pg.inner_text('#main'))
