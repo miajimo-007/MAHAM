@@ -26,6 +26,16 @@ const Rep = {
       const t = LS.get('bct.reptpl.' + App.me, null);
       Object.assign(s, { kind: 'week', anchor: U.todayStr(), secs: (t && t.secs) || Rep.DEFAULT.slice(), people: (t && t.people) || [] });
     }
+    // remembered settings from an older copy may lack the lists — fill them in so the page always opens
+    if (!Array.isArray(s.secs)) {
+      const t = LS.get('bct.reptpl.' + App.me, null);
+      s.secs = (t && Array.isArray(t.secs) && t.secs) || Rep.DEFAULT.slice();
+    }
+    if (!Array.isArray(s.people)) {
+      const t = LS.get('bct.reptpl.' + App.me, null);
+      s.people = (t && Array.isArray(t.people) && t.people) || [];
+    }
+    if (!s.anchor) s.anchor = U.todayStr();
     return s;
   },
   /* the dates of a period, and the one before it */

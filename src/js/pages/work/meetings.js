@@ -453,6 +453,7 @@ P.oneonone = mid => {
 
 /* the person an action belongs to: Done / Update (meeting page, My work) */
 function bindMineActions(root) {
+  if (typeof TodoFlow !== 'undefined') TodoFlow.bind(root);
   root.querySelectorAll('[data-mineok]').forEach(
     b =>
       (b.onclick = e => {

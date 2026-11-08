@@ -211,6 +211,10 @@ Object.assign(UI, {
     App.render(true);
   },
   editRecord(coll, rec, opts = {}) {
+    if (rec && rec.virtual) {
+      rec = Store.get(rec.parent);
+      if (!rec) return;
+    } // a check opens the To Do it checks
     const S = Schemas[coll];
     const isNew = !rec || !rec.id;
     if (coll === 'todo' && !isNew && rec.analyst === App.me && typeof Admin !== 'undefined' && Admin.todoMark)
@@ -258,7 +262,7 @@ Object.assign(UI, {
     UI.modal({
       title: opts.title || (ro ? 'View ' : isNew ? 'New ' : 'Edit ') + S.single,
       wide: fields.length > 6,
-      body: `${isNew && Store.TEAM_SCOPED.has(coll) && App.viewTeam && App.viewTeam !== ((Store.member(App.me) || {}).team || 'apps') ? `<div class="insights addto"><div>➕ Adding to <b>${h(Store.teamName(App.viewTeam))}</b> — switch team at the top to add it somewhere else.</div></div>` : ''}<form id="recform" class="grid-form" novalidate>${UI.groupFlags(fields, f => UI.field(f, roVal(f, base[f.key])))}</form>${notMine && !lockedMonth ? `<p class="note">🔒 Belongs to <b>${h(Store.memberShort(Store.recOwner(Store.db.get(base.id) || base)))}</b> — only they, or someone given “Change or delete other people's items”, can change or delete it.</p>` : ''}${lockedMonth ? `<p class="note">🔒 ${h(Store.monthLabel(lockYm))} is locked — scores for this month are final, so only your manager can change it.</p>` : ''}${lockedNow.length ? '<p class="note">🔒 Approved — the details are locked. Your manager can still change them.</p>' : ''}${S.formNote ? `<p class="note">${S.formNote}</p>` : ''}${!isNew && S.formExtra ? S.formExtra(base) : ''}${typeof Conv !== 'undefined' ? Conv.note(base) : ''}${coll === 'todo' && !isNew && base.analyst !== App.me && typeof Admin !== 'undefined' && Admin.canSee && Admin.canSee() ? `<div class="meta">Given ${U.fmtDate(base.assigned)} to ${h(Store.memberShort(base.analyst))} · ${Admin.seenLabel(base, true)}</div>` : ''}${meta}`,
+      body: `${isNew && Store.TEAM_SCOPED.has(coll) && App.viewTeam && App.viewTeam !== ((Store.member(App.me) || {}).team || 'apps') ? `<div class="insights addto"><div>➕ Adding to <b>${h(Store.teamName(App.viewTeam))}</b> — switch team at the top to add it somewhere else.</div></div>` : ''}<form id="recform" class="grid-form" novalidate>${UI.groupFlags(fields, f => UI.field(f, roVal(f, base[f.key])))}</form>${notMine && !lockedMonth ? `<p class="note">🔒 Belongs to <b>${h(Store.memberShort(Store.recOwner(Store.db.get(base.id) || base)))}</b> — only they, or someone given “Change or delete other people's items”, can change or delete it.</p>` : ''}${lockedMonth ? `<p class="note">🔒 ${h(Store.monthLabel(lockYm))} is locked — scores for this month are final, so only your manager can change it.</p>` : ''}${lockedNow.length ? '<p class="note">🔒 Approved — the details are locked. Your manager can still change them.</p>' : ''}${S.formNote ? `<p class="note">${S.formNote}</p>` : ''}${!isNew && S.formExtra ? S.formExtra(base) : ''}${typeof Conv !== 'undefined' ? Conv.note(base) : ''}${coll === 'todo' && !isNew && base.analyst !== App.me && typeof Admin !== 'undefined' && Admin.canSee && Admin.canSee() ? `<div class="meta">Given ${U.fmtDate(base.assigned)} to ${h(Store.memberShort(base.analyst))} · ${Admin.seenLabel(base, true)}</div>` : ''}${meta}${!isNew && typeof RefNotes !== 'undefined' ? RefNotes.box(base) : ''}`,
       actions: `${canDel ? '<button class="btn danger ghost" data-del>Delete</button>' : ''}${!isNew && !ro && typeof Conv !== 'undefined' && Conv.KINDS[coll] && Object.keys(Conv.KINDS).some(k => k !== coll && !Conv.why(base, k)) ? '<button class="btn ghost" data-convert>⇄ Convert to…</button>' : ''}<span class="grow"></span><button class="btn" data-cancel>${ro ? 'Close' : 'Cancel'}</button>${ro ? '' : `<button class="btn primary" data-save>${isNew ? 'Add' : 'Save'}</button>`}`,
       onMount: w => {
         const form = w.querySelector('#recform');
@@ -270,6 +274,7 @@ Object.assign(UI, {
             })
         );
         if (S.onFormMount) S.onFormMount(form, base);
+        if (!isNew && typeof RefNotes !== 'undefined') RefNotes.bind(w, base);
         w.querySelector('[data-cancel]').onclick = UI.tryClose;
         form.addEventListener('input', e => {
           const f = e.target.closest('.fld');
@@ -306,7 +311,30 @@ Object.assign(UI, {
             );
           };
         const commit = (out, msg) => {
+          const alt = isNew && S.transform ? S.transform(out, base) : null; // e.g. a repeating To Do becomes a rule
+          if (alt) {
+            const first =
+              alt.c === 'todorule' && typeof TodoRules !== 'undefined'
+                ? TodoRules.dates(alt, alt.start, U.todayStr())
+                    .filter((d, i) => !alt.times || i < alt.times)
+                    .map(d => TodoRules.copy(alt, d))
+                : [];
+            UI.closeModal();
+            UI.saveUndo(
+              [alt, ...first],
+              alt.c === 'todorule'
+                ? `Repeating To Do set up — ${TodoRules.everyLabel(alt).toLowerCase()}${first.length ? '' : ', first one on ' + U.fmtDate(TodoRules.next(alt))}`
+                : 'Saved'
+            );
+            App.render();
+            return;
+          }
           if (S.beforeSave) S.beforeSave(out, base);
+          const vw = S.validate ? S.validate(out) : '';
+          if (vw) {
+            UI.toast(vw, 'bad');
+            return;
+          }
           const why = Store.whyNotFair(out);
           if (why) {
             UI.toast(why, 'bad');

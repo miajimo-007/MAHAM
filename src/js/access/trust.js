@@ -177,6 +177,28 @@ Object.assign(Store, {
               Store.privileged(by, 'postAnnouncements', x.r._ts) ||
               (bad(x, 'announcement posted without the "Post announcements" permission'), false)
             );
+          if (r.c === 'todoask')
+            return (
+              (r.by === by && String(r.id).startsWith('todoask-' + by + '-')) ||
+              (bad(x, "follow-up request written in someone else's name"), false)
+            );
+          if (r.c === 'todostep')
+            return (
+              (r.by === by && String(r.id).startsWith('todostep-' + by + '-')) ||
+              (bad(x, "To Do step written in someone else's name"), false)
+            );
+          if (r.c === 'todorule')
+            return (
+              Store.isSuper(by) ||
+              Store.privileged(by, 'assignTodo', x.r._ts) ||
+              (bad(x, 'repeating To Do set up without the right to give To Dos'), false)
+            );
+          if (r.c === 'refnote')
+            return (
+              Store.isSuper(by) ||
+              (r.by === by && String(r.id).startsWith('refnote-' + by + '-')) ||
+              (bad(x, "note written in someone else's name"), false)
+            );
           if (r.c === 'annread')
             return String(r.id).startsWith('annread-' + by + '-') || (bad(x, 'read receipt written for someone else'), false);
           // meeting action: the chair, the chair's minute-taker, or the person it belongs to
@@ -217,6 +239,7 @@ Object.assign(Store, {
         );
       // score fairness (access/fairness.js): replay each record's versions in time order
       const locks = Store.lockMap([...pick(list.filter(x => x.r.c === 'scoresnap')).values()]);
+      Store._verifyRules = pick(list.filter(x => x.r.c === 'todorule')); // repeating To Do copies are checked against these
       const groups = new Map();
       const keep = [];
       for (const x of list) {
@@ -225,7 +248,7 @@ Object.assign(Store, {
           groups.get(x.r.id).push(x);
         } else keep.push(x);
       }
-      for (const vs of groups.values()) {
+      const replay = vs => {
         vs.sort((a, b) => (a.r._ts || 0) - (b.r._ts || 0) || String(a.r._by || '').localeCompare(String(b.r._by || '')));
         let curV = null;
         for (const x of vs) {
@@ -244,10 +267,28 @@ Object.assign(Store, {
           curV = y.r;
           keep.push(y);
         }
+        return curV;
+      };
+      // hand-on steps a workflow made (todo-step-…-a) are checked after the To Do before them, against it (domain/todoflow.js)
+      const later = [];
+      for (const [id, vs] of groups) {
+        if (/^todo-step-/.test(id)) later.push([id, vs]);
+        else replay(vs);
+      }
+      if (later.length) {
+        const todos = new Map();
+        for (const x of keep) if (x.r.c === 'todo' && Store.newer(x.r, todos.get(x.r.id))) todos.set(x.r.id, x.r);
+        Store._verifyTodos = todos;
+        for (const [id, vs] of later.sort((a, b) => a[0].length - b[0].length)) {
+          const cur = replay(vs);
+          if (cur) todos.set(id, cur);
+        }
       }
       list = keep;
     } finally {
       Store.db = keepDb;
+      Store._verifyRules = null;
+      Store._verifyTodos = null;
     }
 
     const db = pick(list);

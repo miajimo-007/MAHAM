@@ -143,13 +143,28 @@ Object.assign(App, {
       el.addEventListener('click', e => {
         if (e.target.closest('button')) return;
         const [c, id] = el.dataset.edit.split('|');
-        const r = Store.get(id);
+        const r = Store.get(id) || (/^chk~/.test(id) ? Store.get(id.split('~')[1]) : null);
         if (r) UI.editRecord(c, r);
       })
     );
     if (keepScroll !== false) {
       window.scrollTo(0, sy);
       main.scrollTop = my;
+    }
+    App.pendingRender = false;
+    // remember what every box holds right after drawing (incl. values set by the page itself), so "unsaved typing" can be told apart
+    if (App.snapInputs) {
+      App.snapInputs(main);
+      setTimeout(() => {
+        if (UI.$('#main') === main) App.snapInputs(main);
+      }, 0);
+    }
+    if (!main._pendBound) {
+      main._pendBound = true;
+      main.addEventListener('focusout', () => setTimeout(() => App.applyPending && App.applyPending(), 250));
+      main.addEventListener('input', () => {
+        if (App.pendingRender) (clearTimeout(App._pendT), (App._pendT = setTimeout(() => App.applyPending(), 1500)));
+      });
     }
     App.renderSync();
   },
@@ -179,8 +194,10 @@ Object.assign(App, {
       set('nav a[data-nav="requests"]', Requests.waitingForMe().length, 'Requests waiting for your decision', '#/requests/approve');
       set(
         'nav a[data-nav="todo"]',
-        Store.all('todo', '*').filter(t => Store.canConfirmTodo(t, App.me)).length,
-        'Finished To Dos waiting for you to confirm'
+        Store.all('todo', '*').filter(
+          t => Store.canConfirmTodo(t, App.me) || (typeof TodoFlow !== 'undefined' && (TodoFlow.withMe(t) || TodoFlow.needsPick(t)))
+        ).length + (typeof TodoFollow !== 'undefined' ? TodoFollow.openForMe().length : 0),
+        'To Dos waiting for you: to confirm, to check (validation…), sent back to you, or a step to give to someone'
       );
       set(
         'nav a[data-nav="projects"]',

@@ -54,6 +54,211 @@
     display: none;
   }
 }
+/* Phones (≤ 700 px): nothing scrolls sideways — tiles two by two, the header on two rows, tabs slide, tables and
+ * wide grids scroll inside their own box, dialogs use the whole screen, buttons big enough for a finger. */
+@media (max-width: 700px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  main {
+    padding: 12px 12px 70px;
+  }
+  .top {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 8px 12px;
+  }
+  .top h1 {
+    font-size: 17px;
+    flex: 1 1 calc(100% - 52px);
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .top .grow {
+    display: none;
+  }
+  .top .yearsel {
+    font-size: 0;
+  }
+  .top .yearsel select {
+    font-size: 13px;
+    padding: 4px 6px;
+  }
+  .top .btn.sm {
+    padding: 5px 8px;
+  }
+  .kpis,
+  .kpis.k2,
+  .kpis.k4,
+  .kpis.k5,
+  .kpis.k6,
+  .kpis.k8,
+  .kpis.k9 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .kpis.k1,
+  .kpis.k3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kpi {
+    min-width: 0;
+    padding: 10px 12px;
+  }
+  .kpi * {
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+  .kpi-val,
+  .kpis .kpi-val {
+    font-size: 22px;
+  }
+  .sec-tabs,
+  .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .sec-tabs::-webkit-scrollbar,
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .sec-tabs > *,
+  .tabs > * {
+    flex: none;
+    white-space: nowrap;
+  }
+  .page-actions {
+    gap: 8px;
+    align-items: center;
+  }
+  .page-actions > .filters {
+    flex: 1 1 100%;
+    gap: 8px;
+  }
+  .page-actions > .btn,
+  .page-actions > a.btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .flt {
+    min-width: 0;
+    flex: 1 1 calc(50% - 8px);
+  }
+  .flt select,
+  .flt input {
+    min-width: 0;
+    width: 100%;
+  }
+  .flt.tog {
+    flex: 1 1 calc(50% - 8px);
+    padding-bottom: 0;
+    justify-content: flex-start;
+  }
+  .flt.tog input,
+  .check input,
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: auto;
+    min-width: 0;
+    flex: none;
+  }
+  .tbl-tools {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tbl-tools .search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .tbl-wrap .tbl-scroll {
+    max-height: none;
+  }
+  .tbl td:has(> b),
+  .tbl td:has(> .tf-lab) {
+    min-width: 150px;
+  }
+  .card,
+  .cols2 > *,
+  .cols3 > *,
+  .grid > * {
+    min-width: 0;
+  }
+  .card {
+    padding: 12px;
+    overflow-x: auto;
+  }
+  main table:not(.tbl),
+  main table.rep-tbl {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  pre,
+  code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .needs-you,
+  .row-btns,
+  .rep-row,
+  .chips-row {
+    flex-wrap: wrap;
+  }
+  .li {
+    flex-wrap: wrap;
+  }
+  .li .grow {
+    min-width: 60%;
+  }
+  .btn {
+    min-height: 36px;
+  }
+  .btn.sm {
+    min-height: 32px;
+  }
+  .btn.xs {
+    min-height: 28px;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  } /* iPhone: no zoom-in when typing */
+  .modal-wrap {
+    padding: 0;
+    align-items: stretch;
+  }
+  .modal {
+    max-width: none !important;
+    width: 100%;
+    min-height: 100%;
+    border-radius: 0;
+  }
+  .modal .modal-body {
+    max-height: none;
+  }
+  .tfw-step {
+    grid-template-columns: 1fr;
+  }
+  .tfw-step .tfw-side {
+    flex-direction: row;
+  }
+  .refnotes .rn-add {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sysbanner,
+  .updatebar,
+  .mode-bar {
+    font-size: 13px;
+  }
+}
 @media print {
   .side,
   .top,

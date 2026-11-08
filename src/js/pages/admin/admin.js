@@ -245,7 +245,7 @@ P.admin = sub => {
     hdmonths: adminHdMonths,
     teams: adminTeams,
     custom: adminCustom,
-    workflows: adminFlows,
+    workflows: () => (WF.draft ? adminFlows() : adminJoin(adminTodoFlows(), adminFlows())),
     feedback: adminFeedback,
     scoring: () => adminJoin(adminMonths(), adminScoreMonths(), adminScoring()),
     data: adminData,

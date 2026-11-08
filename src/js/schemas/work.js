@@ -51,6 +51,53 @@ Object.assign(Schemas, {
           ),
         blank: false,
       },
+      {
+        mgr: true,
+        key: 'ttype',
+        label: 'Type',
+        type: 'select',
+        options: () => (typeof TodoFlow !== 'undefined' ? TodoFlow.types() : []),
+        showIf: () => typeof TodoFlow !== 'undefined' && TodoFlow.types().length > 0,
+        hint: 'Some types go through a workflow by themselves',
+      },
+      {
+        mgr: true,
+        key: 'wf',
+        label: 'Steps after it is done',
+        type: 'select',
+        options: r =>
+          [['', 'None — the manager confirms it']].concat(
+            TodoFlow.defsFor((r && r.team) || App.viewTeam || 'apps').map(d => [d.id, '🔀 ' + d.name])
+          ),
+        blank: false,
+        showIf: () => typeof TodoFlow !== 'undefined' && TodoFlow.defs().length > 0,
+      },
+      {
+        mgr: true,
+        key: 'repeat',
+        label: '↻ Repeat',
+        type: 'select',
+        options: () => [['', 'Does not repeat']].concat(TodoRules.EVERY),
+        blank: false,
+        showIf: r => !r.id && !r.prevStep && typeof TodoRules !== 'undefined',
+        hint: 'Each one is a new To Do on its day (weekly: same weekday as the assigned date · monthly: same day of the month)',
+      },
+      {
+        mgr: true,
+        key: 'repeatEnd',
+        label: 'Repeat until (optional)',
+        type: 'date',
+        showIf: r => !r.id && !r.prevStep && typeof TodoRules !== 'undefined',
+      },
+      {
+        mgr: true,
+        key: 'repeatTimes',
+        label: 'Or stop after (times, optional)',
+        type: 'number',
+        min: 0,
+        step: 1,
+        showIf: r => !r.id && !r.prevStep && typeof TodoRules !== 'undefined',
+      },
       { mgr: true, key: 'instruction', label: 'Manager / Team Leader instruction', type: 'textarea', span: 2, rows: 2 },
       { mgr: true, key: 'dirNote', label: 'Director update', type: 'textarea', span: 2, rows: 2, showIf: r => !!r.fromTask },
       {
@@ -62,7 +109,68 @@ Object.assign(Schemas, {
         hint: 'Your manager sees your latest update (and the director, for tasks from the director)',
       },
     ],
+    validate(r) {
+      if (typeof TodoFlow === 'undefined' || !r.finish || !r.stepNo || !r.wf) return '';
+      const d = TodoFlow.def(r.wf);
+      const st = d && d.steps[r.stepNo - 1];
+      return st && st.needNote && !String(r.comment || '').trim() ? `Write a comment (what you did / found) to finish "${st.name}"` : '';
+    },
+    /* a "Repeat" choice saves a repeating rule instead of one To Do (domain/todorules.js) */
+    transform(out) {
+      if (!out.repeat || typeof TodoRules === 'undefined') return null;
+      const rule = TodoRules.fromForm(out);
+      return rule;
+    },
+    formExtra(r) {
+      return typeof TodoFlow !== 'undefined' ? TodoFlow.panel(Store.get(r.id) || r) + TodoFollow.box(Store.get(r.id) || r) : '';
+    },
+    onFormMount(form, base) {
+      const m = form.closest('#modal') || document;
+      if (typeof TodoFlow !== 'undefined') {
+        TodoFlow.bind(m);
+        if (base.id) TodoFollow.bind(m, Store.get(base.id) || base);
+      }
+      if (!base.id && base.followOf && Store.get(base.followOf))
+        form.insertAdjacentHTML(
+          'afterbegin',
+          `<div class="fld span2 small">↪ Follow-up of: <b>${h(Store.get(base.followOf).task)}</b></div>`
+        );
+      if (!base.id && base.prevStep && Store.get(base.prevStep)) {
+        const p = Store.get(base.prevStep);
+        form.insertAdjacentHTML(
+          'afterbegin',
+          `<div class="fld span2 small">➜ Handed on from <b>${h(Store.memberShort(p.analyst))}</b>: ${h(p.task)} — their part counts as done once you add this.</div>`
+        );
+      }
+      const ty = form.querySelector('[name=ttype]'),
+        wf = form.querySelector('[name=wf]');
+      if (ty && wf)
+        ty.addEventListener('change', () => {
+          const d = TodoFlow.autoFor(ty.value, base.team || App.viewTeam || 'apps');
+          if (d && !wf.value) wf.value = d.id;
+        });
+      const rp = form.querySelector('[name=repeat]');
+      const tog = () => {
+        for (const k of ['repeatEnd', 'repeatTimes']) {
+          const f = form.querySelector(`[name=${k}]`);
+          if (f) f.closest('.fld').style.display = rp.value ? '' : 'none';
+        }
+      };
+      if (rp) {
+        rp.addEventListener('change', tog);
+        tog();
+      }
+    },
     beforeSave(r) {
+      delete r.repeat;
+      delete r.repeatEnd;
+      delete r.repeatTimes;
+      delete r._sendOn;
+      if (r.prevStep && !r.stepName) r.stepName = (String(r.task || '').split(':')[0] || '').trim().slice(0, 40) || 'Next step';
+      if (!r.wf && r.ttype && typeof TodoFlow !== 'undefined') {
+        const d = TodoFlow.autoFor(r.ttype, r.team || (Store.member(r.analyst) || {}).team || 'apps');
+        if (d) r.wf = d.id;
+      }
       if (r.status !== 'Canceled') {
         if (!r.finish) {
           r.reviewedBy = '';

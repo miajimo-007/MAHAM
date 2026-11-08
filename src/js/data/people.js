@@ -37,12 +37,32 @@ Object.assign(Store, {
   /* who may press Done: the person it is assigned to, or a manager / team leader */
   canFinishTodo(r, me) {
     me = me || App.me;
-    return !!r && r.status !== 'Canceled' && !r.finish && (r.analyst === me || Store.can(me, 'assignTodo'));
+    return (
+      !!r &&
+      !r.virtual &&
+      r.status !== 'Canceled' &&
+      !r.finish &&
+      (r.analyst === me || (Store.can(me, 'assignTodo') && Store.inMyTeam(r, me)))
+    );
+  },
+  /* the To Do belongs to one of the teams this person manages (own team, acting-for team; all teams for the super admin) */
+  inMyTeam(r, me) {
+    const a = Store.member(r.analyst);
+    const team = r.team || (a && a.team) || 'apps';
+    return Store.teamsFor(me || App.me).some(t => t.id === team);
   },
   /* who may confirm or send back: a manager / team leader — never the person who did it */
+  /* only a manager / team leader of the To Do's own team (or an acting manager of it, or the super admin) confirms it */
   canConfirmTodo(r, me) {
     me = me || App.me;
-    return !!r && r.status === 'Ready for review' && r.analyst !== me && Store.can(me, 'assignTodo');
+    if (!r || r.virtual || r.status !== 'Ready for review' || r.analyst === me || !Store.can(me, 'assignTodo')) return false;
+    if (typeof TodoFlow !== 'undefined' && TodoFlow.has(r) && TodoFlow.phase(r) !== 'manager') return false; // still going through its steps
+    return Store.inMyTeam(r, me);
+  },
+  /* confirming: with steps, the finish date is when the person's own part was last done (that is what is scored) */
+  confirmedTodo(r) {
+    const f = typeof TodoFlow !== 'undefined' && TodoFlow.has(r) ? TodoFlow.effFinish(r) || r.finish : r.finish;
+    return Object.assign({}, r, { finish: f, status: 'Resolved', reviewedBy: App.me, reviewedOn: U.todayStr() });
   },
   /* a manager closing someone else's To Do (or one they gave themselves) confirms it at the same time */
   selfConfirms(r, by) {

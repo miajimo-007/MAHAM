@@ -73,6 +73,7 @@ Object.assign(Store, {
     return rec;
   },
   saveMany(list) {
+    list = (list || []).filter(r => !(r && (r.virtual || /^chk~/.test(r.id || '')))); // check To Dos are worked out, never saved
     if (!App.me) {
       console.warn('Nothing saved: nobody is signed in');
       return;
@@ -201,6 +202,16 @@ Object.assign(Store, {
     for (const r of list) Store.pending[r.id] = r;
     LS.set('bct.unsaved.' + App.me, Store.pending); // safety copy of what is not in the shared folder yet (only that, so it stays small)
     Store.applyLocal(list);
+    if (typeof TodoFlow !== 'undefined' && list.some(r => r && r.c === 'todo' && r.wf && r.finish)) {
+      const l2 = list.slice();
+      setTimeout(() => {
+        try {
+          TodoFlow.autoNext(l2);
+        } catch (e) {
+          console.warn(e);
+        }
+      }, 0);
+    } // workflow: hand on to the next step
     Store.flushSoon();
     Store.emit();
   },

@@ -84,6 +84,13 @@ P.manager = () => {
     [Requests.waitingForMe().length, 'requests to approve', 'Waiting for your approval'],
     [App.can('approveQW') ? pendingQW.length : 0, 'quick wins to approve', 'Quick wins waiting'],
     [toConfirm, 'To Dos to confirm', 'To Dos to confirm'],
+    ...(typeof TodoFlow !== 'undefined'
+      ? [
+          [Store.all('todo').filter(t => TodoFlow.needsPick(t)).length, 'To Do steps to give to someone', '#/todo'],
+          [TodoFlow.stuck().length, 'To Do steps over time', '#/todo'],
+          [TodoFollow.openForMe().length, 'follow-up requests', '#/manager'],
+        ]
+      : []),
     [overdue.length, 'overdue To Dos', 'Overdue To Do'],
     [App.isDir() ? 0 : myMt.length, 'from the director', 'From the director'],
     [riyMgr.length, 'Central follow-ups', '#/central'],
@@ -94,7 +101,35 @@ P.manager = () => {
   const html = `${annBanner()}${FB.banner()}${Dir.nudgeBanner()}${actingNote}${leaveNote}
   ${App.isSuper() && Store.all('todo').length + Store.all('shadow').length === 0 ? `<div class="insights warnbox"><div>📥 The app has no data yet. <a class="btn sm primary" href="#/importdata">Import the old Excel sheets</a></div></div>` : ''}
   <div class="hello slim"><div><p class="muted">${U.fmtDate(today)}${U.isOff(today) ? ' · ' + h(Store.holidayOf(today) || 'Weekend') : ''} · ${h(Store.teamName(App.viewTeam))}${App.isDir() ? ' team' : ''}</p></div><span class="grow"></span>${App.can('assignTodo') && App.canEdit('todo') ? '<button class="btn primary" data-assign>＋ Assign a To Do</button>' : ''}${App.pageAllowed('reports') ? '<a class="btn" href="#/reports" data-repweek>📄 Weekly report</a>' : ''}</div>
-  ${needsYou}
+  ${needsYou}${(() => {
+    if (typeof TodoFollow === 'undefined') return '';
+    const l = TodoFollow.openForMe();
+    if (!l.length) return '';
+    return card(
+      `🙋 Follow-up requests <span class="count">${l.length}</span>`,
+      l
+        .map(a => {
+          const t = Store.get(a.on);
+          return `<div class="li"><div class="grow click" data-edit="todo|${h(a.on)}"><b>${h(a.text)}</b><div class="muted small">${h(Store.memberShort(a.by))} · from “${h(t ? t.task : '')}”</div></div><button class="btn xs primary" data-tfacc="${h(a.id)}">Make it a To Do</button> <button class="btn xs ghost" data-tfdec="${h(a.id)}">Decline</button></div>`;
+        })
+        .join('')
+    );
+  })()}${(() => {
+    if (typeof TodoFlow === 'undefined') return '';
+    const l = TodoFlow.stuck();
+    if (!l.length) return '';
+    return card(
+      `🔀 To Do steps over time <span class="count">${l.length}</span>`,
+      l
+        .slice(0, 8)
+        .map(t => {
+          const s = TodoFlow.state(t);
+          const st = s.steps[s.cur];
+          return `<div class="li click" data-edit="todo|${h(t.id)}"><div class="grow"><b>${h(t.task)}</b><div class="muted small">${h(st.name)} with ${h(Store.memberShort(s.with))} · ${s.stepLate} day${s.stepLate > 1 ? 's' : ''} over${s.backs ? ' · sent back ×' + s.backs : ''}</div></div></div>`;
+        })
+        .join('')
+    );
+  })()}
   ${approvalsCard()}
   ${workCard}
   ${(() => {
@@ -189,6 +224,22 @@ P.manager = () => {
     title: 'Manager Desk',
     html,
     mount(root) {
+      root.querySelectorAll('[data-tfacc]').forEach(
+        b =>
+          (b.onclick = e => {
+            e.stopPropagation();
+            const a = Store.get(b.dataset.tfacc);
+            if (a) TodoFollow.accept(a);
+          })
+      );
+      root.querySelectorAll('[data-tfdec]').forEach(
+        b =>
+          (b.onclick = e => {
+            e.stopPropagation();
+            const a = Store.get(b.dataset.tfdec);
+            if (a) TodoFollow.decline(a);
+          })
+      );
       bindRequests(root);
       bindMyTasks(root);
       bindAnn(root);

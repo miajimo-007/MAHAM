@@ -462,7 +462,10 @@ Object.assign(App, {
 /* Remembered filters: each person's page filters, table search and sort are kept on this PC and come back next time */
 App.saveView = U.debounce(() => {
   if (!App.me || App.preview) return;
-  const ok = v => v == null || ['string', 'number', 'boolean'].includes(typeof v);
+  const prim = v => v == null || ['string', 'number', 'boolean'].includes(typeof v);
+  // simple values, lists of simple values (e.g. report sections, chosen people) and small notes objects
+  const ok = v =>
+    prim(v) || (Array.isArray(v) && v.every(prim)) || (v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(prim));
   const ps = {};
   for (const [pg, o] of Object.entries(App.ps || {})) {
     if (!o || typeof o !== 'object') continue;

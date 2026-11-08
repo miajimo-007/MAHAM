@@ -61,6 +61,16 @@ Object.assign(Store, {
     'givenBy',
     'priority',
     'hdReq',
+    'wf',
+    'ttype',
+    'fromRule',
+    'followOf',
+    'fromAsk',
+    'prevStep',
+    'chainRoot',
+    'chainTask',
+    'stepNo',
+    'stepName',
   ],
   QW_MGR_FIELDS: ['approval', 'qwId', 'managerComment'],
   QW_LOCKED_FIELDS: ['subject', 'date', 'expected', 'module', 'type', 'impact', 'analyst', 'coWorkers'],
@@ -138,6 +148,19 @@ Object.assign(Store, {
       out.fixed = f;
     }
     if (r.c === 'todo' && !priv('assignTodo')) {
+      // a copy of a repeating To Do, made by the person's own MAHAM: checked against the rule a manager made
+      if (!p && typeof TodoRules !== 'undefined' && !r._del && r.analyst === by) {
+        const base = TodoRules.validCopy(r);
+        if (base) return Store.fairCheck(r, Object.assign({}, base, { _by: base.givenBy, _ts: 1 }), by, ts, locks);
+      }
+      // the next step's To Do a workflow made (by the person who finished the step before, or the one it is for)
+      if (!p && typeof TodoFlow !== 'undefined' && !r._del && /^todo-step-.+-a$/.test(r.id || '')) {
+        const base = TodoFlow.validStep(r, by);
+        if (base) {
+          if (by === base.analyst) return Store.fairCheck(r, Object.assign({}, base, { _by: '', _ts: 1 }), by, ts, locks);
+          return Object.assign(out, { fixed: Object.assign({}, r, base, { _ts: r._ts, _by: r._by, _v: r._v }) });
+        }
+      }
       if (!p) return no(r._del ? 'Only your manager can delete a To Do' : 'Only a manager or team leader can add To Dos');
       if (r._del) return no('Only your manager can delete a To Do');
       if (p.analyst !== by) return no('This To Do belongs to someone else');

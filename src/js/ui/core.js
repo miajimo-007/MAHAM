@@ -93,7 +93,10 @@ const UI = {
       .join('\u0001');
   },
   modalDirty(wrap) {
-    return !!wrap && wrap._start != null && UI.formState(wrap) !== wrap._start;
+    if (!wrap) return false;
+    const rn = wrap.querySelector('#rnnew, .rn-edit');
+    if (rn && rn.value.trim()) return true;
+    /* a note typed but not added yet */ return wrap._start != null && UI.formState(wrap) !== wrap._start;
   },
   /* closing by ✕ / Esc / clicking outside / Cancel: ask first when something was typed */
   tryClose() {
@@ -120,8 +123,11 @@ const UI = {
     if (m) m.remove();
     document.removeEventListener('keydown', UI._esc);
     if (App.pendingRender) {
-      App.pendingRender = false;
-      App.render();
+      if (App.applyPending) setTimeout(App.applyPending, 0);
+      else {
+        App.pendingRender = false;
+        App.render();
+      }
     }
   },
   confirm(msg, yes) {

@@ -37,6 +37,13 @@ folder's own permissions.
 
 More detail: [Hosting, phones and database](docs/HOSTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA-MODEL.md) · [Permissions](docs/PERMISSIONS.md) · [Development](docs/DEVELOPMENT.md)
 
+## Live copy (GitHub Pages)
+
+Every push to `main` publishes the app with [`.github/workflows/pages.yml`](.github/workflows/pages.yml) to
+`https://<owner>.github.io/<repo>/`. That copy uses [`pages/maham.config.js`](pages/maham.config.js): it starts with
+**one owner as the super admin** (sign in with the id, choose a PIN the first time) and keeps the data **on the device
+you use** (back it up from Admin → Data). One-time setup: **Settings → Pages → Source: GitHub Actions**.
+
 ## Phones and the online database
 
 - **Phones:** the layout adapts to small screens, and when the app is served over https (for example GitHub Pages)
@@ -128,7 +135,7 @@ docs/                   architecture, data model, permissions, development notes
 
 ## Versioning
 
-Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.11.07.3**. See [CHANGELOG](CHANGELOG.md).
+Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.11.08.4**. See [CHANGELOG](CHANGELOG.md).
 
 ## License
 

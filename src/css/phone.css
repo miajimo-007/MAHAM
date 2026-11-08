@@ -1,27 +1,7 @@
-/* MAHAM — Phones (basic). Loaded after responsive.css. Big enough to tap, nothing wider than the screen. */
+/* MAHAM — extras for phones and hosted copies (the main phone layout is in responsive.css). Loaded after it. */
 @media (max-width: 700px) {
   html {
     -webkit-text-size-adjust: 100%;
-  }
-  main {
-    padding: 12px;
-  }
-  .top {
-    padding: 8px 12px;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .top h1 {
-    font-size: 17px;
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .top .yearsel,
-  .top #savebtn {
-    display: none;
   }
   .hello {
     flex-direction: column;
@@ -34,69 +14,15 @@
   .att-today {
     flex-wrap: wrap;
   }
-  .kpis,
-  .kpis.k5,
-  .kpis.k8,
-  .kpis.k3 {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-  .kpi-val {
-    font-size: 20px;
-  }
-  .card {
-    padding: 12px;
-  }
-  .tbl-scroll,
-  .tbl-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .tbl {
-    font-size: 13px;
-  }
-  .page-actions,
-  .filters {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .tabs {
-    overflow-x: auto;
-    white-space: nowrap;
-    flex-wrap: nowrap;
-  }
-  .li {
-    flex-wrap: wrap;
-  }
-  .btn,
-  select,
-  input,
-  textarea {
-    min-height: 38px;
-    font-size: 16px;
-  } /* 16px stops iPhone zooming into fields */
-  .btn.xs,
-  .btn.sm {
-    min-height: 32px;
-    font-size: 13px;
-  }
-  .modal-wrap {
-    padding: 8px;
-  }
-  .modal,
-  .modal.wide {
-    max-width: none;
-  }
-  .modal-body {
-    max-height: calc(100vh - 140px);
-    overflow-y: auto;
-  }
   .connect-card {
     padding: 20px;
     margin: 12px;
   }
   .store-note {
     font-size: 11px;
+  }
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 .store-note {

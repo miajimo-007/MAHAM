@@ -10,9 +10,22 @@ Object.assign(UI, {
     const st = (App.tableState[id] = App.tableState[id] || { q: '', sort: defaultSort || null, dir: -1, limit: pageSize });
     if (!st.limit) st.limit = pageSize;
     let list = rows;
+    /* reference notes: 📝 mark, "Has notes" filter, search inside notes, a Notes column in Excel */
+    const RN = typeof RefNotes !== 'undefined';
+    const recOf = r => (r && r.r && r.r.id ? r.r : r) || {};
+    const nCount = r => {
+      const x = recOf(r);
+      return RN && x.id && RefNotes.COLLS.has(x.c) ? RefNotes.count(x.id) : 0;
+    };
+    const anyNotes = RN && rows.some(r => nCount(r));
+    if (st.notes && anyNotes) list = list.filter(r => nCount(r));
     if (st.q) {
       const q = U.lc(st.q);
-      list = list.filter(r => cols.some(c => U.lc(c.text ? c.text(r) : c.get ? c.get(r) : '').includes(q)));
+      list = list.filter(
+        r =>
+          cols.some(c => U.lc(c.text ? c.text(r) : c.get ? c.get(r) : '').includes(q)) ||
+          (nCount(r) && U.lc(RefNotes.text(recOf(r).id)).includes(q))
+      );
     }
     if (st.sort != null) {
       const c = cols.find(c => c.key === st.sort);
@@ -32,7 +45,7 @@ Object.assign(UI, {
     const ids = new Set(list.map(UI.rowId));
     st.sel = (st.sel || []).filter(x => ids.has(x));
     const sel = new Set(st.sel);
-    App.tableRows[id] = { list, cols, exportName, bulk: bk };
+    App.tableRows[id] = { list, cols, exportName, bulk: bk, notes: anyNotes ? r => (nCount(r) ? RefNotes.plain(recOf(r).id) : '') : null };
     const selRows = canBulk ? list.filter(r => sel.has(UI.rowId(r))) : [];
     const bar =
       canBulk && selRows.length
@@ -58,10 +71,16 @@ Object.assign(UI, {
       }
       return c.html ? c.html(r) : h(c.text ? c.text(r) : c.get(r));
     };
+    const markCol = cols.findIndex(c => !c.edit && c.label); // the 📝 mark goes in the first plain column
+    const cellM = (c, r, i, ci) =>
+      cell(c, r, i) +
+      (ci === markCol && nCount(r)
+        ? ` <span class="rn-mark" title="${nCount(r)} note${nCount(r) > 1 ? 's' : ''} for future reference">📝</span>`
+        : '');
     return `<div class="tbl-wrap" data-tbl="${id}">
-      <div class="tbl-tools"><input class="search" type="search" placeholder="Search…" value="${h(st.q)}" data-tsearch="${id}" aria-label="Search table">${toolbar}${bar}<span class="grow"></span><span class="muted">${total > shown.length ? `showing ${shown.length.toLocaleString()} of ` : ''}${total.toLocaleString()} row${total === 1 ? '' : 's'}</span>${exportName && App.can('export') ? `<button class="btn sm ghost" data-texport="${id}" title="Export these rows to Excel">⇩ Excel</button>` : ''}</div>
+      <div class="tbl-tools"><input class="search" type="search" placeholder="Search…" value="${h(st.q)}" data-tsearch="${id}" aria-label="Search table">${anyNotes ? `<label class="check chip-check rn-flt" title="Only items with notes for future reference"><input type="checkbox" data-tnotes="${id}" ${st.notes ? 'checked' : ''}> 📝 Has notes</label>` : ''}${toolbar}${bar}<span class="grow"></span><span class="muted">${total > shown.length ? `showing ${shown.length.toLocaleString()} of ` : ''}${total.toLocaleString()} row${total === 1 ? '' : 's'}</span>${exportName && App.can('export') ? `<button class="btn sm ghost" data-texport="${id}" title="Export these rows to Excel">⇩ Excel</button>` : ''}</div>
       <div class="tbl-scroll"><table class="tbl"><thead><tr>${canBulk ? `<th class="sel"><input type="checkbox" data-tselall="${id}" title="Select all shown" ${shown.length && shown.every(r => sel.has(UI.rowId(r))) ? 'checked' : ''}></th>` : ''}${cols.map(c => `<th class="${c.cls || ''}" data-tsort="${id}|${c.key}" style="${c.w ? `width:${c.w}` : ''}">${h(c.label)}${st.sort === c.key ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
-      <tbody>${shown.length ? shown.map((r, i) => `<tr ${onRow ? `data-trow="${id}|${i}" class="click"` : ''}${UI.rowId(r) ? ` data-rid="${h(UI.rowId(r))}"` : ''}${sel.has(UI.rowId(r)) && canBulk ? ' data-sel="1"' : ''}>${canBulk ? `<td class="sel">${bk.some(a => a.ok(r)) ? `<input type="checkbox" data-tsel="${id}|${h(UI.rowId(r))}" ${sel.has(UI.rowId(r)) ? 'checked' : ''} aria-label="Select row">` : ''}</td>` : ''}${cols.map(c => `<td class="${c.cls || ''} ${/^(Date|Assigned|Due|Finished|Created|Resolved|Expected|Start|End|Presentation)$/.test(c.label) ? 'nw' : ''}">${cell(c, r, i)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${cols.length + (canBulk ? 1 : 0)}" class="empty">${empty || 'Nothing here yet.'}</td></tr>`}</tbody></table></div>
+      <tbody>${shown.length ? shown.map((r, i) => `<tr ${onRow ? `data-trow="${id}|${i}" class="click"` : ''}${UI.rowId(r) ? ` data-rid="${h(UI.rowId(r))}"` : ''}${sel.has(UI.rowId(r)) && canBulk ? ' data-sel="1"' : ''}>${canBulk ? `<td class="sel">${bk.some(a => a.ok(r)) ? `<input type="checkbox" data-tsel="${id}|${h(UI.rowId(r))}" ${sel.has(UI.rowId(r)) ? 'checked' : ''} aria-label="Select row">` : ''}</td>` : ''}${cols.map((c, ci) => `<td class="${c.cls || ''} ${/^(Date|Assigned|Due|Finished|Created|Resolved|Expected|Start|End|Presentation)$/.test(c.label) ? 'nw' : ''}">${cellM(c, r, i, ci)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${cols.length + (canBulk ? 1 : 0)}" class="empty">${empty || 'Nothing here yet.'}</td></tr>`}</tbody></table></div>
       ${total > shown.length ? `<div class="more"><button class="btn sm" data-tmore="${id}">Show more (${(total - shown.length).toLocaleString()} left)</button></div>` : ''}
     </div>`;
   },
@@ -94,6 +113,15 @@ Object.assign(UI, {
             st.dir = 1;
           }
           App.render();
+        })
+    );
+    root.querySelectorAll('[data-tnotes]').forEach(
+      cb =>
+        (cb.onchange = () => {
+          const st = App.tableState[cb.dataset.tnotes];
+          st.notes = cb.checked;
+          st.limit = 100;
+          App.render(true);
         })
     );
     root.querySelectorAll('[data-tmore]').forEach(
@@ -182,12 +210,14 @@ Object.assign(UI, {
     const T = App.tableRows[id];
     if (!T) return;
     const rows = [
-      T.cols.map(c => c.label),
+      T.cols.map(c => c.label).concat(T.notes ? ['Notes'] : []),
       ...T.list.map(r =>
-        T.cols.map(c => {
-          const v = c.xval ? c.xval(r) : c.text ? c.text(r) : c.get(r);
-          return v == null ? '' : v;
-        })
+        T.cols
+          .map(c => {
+            const v = c.xval ? c.xval(r) : c.text ? c.text(r) : c.get(r);
+            return v == null ? '' : v;
+          })
+          .concat(T.notes ? [T.notes(r)] : [])
       ),
     ];
     XL.download(await XL.write([{ name: T.exportName, rows }]), `${T.exportName} ${U.todayStr()}.xlsx`);

@@ -14,19 +14,33 @@ const Calc = {
   /* ---------- To Do ---------- */
   todoDerive(r) {
     const due = r.assigned ? U.addDays(r.assigned, r.duration || 0) : '';
-    const ref = r.finish || U.todayStr();
+    // hand-on chains (domain/todoflow.js): handed on = done; sent back = open again until fixed; finish = last fix
+    const v = typeof TodoFlow !== 'undefined' && !r.virtual && TodoFlow.has(r) ? TodoFlow.view(r) : null;
+    const fin = v ? v.finish : r.finish;
+    const ref = fin || U.todayStr();
     const days = due ? U.diffDays(due, ref) : null;
     const status =
-      r.status === 'Canceled' ? 'Canceled' : r.finish ? (r.status === 'Ready for review' ? 'Ready for review' : 'Resolved') : 'In Progress';
+      v && v.status
+        ? v.status
+        : r.status === 'Canceled'
+          ? 'Canceled'
+          : r.finish
+            ? r.status === 'Ready for review'
+              ? 'Ready for review'
+              : 'Resolved'
+            : 'In Progress';
     const timing = r.task ? (days > 0 ? 'Delayed' : 'On Time') : '';
     return { due, days, status, timing, month: U.month(r.assigned), year: U.year(r.assigned) };
   },
   todos(year) {
-    return Calc.memo('todos' + year, () =>
-      Store.all('todo')
+    // + the checks (validation …) each person does on To Do steps — a To Do for them too (domain/todoflow.js)
+    return Calc.memo('todos' + year, () => {
+      const l = Store.all('todo');
+      return l
+        .concat(typeof TodoFlow !== 'undefined' ? TodoFlow.checkTodos(l) : [])
         .map(r => Object.assign({ r }, Calc.todoDerive(r)))
-        .filter(x => !year || x.year === year)
-    );
+        .filter(x => !year || x.year === year);
+    });
   },
   /* ---------- Help desk (ManageEngine) ---------- */
   isClosed(st) {

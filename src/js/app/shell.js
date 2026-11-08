@@ -3,6 +3,17 @@
 
 Object.assign(App, {
   launch() {
+    try {
+      if (typeof TodoRules !== 'undefined' && App.me && !App.preview) TodoRules.run();
+    } catch (e) {
+      console.warn(e);
+    } // repeating To Dos due by today
+    try {
+      if (typeof TodoFlow !== 'undefined' && App.me && !App.preview)
+        TodoFlow.autoNext(Store.all('todo', '*').filter(t => t.analyst === App.me && t.wf && t.finish));
+    } catch (e) {
+      console.warn(e);
+    } // a workflow step not handed on yet
     LS.set('bct.brand', { name: Store.appName(), logo: Store.appLogo(), tagline: Custom.tagline() });
     App.favicon();
     Custom.applyColor();
@@ -117,6 +128,49 @@ Object.assign(App, {
       }
     });
   },
+  /* Someone else's changes arrived. Redraw the page — but never under someone who is typing: a box on the page that has
+   * focus or holds text not saved yet (My Day's shadow form, a comment, report notes …) would be wiped by the redraw.
+   * Then the redraw waits and happens as soon as they finish (save, clear the box, leave it, or open another page). */
+  _snap: new WeakMap(),
+  snapInputs(root) {
+    App._snap = new WeakMap();
+    (root || document)
+      .querySelectorAll('input, textarea, select')
+      .forEach(e => App._snap.set(e, e.type === 'checkbox' || e.type === 'radio' ? e.checked : e.value));
+  },
+  typing() {
+    const m = UI.$('#main');
+    if (!m) return false;
+    const a = document.activeElement;
+    if (
+      a &&
+      m.contains(a) &&
+      (a.matches('textarea, select, [contenteditable="true"]') ||
+        (a.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit', 'file'].includes(a.type)))
+    )
+      return true;
+    return [...m.querySelectorAll('input, textarea, select')].some(e => {
+      if (!App._snap.has(e) || ['button', 'submit', 'file'].includes(e.type)) return false;
+      const v = e.type === 'checkbox' || e.type === 'radio' ? e.checked : e.value;
+      return v !== App._snap.get(e);
+    });
+  },
+  safeRender() {
+    if (UI.$('#modal') || App.typing()) {
+      App.pendingRender = true;
+      return false;
+    }
+    App.pendingRender = false;
+    App.render(true);
+    return true;
+  },
+  /* apply a waiting redraw once the person has stopped typing */
+  applyPending() {
+    if (App.pendingRender && !UI.$('#modal') && !App.typing()) {
+      App.pendingRender = false;
+      App.render(true);
+    }
+  },
   /* who changed what since last look */
   others() {
     const o = {};
@@ -138,8 +192,10 @@ Object.assign(App, {
       const who = Object.keys(after)
         .filter(k => after[k] !== before[k])
         .map(k => Store.memberShort(k) || k);
-      if (UI.$('#modal')) App.pendingRender = true;
-      else App.render(true);
+      if (manual || !App.safeRender) {
+        if (UI.$('#modal')) App.pendingRender = true;
+        else App.render(true);
+      } else App.safeRender();
       if (manual) UI.toast(who.length ? `Updated — new changes from ${who.join(', ')}` : 'Up to date — no new changes', 'good');
       else if (who.length) UI.toast(`New changes from ${who.join(', ')}`, '');
     } catch (e) {
@@ -285,6 +341,11 @@ Object.assign(App, {
   async poll() {
     if (!App.me) return; // signed out: the login page needs nothing from the shared folder
     Store.autoBackup();
+    try {
+      if (typeof TodoRules !== 'undefined' && TodoRules.run()) App.pendingRender = true;
+    } catch (e) {
+      console.warn(e);
+    }
     if (Date.now() - (App._verChecked || 0) > 15 * 60000) {
       App._verChecked = Date.now();
       App.checkVersion();
@@ -298,10 +359,9 @@ Object.assign(App, {
         const who = Object.keys(after)
           .filter(k => after[k] !== before[k])
           .map(k => Store.memberShort(k) || k);
-        if (UI.$('#modal')) App.pendingRender = true;
-        else App.render(true);
-        if (who.length) UI.toast(`New changes from ${who.join(', ')}`, '');
-      }
+        const shown = App.safeRender();
+        if (who.length) UI.toast(`New changes from ${who.join(', ')}${shown ? '' : ' — they will show when you finish typing'}`, '');
+      } else App.applyPending();
     } catch (e) {
       console.warn(e);
     }

@@ -36,6 +36,29 @@ function myWork(who) {
         edit: 'todo|' + t.id,
       });
     }
+  // hand-on chains: my To Do sent back to fix, or my finished step where I choose who does the next one
+  if (typeof TodoFlow !== 'undefined')
+    for (const t of TodoFlow.mine(me)) {
+      const v = TodoFlow.view(t);
+      if (v.b.open)
+        out.push({
+          r: t,
+          kind: 'Sent back',
+          title: t.task,
+          due: '',
+          src: `↩ ${Store.memberShort(v.b.open.by)}: “${v.b.open.note || ''}”`,
+          edit: 'todo|' + t.id,
+        });
+      else if (v.pickNeeded)
+        out.push({
+          r: t,
+          kind: 'Hand on',
+          title: `Choose who does "${TodoFlow.nextDef(t).name}": ${t.task}`,
+          due: '',
+          src: 'your part is done — the workflow asks you who is next',
+          edit: 'todo|' + t.id,
+        });
+    }
   for (const t of Store.all('mgrtask')) {
     const st = Chain.status(t);
     if (App.forMe(t.manager) && me === App.me && st !== Chain.ST.DONE && st !== Chain.ST.X)
@@ -144,10 +167,17 @@ function myWorkCard() {
   if (!LS.get('bct.seen.' + App.me, 0)) markSeen();
   /* done today, waiting for the manager's confirm — stays on the list greyed until tomorrow */
   const wait = Store.all('todo', '*').filter(
-    t => t.analyst === App.me && t.status === 'Ready for review' && t.finish && t.finish > U.addDays(today, -Custom.target('greyDays'))
+    t =>
+      t.analyst === App.me &&
+      t.status === 'Ready for review' &&
+      t.finish &&
+      t.finish > U.addDays(today, -Custom.target('greyDays')) &&
+      !(typeof TodoFlow !== 'undefined' && (TodoFlow.withMe(t) || TodoFlow.nextOf(t)))
   );
   if (!l.length && !wait.length && o.hideEmpty) return '';
   const kc = {
+    'Hand on': 'k-req',
+    'Sent back': 'k-task',
     Offered: 'k-mtg',
     Approval: 'k-req',
     Stuck: 'k-task',
@@ -163,7 +193,7 @@ function myWorkCard() {
       ? ''
       : `${x.r.priority === 'High' ? ' ' + UI.badge('High', 'bad') : ''}${x.r.dirUpdated && x.r.dirUpdated >= U.addDays(today, -7) ? ' ' + UI.badge('updated by director', 'warn') : ''}${x.r.nudgedOn && x.r.nudgedOn >= U.addDays(today, -3) ? ' ' + UI.badge('🔔 ' + Store.memberShort(x.r.nudgedBy) + ' asked for an update', 'warn') : ''}${x.r.dirNote ? `<div class="small">📝 Director: ${h(x.r.dirNote)}</div>` : ''}`;
   const row = x =>
-    `<div class="li click" ${x.edit ? `data-edit="${h(x.edit)}"` : x.href ? `data-href="${h(x.href)}"` : `data-proj="${h(x.proj)}"`}><span class="ag-kind ${kc[x.kind]}">${h(x.kind)}</span><div class="grow"><b>${h(x.title)}</b>${nw.has(x.r.id) ? ' <span class="badge warn">new</span>' : ''}${extra(x)}<div class="muted small">${h(x.src)}</div></div>${x.due ? `<span class="ov-due ${x.late ? 'late' : x.due === today ? 'today' : ''}">${x.late ? 'overdue · ' : ''}${x.due === today ? 'today' : U.fmtDate(x.due)}</span>` : ''}${x.offer ? ` <button class="btn sm primary" data-ptacc="${h(x.r.id)}">Accept</button> <button class="btn sm ghost" data-ptdec="${h(x.r.id)}">Decline</button>` : x.r.c === 'action' || x.r.c === 'todo' || x.r.c === 'mytask' ? ` <button class="btn sm" data-mineok="${h(x.r.id)}" title="Mark as done today">✓ Done</button>` : ''}</div>`;
+    `<div class="li click" ${x.edit ? `data-edit="${h(x.edit)}"` : x.href ? `data-href="${h(x.href)}"` : `data-proj="${h(x.proj)}"`}><span class="ag-kind ${kc[x.kind]}">${h(x.kind)}</span><div class="grow"><b>${h(x.title)}</b>${nw.has(x.r.id) ? ' <span class="badge warn">new</span>' : ''}${extra(x)}<div class="muted small">${h(x.src)}</div></div>${x.due ? `<span class="ov-due ${x.late ? 'late' : x.due === today ? 'today' : ''}">${x.late ? 'overdue · ' : ''}${x.due === today ? 'today' : U.fmtDate(x.due)}</span>` : ''}${x.offer ? ` <button class="btn sm primary" data-ptacc="${h(x.r.id)}">Accept</button> <button class="btn sm ghost" data-ptdec="${h(x.r.id)}">Decline</button>` : x.r.c === 'todo' && typeof TodoFlow !== 'undefined' && TodoFlow.withMe(x.r) ? ' ' + TodoFlow.buttons(x.r) : x.r.c === 'action' || x.r.c === 'todo' || x.r.c === 'mytask' ? ` <button class="btn sm" data-mineok="${h(x.r.id)}" title="Mark as done today">✓ Done</button>` : ''}</div>`;
   const wrow = t =>
     `<div class="li click waiting" data-edit="todo|${h(t.id)}"><span class="ag-kind k-task">To Do</span><div class="grow"><b>${h(t.task)}</b><div class="muted small">✓ done ${t.finish === today ? 'today' : U.fmtDate(t.finish)} — waiting for your manager to confirm</div></div></div>`;
   return card(

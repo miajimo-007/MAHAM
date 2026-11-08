@@ -2,6 +2,36 @@
 
 Versions are dates (`YYYY.MM.DD.n`).
 
+## 2026.11.08.4
+
+- **Hand-on chains:** "➜ Send on" gives the next person a new To Do of their own (filled-in form: who, wording, due
+  days). The person before counts as done once handed on. The next person can "↩ Send back" with a reason: the To Do
+  before reopens (scored as not done) until "✓ Fixed". Each step is scored as a To Do of its own person.
+- **To Do workflows** (Admin → Workflows, super admin): steps hand on by themselves — to a named person, a team role,
+  or one chosen by whoever finishes the step before; "a comment is needed to finish it"; where Send back goes; To Do
+  types that use a workflow by themselves. A workflow's next-step To Do is accepted by the trust check only when it
+  matches the workflow (checked after the To Do before it).
+- **Follow-up To Dos** from a To Do (managers create; analysts add a personal follow-up or ask the manager, who makes
+  it a To Do or declines with a reason).
+- **Phones:** nothing scrolls sideways — tiles two by two, header on two rows, sliding tabs, filters two per row,
+  tables scroll in their own box, full-screen dialogs, 16 px fields (no iPhone zoom), finger-sized buttons.
+- **GitHub Pages:** `.github/workflows/pages.yml` publishes the app on every push to main; `pages/maham.config.js`
+  starts it with one owner as super admin, data kept on the device.
+
+## 2026.11.08.2
+
+- **📝 Notes for future reference** on every kind of task (each note is its own record in the writer's file; 📝 mark,
+  "Has notes" filter, search inside notes, Notes column in Excel).
+- **↻ Repeating To Dos** (every working day / week / month / 3 months; until a date or N times). Each copy is made by
+  the person's own app on its day (missed days caught up, never twice) and accepted only if it matches a manager's
+  rule. To Do List → ↻ Scheduled: pause, resume, edit (from today), stop.
+
+## 2026.11.08.1
+
+- Fixed: Reports could fail to open when remembered filters came back without the chosen sections and people.
+- Teams kept apart: the To Do number, confirming and finishing a To Do cover only the manager's own team.
+- Typing is no longer wiped when someone else saves: the page waits until you finish, then shows their changes.
+
 ## 2026.11.07.3
 
 - Fixed: signing out right after a change could write a stray "null.json" in the users folder. Sign out now waits for
