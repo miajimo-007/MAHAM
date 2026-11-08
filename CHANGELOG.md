@@ -2,6 +2,19 @@
 
 Versions are dates (`YYYY.MM.DD.n`).
 
+## 2026.11.08.5 — many companies (online)
+
+- **Three levels:** the platform owner (Owner Console: create, pause or delete companies, seats, invite an admin — no
+  company data), each company's **own admin** (the super admin of that company only) and its users. The database
+  keeps every company apart (row-level security) and checks seats, invitations and the last admin.
+- **Email sign-in:** sign in, create an account (invited emails only), forgot password, reset link. Someone in two
+  companies chooses one; an account nobody invited sees nothing; a paused company opens for nobody.
+- **Admin → Company & accounts:** invite people (existing or new), Admin / User, turn accounts off, cancel
+  invitations, seats used, audit log, support access for 24 hours or 7 days (read-only visits, logged), delete the
+  company. First open of a new company: a short setup (company name, your name, teams).
+- **GitHub Pages copy is online** (`pages/maham.config.js`). Tested against a real PostgreSQL running
+  `supabase/schema.sql` (`test_cloud_rules`, `test_cloud_signin`, `test_cloud_console`).
+
 ## 2026.11.08.4
 
 - **Hand-on chains:** "➜ Send on" gives the next person a new To Do of their own (filled-in form: who, wording, due

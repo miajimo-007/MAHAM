@@ -40,18 +40,19 @@ More detail: [Hosting, phones and database](docs/HOSTING.md) · [Architecture](d
 ## Live copy (GitHub Pages)
 
 Every push to `main` publishes the app with [`.github/workflows/pages.yml`](.github/workflows/pages.yml) to
-`https://<owner>.github.io/<repo>/`. That copy uses [`pages/maham.config.js`](pages/maham.config.js): it starts with
-**one owner as the super admin** (sign in with the id, choose a PIN the first time) and keeps the data **on the device
-you use** (back it up from Admin → Data). One-time setup: **Settings → Pages → Source: GitHub Actions**.
+`https://<owner>.github.io/<repo>/`. That copy uses [`pages/maham.config.js`](pages/maham.config.js): it is
+**online** — many companies on one Supabase database, each kept apart by the database. Sign in with email and password;
+companies and people join only by invitation (Owner Console → company admin). One-time setup: **Settings → Pages →
+Source: GitHub Actions**, and the database steps in [docs/HOSTING.md](docs/HOSTING.md).
 
 ## Phones and the online database
 
 - **Phones:** the layout adapts to small screens, and when the app is served over https (for example GitHub Pages)
   it can be installed with _Add to Home Screen_. Without a shared folder (phones, Safari, Firefox) the data is kept
   on the device.
-- **Online database:** ready but off. Fill in `maham.config.js` (next to `MAHAM.html`) and run
+- **Online database (many companies):** fill in `maham.config.js` (next to `MAHAM.html`) and run
   `supabase/schema.sql` — every step is in [docs/HOSTING.md](docs/HOSTING.md). The database enforces who may read
-  and write (row-level security); the app does not need a rebuild.
+  and write (row-level security); the app does not need a rebuild. The shared-folder and this-device modes stay.
 
 ## Requirements
 
@@ -135,7 +136,7 @@ docs/                   architecture, data model, permissions, development notes
 
 ## Versioning
 
-Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.11.08.4**. See [CHANGELOG](CHANGELOG.md).
+Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.11.08.5**. See [CHANGELOG](CHANGELOG.md).
 
 ## License
 

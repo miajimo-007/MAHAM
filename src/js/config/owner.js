@@ -9,9 +9,16 @@
   const c = window.MAHAM_CONFIG || {};
   const o = c.owner;
   const seed = window.SEED_DATA;
-  if (!o || !o.id || !seed || !Array.isArray(seed.records)) return;
+  if (!seed || !Array.isArray(seed.records)) return;
   const team = seed.records.find(r => r.id === 'settings-team');
   if (!team) return;
+  // online (many companies): no sample people — the company's people come from the database (invitations)
+  if (c.storage === 'cloud') {
+    team.members = [];
+    seed.source = 'online company';
+    return;
+  }
+  if (!o || !o.id) return;
   const teams = seed.records.find(r => r.id === 'settings-teams');
   const first = teams && teams.teams && teams.teams[0] ? teams.teams[0].id : 'apps';
   const name = o.name || o.id;

@@ -26,38 +26,51 @@ Until the database is set up, phones keep their data on the phone (`'auto'` / `'
 1. Create a project at supabase.com. Choose the region closest to your customers — and check where your customers
    require their data to be stored (for Saudi organisations, the Personal Data Protection Law; hospitals often require
    in-Kingdom hosting — Supabase can also be self-hosted on a cloud region in the Kingdom).
-2. **SQL Editor → New query**: paste `supabase/schema.sql`, **Run**.
-3. **Authentication → Providers**: keep _Email_ on. For a company, turn off public sign-ups (**Authentication →
-   Sign In / Providers → Allow new users to sign up: off**) — the owner creates accounts.
-4. **Authentication → Users → Add user**: create the owner's account (email + password).
-5. Create the company and link the owner (bottom of `schema.sql`, the commented `insert` — replace the email). The
-   `member_id` must be the owner's id in the app (the super admin in Admin → People; `adam` in the sample data).
-6. **Project Settings → API**: copy the _Project URL_ and the _anon public_ key.
+2. **SQL Editor → New query**: paste `supabase/schema.sql`, **Run**. (Safe to run again after an update.)
+3. **Authentication → URL Configuration**: set **Site URL** to the address of the app (for example
+   `https://<owner>.github.io/<repo>/`), so the links in sign-up and password emails come back to the app.
+4. **Authentication → Users → Add user**: create **your own** account (email + password, _Auto Confirm User_ on).
+5. Make yourself the **platform owner**: the last (commented) line of `schema.sql` — put your email, run just that line.
+6. **Project Settings → API**: copy the _Project URL_ and the _anon_ / _publishable_ key (never the secret key).
 
 ## 3. Connect the app
 
-Edit `maham.config.js` on the website:
+Edit `maham.config.js` next to the app (on GitHub Pages: `pages/maham.config.js`):
 
 ```js
 storage: 'cloud',
-cloud: { url: 'https://abcd1234.supabase.co', anonKey: 'eyJ…', company: '', companyName: 'My Company' },
+cloud: { url: 'https://abcd1234.supabase.co', anonKey: 'sb_publishable_…' },
 ```
 
-Refresh. The app asks for email and password, finds the company and opens as that person.
-The _anon_ key is meant to be public; the database's row-level security decides who reads and writes what.
+Refresh. Sign in with your email and password: as platform owner you land in the **Owner Console**.
+The anon key is meant to be public; the database's row-level security decides who reads and writes what.
 
-## 4. Add people
+## 4. Companies and people (all by invitation)
 
-1. In the app: **Admin → People → add the person** (note their id).
-2. In Supabase: **Authentication → Users → Add user** (their email and a first password).
-3. Link them (SQL, bottom of `schema.sql`): company id + their email + their id in the app.
+1. **Owner Console → New company**: its name, seats, and its admin's email. Send the admin the app's link.
+2. The admin opens the link, chooses **Create account** with that email, and answers three setup questions
+   (company name, their name, teams).
+3. The admin invites their own people in **Admin → Company & accounts** (an existing person in Admin → People, or a
+   new one) and sends them the link. Each person chooses **Create account** with the invited email.
+4. In the same place the admin makes people **Admin** or **User**, turns accounts off, cancels invitations, sees the
+   seats used, the **audit log**, allows **support access** for 24 hours or 7 days, and can delete the company.
 
-They sign in on any phone or PC. "Switch person" becomes **Sign out**.
+An account nobody invited sees nothing. Someone invited by two companies chooses one when signing in.
+"Switch person" becomes **Sign out**. Forgot password sends a link by email.
+
+## Who sees what
+
+| Who                  | Can                                                                                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform owner (you) | Owner Console: create / pause / delete companies, seats, invite an admin. **No company data** — only read-only support visits while a company allows it (logged). |
+| Company admin        | Everything in their own company (the app's super admin), people and invitations.                                                                                  |
+| User                 | Their company's app, by the app's normal permissions; writes only their own data file.                                                                            |
 
 ## What the database enforces
 
-- Everyone reads only their own company.
-- Each person writes only their own data file (and backups); the owner may write any file of the company.
+- Everyone reads only their own company; a paused company opens for nobody.
+- Each person writes only their own data files (and backups); the company admin may write any file of the company.
+- Seats, invitations, the last admin, support access and the audit log are checked in the database, not in the app.
 - The app's own trust rules (`src/js/access/trust.js`) still run on top: changes a person is not allowed to make are
   ignored and listed in System Check.
 

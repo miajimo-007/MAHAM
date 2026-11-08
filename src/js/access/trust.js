@@ -54,7 +54,10 @@ Object.assign(Store, {
     const seedTeam = list.find(x => !x.owner && x.r.id === 'settings-team');
     let cur = seedTeam ? seedTeam.r : { id: 'settings-team', c: 'settings', members: [], _ts: 0 };
     const timeline = [[cur._ts || 0, cur.members || []]];
-    const superIn = (members, id) => !!((members || []).find(m => m.id === id) || {}).superAdmin;
+    const superIn = (members, id) =>
+      Array.isArray(Store.trustedPeople)
+        ? Store.trustedPeople.some(p => p.id === id && p.admin && p.active !== false)
+        : !!((members || []).find(m => m.id === id) || {}).superAdmin;
     const superAt = (id, ts) => {
       let m = timeline[0][1];
       for (const [t, mem] of timeline) {
@@ -93,6 +96,34 @@ Object.assign(Store, {
         else continue;
       }
       timeline.push([cur._ts || 0, cur.members || []]);
+    }
+    // online database (GitHub version): the database decides who is in the company and who is its admin
+    if (Array.isArray(Store.trustedPeople)) {
+      const tp = new Map(Store.trustedPeople.map(p => [p.id, p]));
+      const have = new Set((cur.members || []).map(m => m.id));
+      const ms = (cur.members || []).map(m =>
+        tp.has(m.id)
+          ? Object.assign({}, m, { superAdmin: !!tp.get(m.id).admin, active: m.active !== false && tp.get(m.id).active !== false })
+          : Object.assign({}, m, { superAdmin: false })
+      );
+      for (const p of Store.trustedPeople)
+        if (!have.has(p.id))
+          ms.push({
+            id: p.id,
+            name: p.name || p.id,
+            short: p.name || p.id,
+            me: '',
+            scored: !p.admin,
+            active: p.active !== false,
+            aliases: [],
+            role: 'analyst',
+            team: p.team || ((Store.setting && (cur.members || [])[0]) || {}).team || '',
+            superAdmin: !!p.admin,
+            email: p.email || '',
+          });
+      cur = Object.assign({}, cur, { members: ms });
+      timeline.length = 0;
+      timeline.push([0, ms]);
     }
     const members = cur.members || [];
     const isMember = id => members.some(m => m.id === id);

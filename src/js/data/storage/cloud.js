@@ -62,20 +62,122 @@ const CloudBackend = {
     LS.set('maham.cloud.session', CloudBackend.session);
   },
   signOut() {
+    try {
+      if (CloudBackend.session)
+        fetch(CloudBackend.base() + '/auth/v1/logout', { method: 'POST', headers: CloudBackend.headers() }).catch(() => {});
+    } catch (e) {
+      /* */
+    }
     CloudBackend.session = null;
     CloudBackend.company = null;
     LS.set('maham.cloud.session', null);
   },
-  /* which company and which person in the app this account is (table company_members) */
-  async membership() {
-    const uid = CloudBackend.session && CloudBackend.session.user && CloudBackend.session.user.id;
-    if (!uid) return null;
-    const want = CloudBackend.cfg.company ? `&company_id=eq.${encodeURIComponent(CloudBackend.cfg.company)}` : '';
-    const r = await CloudBackend.req(`/rest/v1/company_members?select=company_id,member_id,is_owner&user_id=eq.${uid}${want}&limit=1`);
-    if (!r.ok) throw new Error('Could not read your company (' + r.status + ')');
-    const [m] = await r.json();
-    if (!m) return null;
+  /* ---------- accounts (people join only by invitation: an account without one sees nothing) ---------- */
+  async signUp(email, password) {
+    const r = await fetch(CloudBackend.base() + '/auth/v1/signup', {
+      method: 'POST',
+      headers: { apikey: CloudBackend.cfg.anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.msg || j.error_description || j.message || 'Could not create the account');
+    if (j.access_token) {
+      CloudBackend.keep(j);
+      return 'signed-in';
+    }
+    return 'confirm-email'; // Supabase first sends a link to confirm the address
+  },
+  async recover(email) {
+    const r = await fetch(CloudBackend.base() + '/auth/v1/recover', {
+      method: 'POST',
+      headers: { apikey: CloudBackend.cfg.anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.msg || j.message || 'Could not send the email');
+    }
+  },
+  async setPassword(password) {
+    const r = await CloudBackend.req('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ password }) });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.msg || j.message || 'Could not change the password');
+    }
+  },
+  /* links in Supabase emails come back as #access_token=…&refresh_token=…&type=recovery|signup|invite|magiclink */
+  fromLink() {
+    const h = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+    if (!h.get('access_token')) return '';
+    CloudBackend.keep({ access_token: h.get('access_token'), refresh_token: h.get('refresh_token') || '', user: null });
+    history.replaceState(null, '', location.pathname + location.search);
+    return h.get('type') || 'signin';
+  },
+  async me() {
+    const r = await CloudBackend.req('/auth/v1/user');
+    if (!r.ok) return null;
+    const u = await r.json();
+    if (CloudBackend.session) {
+      CloudBackend.session.user = u;
+      LS.set('maham.cloud.session', CloudBackend.session);
+    }
+    return u;
+  },
+  email() {
+    return ((CloudBackend.session || {}).user || {}).email || '';
+  },
+  async rpc(fn, args) {
+    const r = await CloudBackend.req('/rest/v1/rpc/' + fn, { method: 'POST', body: JSON.stringify(args || {}) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) {
+      const e = new Error((j && (j.message || j.msg)) || fn + ' failed (' + r.status + ')');
+      e.status = r.status;
+      throw e;
+    }
+    return j;
+  },
+  /* the companies this account belongs to (open invitations for its email are accepted first) */
+  async companies() {
+    try {
+      await CloudBackend.rpc('accept_invites');
+    } catch (e) {
+      /* none */
+    }
+    return (await CloudBackend.rpc('my_companies')) || [];
+  },
+  async isPlatformOwner() {
+    try {
+      return !!(await CloudBackend.rpc('is_platform_owner'));
+    } catch (e) {
+      return false;
+    }
+  },
+  /* the company's people according to the database: who may sign in, and who is an admin */
+  async people(company) {
+    const r = await CloudBackend.req(`/rest/v1/company_members?select=member_id,role,active,email&company_id=eq.${company}`);
+    if (!r.ok) throw new Error('Could not read the people of your company (' + r.status + ')');
+    return (await r.json()).map(m => ({ id: m.member_id, admin: m.role === 'admin', active: m.active !== false, email: m.email || '' }));
+  },
+  async invites(company) {
+    const r = await CloudBackend.req(`/rest/v1/invites?select=email,member_id,role,created_at,accepted_at&company_id=eq.${company}`);
+    return r.ok ? r.json() : [];
+  },
+  /* the company to open: the one asked for in the settings, else the last one used, else the first */
+  pick(list) {
+    const ok = list.filter(
+      m => m.active && m.status === 'active' && (!CloudBackend.cfg.company || m.company_id === CloudBackend.cfg.company)
+    );
+    const last = LS.get('maham.cloud.company', '');
+    return ok.find(x => x.company_id === last) || (ok.length === 1 ? ok[0] : null);
+  },
+  use(m) {
     CloudBackend.company = m.company_id;
+    LS.set('maham.cloud.company', m.company_id);
+  },
+  async membership() {
+    if (!CloudBackend.session) return null;
+    const m = CloudBackend.pick(await CloudBackend.companies());
+    if (m) CloudBackend.use(m);
     return m;
   },
   /* ---------- the five backend methods (see vfs.js) ---------- */

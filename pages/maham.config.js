@@ -1,10 +1,10 @@
 /* MAHAM settings for the GitHub Pages copy (published by .github/workflows/pages.yml).
- * The data stays in the browser of the device you use — nothing is sent anywhere. Back it up from Admin → Data.
- * Only the owner below exists at the start (super admin). Sign in with the id and choose a PIN the first time.
- * To share data between people and devices later, set up the online database (docs/HOSTING.md) and use 'cloud'. */
+ * Online: the data is kept in the Supabase database below, each company apart (supabase/schema.sql, docs/HOSTING.md).
+ * People sign in with email + password; companies and people join only by invitation (Owner Console → company admin).
+ * The anon / publishable key is meant to be public — the database's row-level security does the protecting.
+ * Never put the service_role / secret key here. */
 window.MAHAM_CONFIG = {
-  storage: 'device',
-  cloud: { url: '', anonKey: '', company: '', companyName: '' },
+  storage: 'cloud',
+  cloud: { url: 'https://hmrvcxyltbcrpipisbpg.supabase.co', anonKey: 'sb_publishable_0AbqZlc55Ute70MaZcYOnw_CXFcVz1j' },
   installable: true,
-  owner: { id: 'mohammed', name: 'Mohammed', short: 'Mohammed' },
 };
