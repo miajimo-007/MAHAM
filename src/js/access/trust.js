@@ -120,6 +120,7 @@ Object.assign(Store, {
             team: p.team || ((Store.setting && (cur.members || [])[0]) || {}).team || '',
             superAdmin: !!p.admin,
             email: p.email || '',
+            hidden: !!p.hidden,
           });
       cur = Object.assign({}, cur, { members: ms });
       timeline.length = 0;

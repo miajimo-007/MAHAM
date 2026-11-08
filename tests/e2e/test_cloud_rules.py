@@ -1,6 +1,6 @@
 """The online database's rules, tested against a real PostgreSQL running supabase/schema.sql (row-level security):
 platform owner vs company admin vs user vs another company vs not signed in; invitations and seats; each person's own
-files (incl. help-desk months, past years, logs); support access only when the company grants it; paused companies;
+files (incl. help-desk months, past years, logs); the platform owner's full, logged admin access; paused companies;
 the audit log; deleting a company."""
 import os, sys
 from harness import Check
@@ -60,16 +60,23 @@ def main():
         X = Api(sb, sb.as_user('random@nowhere.test')); c('an account without an invitation sees nothing', X.rpc('accept_invites')[1] == 0 and X.get(f(0))[1] == [] and X.rpc('my_companies')[1] == [])
         # ---------- what a user may not do ----------
         for fn, kw in [('invite_member', dict(c=cid, p_email='a@b.test', p_member='z')), ('set_member', dict(c=cid, p_member='adam', p_role='user', p_active=True)),
-                       ('grant_support', dict(c=cid, hours=5)), ('delete_my_company', dict(c=cid, p_confirm='Acme')), ('owner_companies', {}),
+                       ('delete_my_company', dict(c=cid, p_confirm='Acme')), ('owner_companies', {}),
                        ('owner_create_company', dict(p_name='Mine', p_admin_email='y@y.test')), ('owner_set_company', dict(c=cid, p_status='paused', p_seats=99))]:
             c(f'a user cannot {fn}', U.rpc(fn, **kw)[0] == 403)
         c("a company admin cannot use the Owner Console", A.rpc('owner_companies')[0] == 403 and A.rpc('owner_set_company', c=cid, p_status='active', p_seats=999)[0] == 403)
-        # ---------- support access: only when the company grants it ----------
-        c("platform owner cannot read a company's data", P.get(f(0))[1] == [] and P.rpc('owner_open_support', c=cid)[0] == 403)
-        c('company admin grants 2 hours of support', A.rpc('grant_support', c=cid, hours=2)[0] == 200)
-        c('…then the platform owner can read (and the visit is logged)', len(P.get(f(0))[1]) >= 5 and P.rpc('owner_open_support', c=cid)[0] == 200)
-        c("…but still cannot write", put(P, 'users/adam.json', 'x', cid) == 403)
-        A.rpc('grant_support', c=cid, hours=0); c('support taken back: nothing again', P.get(f(0))[1] == [])
+        # ---------- the platform owner: full admin access to every company, logged ----------
+        c("platform owner reads any company's data", len(P.get(f(0))[1]) >= 5)
+        c('…opens it (logged)', P.rpc('owner_open', c=cid)[0] == 200)
+        c('…saves in it', put(P, 'users/adam.json', '{"by":"owner"}', cid) == 201 and put(P, 'users/platform-owner.json', '{}', cid) == 201)
+        st, acc = P.rpc('owner_accounts', c=cid)
+        c('…sees its accounts and open invitations', st == 200 and {a['member_id'] for a in acc} >= {'adam', 'yousef', 'sara'} and any(a['invited'] for a in acc), acc)
+        c('…manages accounts like its admin', P.rpc('set_member', c=cid, p_member='yousef', p_role='user', p_active=True)[0] == 200)
+        c('…is not counted as a seat', A.rpc('invite_member', c=cid, p_email='nora@acme.test', p_member='nora')[0] == 400)
+        log = sb.sql(f"select string_agg(action, ',') from public.audit where company_id = '{cid}';")
+        c("…and all of it is in the company's audit log", 'owner opened' in log and 'owner saved' in log, log)
+        n = sb.sql(f"select count(*) from public.audit where company_id = '{cid}' and action = 'owner saved';").strip()
+        c('…saves are grouped (one line per 10 minutes)', n == '1', n)
+        c('a company admin cannot use owner_open / owner_accounts', A.rpc('owner_open', c=cid)[0] == 403 and A.rpc('owner_accounts', c=cid)[0] == 403)
         # ---------- the admin manages people ----------
         st, e = A.rpc('set_member', c=cid, p_member='adam', p_role='user', p_active=True)
         c('the last admin cannot be made a user', st == 400 and 'admin' in (e or {}).get('message', ''), (st, e))
@@ -82,12 +89,13 @@ def main():
         c('platform owner pauses Acme', P.rpc('owner_set_company', c=cid, p_status='paused', p_seats=3)[0] == 200)
         mc = A.rpc('my_companies')[1]
         c('…its people see "paused" and no data', mc and mc[0]['status'] == 'paused' and A.get(f(0))[1] == [] and put(A, 'users/adam.json', 'x', cid) == 403, mc)
+        c('…the platform owner still can', len(P.get(f(0))[1]) >= 5)
         P.rpc('owner_set_company', c=cid, p_status='active', p_seats=5)
         c('…active again (5 seats)', len(A.get(f(0))[1]) >= 5)
         # ---------- audit ----------
         st, log = A.rpc('company_audit', c=cid); acts = {r['action'] for r in (log or [])}
-        c('audit log: created, invited, joined, support granted / visit / ended, member changed, company changed',
-          {'company created', 'invited', 'joined', 'support granted', 'support visit', 'support ended', 'member changed', 'company changed'} <= acts, sorted(acts))
+        c('audit log: created, invited, joined, owner opened / saved, member changed, company changed',
+          {'company created', 'invited', 'joined', 'owner opened', 'owner saved', 'member changed', 'company changed'} <= acts, sorted(acts))
         c('a user cannot read the audit log', U.rpc('company_audit', c=cid)[0] == 403)
         # ---------- re-invite a person who left, to a new email ----------
         A.rpc('set_member', c=cid, p_member='yousef', p_role='user', p_active=False)

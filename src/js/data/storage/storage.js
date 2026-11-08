@@ -276,6 +276,9 @@ const MahamStorage = {
     const teams = ((window.SEED_DATA || {}).records || []).find(r => r.id === 'settings-teams');
     const firstTeam = teams && teams.teams && teams.teams[0] ? teams.teams[0].id : '';
     Store.trustedPeople = (await CloudBackend.people(m.company_id)).map(p => Object.assign({ team: firstTeam }, p));
+    // the platform owner opens any company as an extra, hidden admin (every visit and save is in the company's audit log)
+    if (m.owner)
+      Store.trustedPeople.push({ id: m.member_id, name: 'Platform owner', admin: true, active: true, hidden: true, team: firstTeam });
     Store.cloudCompany = m;
     App.me = m.member_id;
     LS.set('bct.me', m.member_id);
@@ -307,7 +310,7 @@ const MahamStorage = {
       UI.confirm('Sign out of this account?', () => App.signOut());
     };
     await this.open(VFS.root(CloudBackend, 'MAHAM'), m.name || (this.cfg().cloud || {}).companyName || 'online');
-    if (typeof CompanySetup !== 'undefined' && !CloudBackend.supportVisit && CompanySetup.needed()) CompanySetup.open();
+    if (typeof CompanySetup !== 'undefined' && !CloudBackend.ownerVisit && CompanySetup.needed()) CompanySetup.open();
   },
   /* ---------- phone: "Add to Home Screen" (works when the app is served over https, e.g. GitHub Pages) ---------- */
   installable() {
@@ -329,10 +332,10 @@ const MahamStorage = {
     if (!foot) return;
     if (Store.storageMode === 'cloud') {
       const many = (MahamStorage.list || []).filter(m => m.active && m.status === 'active').length > 1;
-      if (CloudBackend.supportVisit)
+      if (CloudBackend.ownerVisit)
         foot.insertAdjacentHTML(
           'afterbegin',
-          '<div class="store-note warn"><b>Support visit — read only.</b> Nothing you change is saved. <a href="#" id="cl-leave">Leave</a></div>'
+          '<div class="store-note warn"><b>Platform owner</b> — what you do here is in this company\'s audit log. <a href="#" id="cl-leave">Owner Console</a></div>'
         );
       const lv = UI.$('#cl-leave');
       if (lv)

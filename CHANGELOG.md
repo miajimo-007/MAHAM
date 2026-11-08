@@ -4,14 +4,18 @@ Versions are dates (`YYYY.MM.DD.n`).
 
 ## 2026.11.08.5 — many companies (online)
 
-- **Three levels:** the platform owner (Owner Console: create, pause or delete companies, seats, invite an admin — no
-  company data), each company's **own admin** (the super admin of that company only) and its users. The database
+- **Three levels:** the platform owner (Owner Console: create, pause or delete companies, seats, invite an admin, and
+  full admin access to every company, always logged), each company's **own admin** (the super admin of that company only) and its users. The database
   keeps every company apart (row-level security) and checks seats, invitations and the last admin.
 - **Email sign-in:** sign in, create an account (invited emails only), forgot password, reset link. Someone in two
   companies chooses one; an account nobody invited sees nothing; a paused company opens for nobody.
 - **Admin → Company & accounts:** invite people (existing or new), Admin / User, turn accounts off, cancel
-  invitations, seats used, audit log, support access for 24 hours or 7 days (read-only visits, logged), delete the
-  company. First open of a new company: a short setup (company name, your name, teams).
+  invitations, seats used, audit log, delete the company.
+- **Platform owner has full admin access** to every company (also a paused one): Owner Console → **Accounts** (roles,
+  on / off, invitations) and **Open as admin** (all of its data, as a hidden "Platform owner"). Every opening, and the
+  owner's saves (grouped per 10 minutes), are in that company's audit log. First open of a new company: a short setup (company name, your name, teams).
+- **An admin is always an admin** (online): no "Switch to Admin" / "Back to analyst", and an admin is not part of a
+  team (not in team lists or scoring; sees every team). The shared-folder and this-device copies keep the two modes.
 - **GitHub Pages copy is online** (`pages/maham.config.js`). Tested against a real PostgreSQL running
   `supabase/schema.sql` (`test_cloud_rules`, `test_cloud_signin`, `test_cloud_console`).
 

@@ -52,11 +52,10 @@ const OwnerConsole = {
       msg = e.message;
     }
     const mine = (MahamStorage.list || []).filter(m => m.active && m.status === 'active');
-    const now = Date.now();
-    App.screen(`<h1>Owner Console</h1><p class="muted small">Signed in as <b>${U.h(CloudBackend.email())}</b>. You see each company's name, seats and size — not its data. You can read a company's data only while its admin allows support access, and every visit is in their audit log.</p>
+    App.screen(`<h1>Owner Console</h1><p class="muted small">Signed in as <b>${U.h(CloudBackend.email())}</b>. You have full admin access to every company. Each time you open a company, and what you save there, goes into that company's audit log (its admins can read it).</p>
       ${msg ? `<div class="insights warnbox"><div>${U.h(msg)}</div></div>` : ''}
       <div class="row-btns"><button class="btn primary" id="oc-new">＋ New company</button>${mine.length ? '<button class="btn" id="oc-mine">Open my company</button>' : ''}<span class="grow"></span><button class="btn ghost" id="oc-out">Sign out</button></div>
-      <div class="tbl-scroll"><table class="tbl oc-tbl"><thead><tr><th>Company</th><th>Status</th><th>People / seats</th><th>Admins</th><th>Open invitations</th><th>Data</th><th>Last saved</th><th>Support access</th><th></th></tr></thead><tbody>
+      <div class="tbl-scroll"><table class="tbl oc-tbl"><thead><tr><th>Company</th><th>Status</th><th>People / seats</th><th>Admins</th><th>Open invitations</th><th>Data</th><th>Last saved</th><th></th></tr></thead><tbody>
       ${
         list.length
           ? list
@@ -67,11 +66,10 @@ const OwnerConsole = {
                 ) => `<tr><td><b>${U.h(c.name)}</b><br><span class="muted small">since ${U.h(CloudUI.when(c.created_at).split(',')[0])}</span></td>
         <td>${c.status === 'active' ? UI.badge('active', 'good') : UI.badge('paused', 'warn')}</td><td class="ctr">${c.members} / ${c.seats}</td><td class="ctr">${c.admins}</td><td class="ctr">${c.invites}</td>
         <td class="nw">${c.data_kb >= 1024 ? (c.data_kb / 1024).toFixed(1) + ' MB' : c.data_kb + ' KB'}</td><td class="nw small">${U.h(CloudUI.when(c.last_save))}</td>
-        <td class="small">${c.support_until && Date.parse(c.support_until) > now ? `until ${U.h(CloudUI.when(c.support_until))}<br><button class="btn xs" data-ocvisit="${i}">Open (read only)</button>` : '<span class="muted">not allowed</span>'}</td>
-        <td class="nw"><button class="btn xs" data-ocedit="${i}">Status &amp; seats</button> <button class="btn xs" data-ocadmin="${i}">Invite an admin</button> <button class="btn xs ghost" data-ocdel="${i}">Delete</button></td></tr>`
+        <td class="nw"><button class="btn xs primary" data-ocvisit="${i}">Open as admin</button> <button class="btn xs" data-ocacc="${i}">Accounts</button> <button class="btn xs" data-ocedit="${i}">Status &amp; seats</button> <button class="btn xs" data-ocadmin="${i}">Invite an admin</button> <button class="btn xs ghost" data-ocdel="${i}">Delete</button></td></tr>`
               )
               .join('')
-          : '<tr><td colspan="9" class="muted">No companies yet — press <b>New company</b>.</td></tr>'
+          : '<tr><td colspan="8" class="muted">No companies yet — press <b>New company</b>.</td></tr>'
       }
       </tbody></table></div>`);
     const card = UI.$('.connect-card');
@@ -92,6 +90,7 @@ const OwnerConsole = {
     UI.$$('[data-ocadmin]').forEach(b => (b.onclick = () => OwnerConsole.invite(list[+b.dataset.ocadmin])));
     UI.$$('[data-ocdel]').forEach(b => (b.onclick = () => OwnerConsole.remove(list[+b.dataset.ocdel])));
     UI.$$('[data-ocvisit]').forEach(b => (b.onclick = () => OwnerConsole.visit(list[+b.dataset.ocvisit])));
+    UI.$$('[data-ocacc]').forEach(b => (b.onclick = () => OwnerConsole.accounts(list[+b.dataset.ocacc])));
   },
   create() {
     UI.modal({
@@ -198,30 +197,89 @@ const OwnerConsole = {
         }),
     });
   },
-  /* support visit: read only, as the company's first admin would see it; the database refuses any write anyway */
+  /* open a company as its admin (an extra, hidden admin "Platform owner"); logged in the company's audit log */
   async visit(c) {
     try {
-      await CloudUI.rpc('owner_open_support', { c: c.id });
-      const ms = await CloudUI.get(`/rest/v1/company_members?select=member_id,role,active&company_id=eq.${c.id}`);
-      const a = ms.find(m => m.role === 'admin' && m.active) || ms[0];
-      if (!a) return UI.toast('This company has nobody in it yet', 'bad');
-      CloudBackend.supportVisit = true;
-      CloudBackend.write = async (path, data) => ({ size: typeof data === 'string' ? data.length : 0, mtime: Date.now() }); // nothing is saved
-      CloudBackend.remove = async () => {};
-      CloudBackend.company = c.id;
-      App.canEdit = () => false;
+      await CloudUI.rpc('owner_open', { c: c.id });
+      CloudBackend.ownerVisit = true;
       history.replaceState(null, '', location.pathname + location.search);
-      await MahamStorage.cloudStart({
-        company_id: c.id,
-        member_id: a.member_id,
-        name: c.name,
-        role: 'support',
-        status: 'active',
-        active: true,
-      });
+      const m = { company_id: c.id, member_id: 'platform-owner', name: c.name, role: 'admin', status: c.status, active: true, owner: true };
+      CloudBackend.use(m);
+      await MahamStorage.cloudStart(m);
+      if (App.mode !== 'admin') App.switchMode('admin');
     } catch (e) {
       CloudUI.err(e);
     }
+  },
+  /* a company's accounts and open invitations: role, on / off, cancel, invite */
+  async accounts(c) {
+    let rows;
+    try {
+      rows = await CloudUI.rpc('owner_accounts', { c: c.id });
+    } catch (e) {
+      return CloudUI.err(e);
+    }
+    UI.modal({
+      title: `${c.name} — accounts`,
+      wide: true,
+      body: `<p class="muted small">${c.members} of ${c.seats} seats used${c.invites ? ` · ${c.invites} open invitation${c.invites > 1 ? 's' : ''}` : ''}. Changes are in the company's audit log.</p>
+        <div class="tbl-scroll"><table class="tbl"><thead><tr><th>Person (id)</th><th>Email</th><th>Access</th><th>Can sign in</th></tr></thead><tbody>
+        ${
+          rows
+            .map(a =>
+              a.invited
+                ? `<tr class="muted"><td>${U.h(a.member_id)}</td><td class="small">${U.h(a.email || '')}</td><td>${a.role === 'admin' ? 'Admin' : 'User'} · invited ${U.h(CloudUI.when(a.created_at).split(',')[0])}</td><td><button class="btn xs ghost" data-occancel="${U.h(a.member_id)}">Cancel invitation</button></td></tr>`
+                : `<tr data-ocm="${U.h(a.member_id)}"><td><b>${U.h(a.member_id)}</b></td><td class="small">${U.h(a.email || '')}</td><td><select data-ocrole><option value="user" ${a.role === 'user' ? 'selected' : ''}>User</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>Admin</option></select></td><td class="ctr"><input type="checkbox" data-ocact ${a.active ? 'checked' : ''}></td></tr>`
+            )
+            .join('') || '<tr><td colspan="4" class="muted">Nobody yet</td></tr>'
+        }
+        </tbody></table></div>`,
+      actions:
+        '<button class="btn" data-ocinv>＋ Invite an admin</button><span class="grow"></span><button class="btn primary" data-ocopen>Open as admin</button>',
+      onMount: w => {
+        const again = () => {
+          UI.closeModal();
+          OwnerConsole.open().then(() => OwnerConsole.accounts(c));
+        };
+        w.querySelectorAll('[data-ocm]').forEach(tr => {
+          const go = async () => {
+            try {
+              await CloudUI.rpc('set_member', {
+                c: c.id,
+                p_member: tr.dataset.ocm,
+                p_role: tr.querySelector('[data-ocrole]').value,
+                p_active: tr.querySelector('[data-ocact]').checked,
+              });
+              UI.toast(`${tr.dataset.ocm}: saved`, 'good');
+            } catch (e) {
+              CloudUI.err(e);
+              again();
+            }
+          };
+          tr.querySelector('[data-ocrole]').onchange = go;
+          tr.querySelector('[data-ocact]').onchange = go;
+        });
+        w.querySelectorAll('[data-occancel]').forEach(
+          b =>
+            (b.onclick = async () => {
+              try {
+                await CloudUI.rpc('cancel_invite', { c: c.id, p_member: b.dataset.occancel });
+                again();
+              } catch (e) {
+                CloudUI.err(e);
+              }
+            })
+        );
+        w.querySelector('[data-ocinv]').onclick = () => {
+          UI.closeModal();
+          OwnerConsole.invite(c);
+        };
+        w.querySelector('[data-ocopen]').onclick = () => {
+          UI.closeModal();
+          OwnerConsole.visit(c);
+        };
+      },
+    });
   },
 };
 
@@ -239,7 +297,7 @@ const CompanyAdmin = {
     let co, ms, inv, log;
     try {
       [[co], ms, inv, log] = await Promise.all([
-        CloudUI.get(`/rest/v1/companies?select=id,name,status,seats,support_until,created_at&id=eq.${cid}`),
+        CloudUI.get(`/rest/v1/companies?select=id,name,status,seats,created_at&id=eq.${cid}`),
         CloudUI.get(`/rest/v1/company_members?select=member_id,role,active,email,user_id&company_id=eq.${cid}`),
         CloudUI.get(`/rest/v1/invites?select=email,member_id,role,created_at&accepted_at=is.null&company_id=eq.${cid}`),
         CloudUI.rpc('company_audit', { c: cid, n: 100 }).catch(() => []),
@@ -255,7 +313,6 @@ const CompanyAdmin = {
       m => m.active !== false && !ms.some(x => x.member_id === m.id) && !inv.some(i => i.member_id === m.id)
     );
     const byUser = new Map(ms.map(m => [m.user_id, name(m.member_id)]));
-    const sup = co.support_until && Date.parse(co.support_until) > Date.now();
     const card = (t, b) => `<div class="card"><h3>${t}</h3>${b}</div>`;
     const what = a =>
       ({
@@ -270,6 +327,8 @@ const CompanyAdmin = {
         'support granted': 'Support access allowed',
         'support ended': 'Support access ended',
         'support visit': 'Support visit (read only)',
+        'owner opened': 'Platform owner opened the company',
+        'owner saved': 'Platform owner saved changes',
       })[a] || a;
     box.innerHTML =
       card(
@@ -300,19 +359,13 @@ const CompanyAdmin = {
         }</div>`
       ) +
       card(
-        'Support access',
-        `<p class="small">Your provider cannot see your data. If you need help, allow read-only access for a while — every visit is logged below.</p>
-        <p>${sup ? `${UI.badge('allowed', 'warn')} until <b>${U.h(CloudUI.when(co.support_until))}</b>` : UI.badge('not allowed', 'good')}</p>
-        <div class="row-btns"><button class="btn sm" data-co-sup="24">Allow 24 hours</button><button class="btn sm" data-co-sup="168">Allow 7 days</button>${sup ? '<button class="btn sm" data-co-sup="0">Stop now</button>' : ''}</div>`
-      ) +
-      card(
         'Audit log',
         `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead><tbody>
         ${
           (log || [])
             .map(
               r =>
-                `<tr><td class="nw small">${U.h(CloudUI.when(r.at))}</td><td class="small">${U.h(byUser.get(r.user_id) || (r.user_id ? 'provider' : 'system'))}</td><td>${U.h(what(r.action))}</td><td class="small muted">${U.h(
+                `<tr><td class="nw small">${U.h(CloudUI.when(r.at))}</td><td class="small">${U.h(byUser.get(r.user_id) || (r.user_id ? 'Platform owner' : 'system'))}</td><td>${U.h(what(r.action))}</td><td class="small muted">${U.h(
                   Object.entries(r.detail || {})
                     .map(([k, v]) => `${k}: ${v}`)
                     .join(' · ')
@@ -347,17 +400,6 @@ const CompanyAdmin = {
     box
       .querySelectorAll('[data-co-cancel]')
       .forEach(b => (b.onclick = () => act('cancel_invite', { c: cid, p_member: b.dataset.coCancel }, 'Invitation cancelled')));
-    box
-      .querySelectorAll('[data-co-sup]')
-      .forEach(
-        b =>
-          (b.onclick = () =>
-            act(
-              'grant_support',
-              { c: cid, hours: +b.dataset.coSup },
-              +b.dataset.coSup ? 'Support access allowed' : 'Support access stopped'
-            ))
-      );
     box.querySelector('#co-inv').onclick = () => CompanyAdmin.invite(noAcc);
     box.querySelectorAll('[data-co-invp]').forEach(
       a =>
@@ -510,17 +552,10 @@ const CompanySetup = {
               });
               Store.save(Object.assign({}, Store.get('settings-teams') || { id: 'settings-teams', c: 'settings' }, { teams: list }));
             }
-            const first = (Store.teams()[0] || {}).id || '';
             saveMembersAll(
               Store.members().map(m =>
                 m.id === App.me
-                  ? Object.assign({}, m, {
-                      name: v.name,
-                      short: v.short || v.name.split(' ')[0],
-                      me: v.name,
-                      team: m.team || first,
-                      scored: false,
-                    })
+                  ? Object.assign({}, m, { name: v.name, short: v.short || v.name.split(' ')[0], me: v.name, team: '', scored: false })
                   : m
               ),
               'Company set up'
@@ -573,5 +608,5 @@ const CompanySetup = {
     const h0 = head(tab);
     return CloudUI.on() ? h0 : h0.replace(/<a class="tab[^"]*" href="#\/admin\/company">[^<]*<\/a>/, '');
   };
-  ADMIN_FIND.push(['Company & accounts — invite people, admins, support access, audit log', 'company']);
+  ADMIN_FIND.push(['Company & accounts — invite people, admins, audit log', 'company']);
 })();

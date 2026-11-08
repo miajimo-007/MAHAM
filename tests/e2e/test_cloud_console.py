@@ -1,5 +1,5 @@
 """Online, many companies, in the browser against a real PostgreSQL: the platform owner's Owner Console (create a
-company, seats/pause, cannot read data, support visit only when allowed — read only); the company admin's first-time
+company, seats, its accounts, open any company as admin — logged); the company admin's first-time
 setup and Admin → Company & accounts (invite an existing or new person, make admin, turn off, cancel an invitation,
 allow support, audit log); the invited person signs in and is a user, not an admin."""
 import os, subprocess, sys, time
@@ -47,8 +47,8 @@ async def main():
             c('new company: shows the link to send the admin', url in await pg.input_value('.modal #cl-link'))
             await pg.click('.modal [data-done]'); await pg.wait_for_selector('.oc-tbl [data-ocedit]', timeout=10000)
             row = await pg.inner_text('.oc-tbl tbody tr')
-            c('Acme listed: 0 / 3 seats, 1 open invitation, support not allowed', 'Acme' in row and '0 / 3' in row and 'not allowed' in row, row)
-            c('no support visit button while not allowed', not await pg.query_selector('[data-ocvisit]'))
+            c('Acme listed: 0 / 3 seats, 1 open invitation', 'Acme' in row and '0 / 3' in row, row)
+            c('Open as admin and Accounts for every company', bool(await pg.query_selector('[data-ocvisit]')) and bool(await pg.query_selector('[data-ocacc]')))
             errors += pg.errors; await ctx.close()
             # ---------------- Acme's admin: first-time setup ----------------
             ctx, pg = await page()
@@ -59,6 +59,13 @@ async def main():
             await pg.click('.modal [data-ok]'); await pg.wait_for_selector('#coadm .card h3', timeout=20000); await pg.wait_for_timeout(800)
             st = await pg.evaluate("({ n: Store.member(App.me).name, teams: Store.teams().map(t => t.name).join(','), co: Store.cloudCompany.name })")
             c('setup saved: your name, teams, company name', st == {'n': 'Adam Admin', 'teams': 'Support,Finance', 'co': 'Acme Ltd'}, st)
+            st2 = await pg.evaluate("({ mode: App.mode, btn: !!document.querySelector('#modebtn, #modebar'), inTeam: Store.teams().some(t => Store.team(t.id).some(m => m.id === App.me)) })")
+            c('the admin is always in admin mode (no switch) and in no team', st2 == {'mode': 'admin', 'btn': False, 'inTeam': False}, st2)
+            await pg.evaluate("App.switchMode('analyst')"); await pg.wait_for_timeout(300)
+            c('…"back to analyst" does nothing', await pg.evaluate("App.mode") == 'admin')
+            r = await pg.evaluate("""(async () => { const o = UI.memberOptions(''); Store.save({ c: 'shadow', id: 'admin-test', analyst: App.me, team: Store.teams()[0].id, date: U.todayStr(), taskType: 'TRAINING >> x', source: 'Call', subject: 'Admin tries it', minutes: 10 }); await Store.flush();
+              return { pick: o.includes('value="' + App.me + '"'), saved: !!Store.get('admin-test'), all: ['shadow', 'todo', 'helpdesk', 'meeting', 'settings'].every(c => App.canEdit(c)) }; })()""")
+            c('…but has every function and can pick themself to try things', r == {'pick': True, 'saved': True, 'all': True}, r)
             c('…and opened Admin → Company & accounts', 'Company & accounts' in await pg.inner_text('.adm-tabs') and 'Accounts' in await pg.inner_text('#coadm'))
             c('seats: 1 used of 3', '1 used of 3' in await pg.inner_text('#coadm'))
             # invite a new person
@@ -76,8 +83,7 @@ async def main():
             omar = await pg.evaluate("Store.members().find(m => m.name === 'Omar One').id")
             await pg.click(f'[data-co-cancel="{omar}"]'); await pg.wait_for_timeout(1500)
             c('cancel an invitation frees the seat', '1 used + 1 invited of 3' in await pg.inner_text('#coadm'))
-            await pg.click('[data-co-sup="24"]'); await pg.wait_for_timeout(1500)
-            c('allow support for 24 hours', 'until' in await pg.inner_text('#coadm'))
+            c('no "support access" card any more', 'Support access' not in await pg.inner_text('#coadm'))
             await pg.evaluate("location.hash = '#/admin/people'"); await pg.wait_for_selector('[data-k=superAdmin]', timeout=15000)
             c("People: the admin tick follows the database (can't be ticked here)", await pg.evaluate("[...document.querySelectorAll('[data-k=superAdmin]')].every(i => i.disabled)"))
             await pg.screenshot(path=f'{SHOTS}/cloud_company_admin.png')
@@ -86,6 +92,7 @@ async def main():
             ctx, pg = await page()
             await signin(pg, 'sara@acme.test', 'sarapass11'); await pg.wait_for_selector('#main', timeout=30000); await pg.wait_for_timeout(800)
             st = await pg.evaluate("({ me: App.me, name: (Store.member(App.me) || {}).name, sup: Store.isSuper(App.me), setup: !!document.querySelector('.modal #cos') })")
+            c('a user has no admin switch and is in a team', not await pg.query_selector('#modebtn') and await pg.evaluate("Store.teams().some(t => Store.team(t.id).some(m => m.id === App.me))"))
             c('Sara opens as herself, a user (not admin), no setup', st['name'] == 'Sara Saleh' and not st['sup'] and not st['setup'], st)
             await pg.evaluate("App.switchMode('admin'); location.hash = '#/admin/company'"); await pg.wait_for_timeout(1200)
             c('…and cannot open Company & accounts', not await pg.query_selector('#coadm'))
@@ -103,17 +110,27 @@ async def main():
             c('turn Sara off', sb.sql(f"select active from public.company_members where member_id = '{sara}';").strip() == 'f')
             await pg.wait_for_selector('#coadm table', timeout=10000)
             log = await pg.inner_text('#coadm')
-            c('audit log shows invitations, joins, account changes, support', all(w in log for w in ('Invited', 'Joined', 'Account changed', 'Support access allowed', 'Invitation cancelled')), log[-600:])
+            c('audit log shows invitations, joins, account changes, support', all(w in log for w in ('Invited', 'Joined', 'Account changed', 'Invitation cancelled')), log[-600:])
             errors += pg.errors; await ctx.close()
-            # ---------------- the platform owner's support visit ----------------
+            # ---------------- the platform owner: accounts, then opens Acme as admin ----------------
             ctx, pg = await page()
-            await signin(pg, 'owner@platform.test', 'ownerpass1'); await pg.wait_for_selector('[data-ocvisit]', timeout=20000)
-            await pg.click('[data-ocvisit]'); await pg.wait_for_selector('#main', timeout=30000); await pg.wait_for_timeout(800)
-            c('support visit opens Acme read only, with a banner', 'Support visit' in await pg.inner_text('.side-foot') and await pg.evaluate("Store.members().some(m => m.name === 'Adam Admin')"))
-            before = sb.sql("select count(*), max(updated_at) from public.files;").strip()
-            await pg.evaluate("(async () => { Store.save({ c: 'shadow', id: 'support-try', analyst: App.me, date: U.todayStr(), subject: 'x', minutes: 5 }); await Store.flush(); })()"); await pg.wait_for_timeout(1000)
-            c('…nothing the visitor does is saved', sb.sql("select count(*), max(updated_at) from public.files;").strip() == before)
-            c('…and the visit is in the audit log', 'support visit' in sb.sql("select string_agg(action, ',') from public.audit;"))
+            await signin(pg, 'owner@platform.test', 'ownerpass1'); await pg.wait_for_selector('[data-ocacc]', timeout=20000)
+            await pg.click('[data-ocacc]'); await pg.wait_for_selector('.modal [data-ocm]', timeout=10000)
+            t = await pg.inner_text('.modal')
+            c("Accounts: every account and invitation of the company", 'admin@acme.test' in t and 'sara@acme.test' in t, t[:300])
+            await pg.check(f'.modal [data-ocm="{sara}"] [data-ocact]'); await pg.wait_for_timeout(1200)
+            c('…the owner turns Sara on again', sb.sql(f"select active from public.company_members where member_id = '{sara}';").strip() == 't')
+            await pg.click('.modal [data-ocopen]'); await pg.wait_for_selector('#main', timeout=30000); await pg.wait_for_timeout(800)
+            st = await pg.evaluate("({ me: App.me, admin: App.mode === 'admin' && App.realSuper(), adam: Store.members().some(m => m.name === 'Adam Admin'), setup: !!document.querySelector('.modal #cos') })")
+            c('Open as admin: inside Acme, in admin mode, with its data, no setup', st == {'me': 'platform-owner', 'admin': True, 'adam': True, 'setup': False}, st)
+            c('…with the "Platform owner — in the audit log" note', 'Platform owner' in await pg.inner_text('.side-foot'))
+            await pg.evaluate("(async () => { Store.save({ c: 'shadow', id: 'owner-try', analyst: 'adam', team: Store.teams()[0].id, date: U.todayStr(), taskType: 'TRAINING >> x', source: 'Call', subject: 'Owner was here', minutes: 5 }); await Store.flush(); })()"); await pg.wait_for_timeout(1200)
+            c('…and can save in it', 'Owner was here' in sb.sql("select string_agg(content, '') from public.files;"))
+            acts = sb.sql("select string_agg(action, ',') from public.audit;")
+            c("…all of it in Acme's audit log", 'owner opened' in acts and 'owner saved' in acts, acts)
+            await pg.evaluate("location.hash = '#/admin/company'"); await pg.wait_for_selector('#coadm table', timeout=20000); await pg.wait_for_timeout(500)
+            log = await pg.inner_text('#coadm')
+            c("…which the company's admin page shows", 'Platform owner opened the company' in log and 'Platform owner saved changes' in log)
             errors += pg.errors; await ctx.close()
             c('no page errors', not errors, errors[:3])
             await b.close()

@@ -2,9 +2,9 @@
 -- Run once in Supabase → SQL Editor → New query → Run. Safe to run again after an update (it only adds / replaces).
 --
 -- Who is who
---   * Platform owner (you): runs the Owner Console — creates companies, invites each company's first admin, pauses or
---     deletes a company, sets its seats. Does NOT see a company's data, unless that company's admin grants
---     time-limited support access (every grant and every support visit is in the audit log).
+--   * Platform owner (you): runs the Owner Console — creates companies, invites admins, pauses or deletes a company,
+--     sets its seats — and has full admin access to every company (accounts and data). Every time the platform owner
+--     opens a company, and their saves there, are written to that company's audit log, which its admins can read.
 --   * Company admin: the super admin of their own company only (people, invitations, settings, data).
 --   * Users: everyone else in a company.
 -- Every company's data is kept apart HERE, by row-level security — not by the app.
@@ -108,14 +108,17 @@ $$;
 create or replace function public.company_active(c uuid) returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from companies where id = c and status = 'active');
 $$;
+-- the platform owner counts as an admin of every company (also a paused one); everything they do there is logged
 create or replace function public.is_member(c uuid) returns boolean language sql stable security definer set search_path = public as $$
-  select public.company_active(c) and exists (select 1 from company_members where company_id = c and user_id = auth.uid() and active);
+  select (public.is_platform_owner() and exists (select 1 from companies where id = c))
+      or (public.company_active(c) and exists (select 1 from company_members where company_id = c and user_id = auth.uid() and active));
 $$;
 create or replace function public.is_admin(c uuid) returns boolean language sql stable security definer set search_path = public as $$
-  select public.company_active(c) and exists (select 1 from company_members where company_id = c and user_id = auth.uid() and active and role = 'admin');
+  select (public.is_platform_owner() and exists (select 1 from companies where id = c))
+      or (public.company_active(c) and exists (select 1 from company_members where company_id = c and user_id = auth.uid() and active and role = 'admin'));
 $$;
 create or replace function public.has_support(c uuid) returns boolean language sql stable security definer set search_path = public as $$
-  select public.is_platform_owner() and exists (select 1 from companies where id = c and support_until > now());
+  select public.is_platform_owner() and exists (select 1 from companies where id = c);
 $$;
 create or replace function public.my_member_id(c uuid) returns text language sql stable security definer set search_path = public as $$
   select member_id from company_members where company_id = c and user_id = auth.uid() and active;
@@ -163,7 +166,7 @@ create policy invites_read on public.invites for select using (public.is_admin(c
 
 -- files: read the whole company (or with a support grant); write your own files and backups; admins write any
 drop policy if exists files_read on public.files;
-create policy files_read on public.files for select using (public.is_member(company_id) or public.has_support(company_id));
+create policy files_read on public.files for select using (public.is_member(company_id));
 drop policy if exists files_write on public.files;
 create policy files_write on public.files for insert with check (
   public.is_member(company_id) and (public.is_admin(company_id) or public.is_own_file(company_id, path) or path like 'MAHAM Data/Backups/%'));
@@ -177,6 +180,22 @@ create policy files_delete on public.files for delete using (
 -- audit: the company's admins read their company's log; the platform owner reads all
 drop policy if exists audit_read on public.audit;
 create policy audit_read on public.audit for select using (public.is_admin(company_id) or public.is_platform_owner());
+
+-- the platform owner's saves in a company go to its audit log (at most one line per 10 minutes, with the files saved)
+create or replace function public.files_owner_log() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_platform_owner() and not exists (select 1 from company_members where company_id = new.company_id and user_id = auth.uid() and active) then
+    if exists (select 1 from audit where company_id = new.company_id and user_id = auth.uid() and action = 'owner saved' and at > now() - interval '10 minutes') then
+      update audit set detail = jsonb_set(detail, '{files}', to_jsonb(least(coalesce((detail ->> 'files')::int, 1) + 1, 100000)))
+       where id = (select max(id) from audit where company_id = new.company_id and user_id = auth.uid() and action = 'owner saved');
+    else
+      insert into audit (company_id, action, detail) values (new.company_id, 'owner saved', jsonb_build_object('files', 1, 'first', new.path));
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists files_owner_log on public.files;
+create trigger files_owner_log after insert or update on public.files for each row execute function public.files_owner_log();
 
 -- ---------------------------------------------------------------- functions the app calls
 -- the companies I belong to (or was invited to), with my role there
@@ -335,12 +354,25 @@ begin
   delete from companies where id = c;
 end $$;
 
--- a support visit (only while the company's grant lasts) — recorded in that company's audit log
-create or replace function public.owner_open_support(c uuid) returns boolean language plpgsql security definer set search_path = public as $$
+-- the platform owner opens a company (as its admin) — recorded in that company's audit log
+create or replace function public.owner_open(c uuid) returns boolean language plpgsql security definer set search_path = public as $$
 begin
-  if not public.has_support(c) then raise exception 'This company has not granted support access' using errcode = '42501'; end if;
-  perform public.log(c, 'support visit', '{}');
+  if not public.is_platform_owner() then raise exception 'Platform owner only' using errcode = '42501'; end if;
+  if not exists (select 1 from companies where id = c) then raise exception 'No such company'; end if;
+  perform public.log(c, 'owner opened', '{}');
   return true;
+end $$;
+drop function if exists public.owner_open_support(uuid);
+-- the accounts of a company, for the Owner Console
+create or replace function public.owner_accounts(c uuid) returns table (member_id text, email text, role text, active boolean, invited boolean, created_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_platform_owner() then raise exception 'Platform owner only' using errcode = '42501'; end if;
+  return query
+    select m.member_id, m.email, m.role, m.active, false, m.created_at from company_members m where m.company_id = c
+    union all
+    select i.member_id, i.email, i.role, true, true, i.created_at from invites i where i.company_id = c and i.accepted_at is null
+    order by 5, 1;
 end $$;
 
 -- the company's audit log (its admins; the platform owner)
@@ -359,7 +391,7 @@ revoke insert, update, delete on public.companies, public.company_members, publi
 grant execute on function public.my_companies(), public.accept_invites(), public.invite_member(uuid, text, text, text), public.cancel_invite(uuid, text),
   public.set_member(uuid, text, text, boolean), public.rename_company(uuid, text), public.grant_support(uuid, integer), public.delete_my_company(uuid, text),
   public.owner_companies(), public.owner_create_company(text, text, text, integer), public.owner_set_company(uuid, text, integer),
-  public.owner_invite_admin(uuid, text, text), public.owner_delete_company(uuid, text), public.owner_open_support(uuid), public.company_audit(uuid, integer),
+  public.owner_invite_admin(uuid, text, text), public.owner_delete_company(uuid, text), public.owner_open(uuid), public.owner_accounts(uuid), public.company_audit(uuid, integer),
   public.is_platform_owner(), public.is_member(uuid), public.is_admin(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------------------------------------------

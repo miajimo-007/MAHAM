@@ -53,18 +53,18 @@ The anon key is meant to be public; the database's row-level security decides wh
 3. The admin invites their own people in **Admin → Company & accounts** (an existing person in Admin → People, or a
    new one) and sends them the link. Each person chooses **Create account** with the invited email.
 4. In the same place the admin makes people **Admin** or **User**, turns accounts off, cancels invitations, sees the
-   seats used, the **audit log**, allows **support access** for 24 hours or 7 days, and can delete the company.
+   seats used, the **audit log**, and can delete the company.
 
 An account nobody invited sees nothing. Someone invited by two companies chooses one when signing in.
 "Switch person" becomes **Sign out**. Forgot password sends a link by email.
 
 ## Who sees what
 
-| Who                  | Can                                                                                                                                                               |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Platform owner (you) | Owner Console: create / pause / delete companies, seats, invite an admin. **No company data** — only read-only support visits while a company allows it (logged). |
-| Company admin        | Everything in their own company (the app's super admin), people and invitations.                                                                                  |
-| User                 | Their company's app, by the app's normal permissions; writes only their own data file.                                                                            |
+| Who                  | Can                                                                                                                                                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform owner (you) | Owner Console: create / pause / delete companies, seats, accounts, invite an admin — and **Open as admin** in any company (all of its data). Every opening and every save there is in that company's audit log. |
+| Company admin        | Everything in their own company (the app's super admin), people and invitations.                                                                                                                                |
+| User                 | Their company's app, by the app's normal permissions; writes only their own data file.                                                                                                                          |
 
 ## What the database enforces
 
