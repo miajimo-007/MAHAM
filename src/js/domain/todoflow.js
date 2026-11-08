@@ -48,7 +48,7 @@ const TodoFlow = {
   whoLabel(w) {
     if (!w) return '';
     if (w.startsWith('m:')) return Store.memberShort(w.slice(2)) || w.slice(2);
-    return (TodoFlow.WHO.find(x => x[0] === w) || [, w])[1];
+    return (TodoFlow.WHO.find(x => x[0] === w) || ['', w])[1];
   },
   resolve(who, team, not) {
     const no = new Set((not || []).filter(Boolean));
