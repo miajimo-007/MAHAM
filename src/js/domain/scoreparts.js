@@ -134,7 +134,11 @@ const ScoreParts = {
         ).length;
       case 'central':
         return Store.all('central', '*').filter(
-          r => r.analyst === mid && r.status === 'Solved' && ScoreParts.inMonth(U.ds(new Date(r._ts || 0)), y, mo)
+          r =>
+            r.analyst === mid &&
+            (typeof FollowUp !== 'undefined'
+              ? FollowUp.isSolved(r) && ScoreParts.inMonth(FollowUp.doneDay(r), y, mo)
+              : r.status === 'Solved' && ScoreParts.inMonth(U.ds(new Date(r._ts || 0)), y, mo))
         ).length;
       case 'present': {
         const d = ScoreParts.monthDays(y, mo);

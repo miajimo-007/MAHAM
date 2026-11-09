@@ -76,7 +76,7 @@ const TimeRulesUI = {
       ${card('Requests (leave, permission …)', `<div class="grid-form">${n('r_days', 'Days to decide', R.requests.approveDays)}</div>`)}
       </div><div>
       ${card('Project tasks', `<div class="grid-form">${n('k_grace', 'Grace days after the due date', R.ptask.grace)}<div></div>${n('k_pct', 'Project at risk: % of tasks late', R.ptask.riskLatePct)}${n('k_left', '…or working days to its due date (with work left)', R.ptask.riskDaysLeft)}</div>`)}
-      ${card('Follow-ups and quick wins', `<div class="grid-form">${n('s_fu', 'Follow-up stuck after (days)', R.stuck.followup)}${n('s_qw', 'Quick win stuck after (days)', R.stuck.quickwin)}</div>`)}
+      ${card('Follow-ups and quick wins', `<div class="grid-form">${n('s_fu', 'Follow-up stuck after (days)', R.stuck.followup)}${n('s_qw', 'Quick win stuck after (days)', R.stuck.quickwin)}</div><p class="muted small">Central follow-ups — working days since the last chase or move:</p><div class="grid-form">${n('ry_a', 'Need analyst follow-up after', R.central.analyst)}${n('ry_l', 'Need team leader follow-up after', R.central.leader)}${n('ry_m', 'Need manager follow-up after', R.central.manager)}${n('ry_c', 'Next chase after (working days)', R.central.chase)}</div>`)}
       ${card(
         'Escalation',
         `<div class="grid-form">${n('e_mgr', 'On the Manager Desk at (days late)', R.escalate.manager)}${n('e_dir', 'On the Director Desk at (days late)', R.escalate.director)}</div><p class="muted small">Counted after the grace days, in working days, from the item's <b>last update</b> (any note, status change or edit restarts the clock). Only work opened after the time rules started counts.</p>
@@ -118,6 +118,12 @@ const TimeRulesUI = {
             requests: { approveDays: num('r_days') },
             ptask: { grace: num('k_grace'), riskLatePct: num('k_pct'), riskDaysLeft: num('k_left') },
             stuck: { followup: num('s_fu'), quickwin: num('s_qw') },
+            central: {
+              analyst: num('ry_a'),
+              leader: Math.max(num('ry_l'), num('ry_a')),
+              manager: Math.max(num('ry_m'), num('ry_l'), num('ry_a')),
+              chase: Math.max(1, num('ry_c')),
+            },
             escalate: { manager: num('e_mgr'), director: Math.max(num('e_dir'), num('e_mgr')) },
             show: Object.fromEntries([...root.querySelectorAll('[data-show]')].map(i => [i.dataset.show, i.checked])),
           };

@@ -15,6 +15,7 @@ const TimeRules = {
     requests: { approveDays: 2 },
     ptask: { grace: 0, riskLatePct: 20, riskDaysLeft: 7 },
     stuck: { followup: 14, quickwin: 30 },
+    central: { analyst: 30, leader: 60, manager: 90, chase: 7 },
     escalate: { manager: 2, director: 5 },
     show: { todo: true, helpdesk: true, requests: true, ptask: true, quickwin: true, followup: true },
   },
@@ -247,8 +248,15 @@ const TimeRules = {
         }
       if (on(R, 'followup'))
         for (const q of Store.all('central', team)) {
-          if (!['Under Review', 'Accepted', ''].includes(q.status || '') || !q.date || q.date < S0) continue;
-          const n = TimeRules.workBetween(TimeRules.lastMove(q.date, q), today, off) - +R.stuck.followup;
+          if (
+            !(typeof FollowUp !== 'undefined' ? FollowUp.isOpen(q) : ['Under Review', 'Accepted', ''].includes(q.status || '')) ||
+            !q.date ||
+            q.date < S0
+          )
+            continue;
+          const n =
+            TimeRules.workBetween(typeof FollowUp !== 'undefined' ? FollowUp.lastTouch(q) : TimeRules.lastMove(q.date, q), today, off) -
+            +R.stuck.followup;
           const l = lvl(R, n);
           if (l)
             push({

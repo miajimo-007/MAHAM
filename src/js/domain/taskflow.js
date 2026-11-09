@@ -36,11 +36,28 @@ const TaskFlow = {
     ['actual', 'Actual hours'],
   ],
   /* the screen / field lists include the custom fields admins add (Work.custom) */
+  FU_FIELDS: [
+    ['redmine', 'Reference no. (follow-ups)'],
+    ['expected', 'Expected date (follow-ups)'],
+  ],
+  fuMode() {
+    return typeof TFE !== 'undefined' && TFE.scope === 'fu';
+  },
   get SCREEN() {
+    if (TaskFlow.fuMode())
+      return TaskFlow.SCREEN_BASE.filter(x => ['comment', 'resolution'].includes(x[0])).concat(
+        TaskFlow.FU_FIELDS,
+        Work.custom('fu').map(f => [f.key, f.label])
+      );
     return TaskFlow.SCREEN_BASE.concat(typeof Work !== 'undefined' ? Work.allCustom().map(f => [f.key, f.label]) : []);
   },
   get FIELDS() {
-    return TaskFlow.FIELDS_BASE.concat(typeof Work !== 'undefined' ? Work.allCustom().map(f => [f.key, f.label]) : []);
+    if (TaskFlow.fuMode())
+      return TaskFlow.FU_FIELDS.concat(
+        [['resolution', 'Resolution']],
+        Work.custom('fu').map(f => [f.key, f.label])
+      );
+    return TaskFlow.FIELDS_BASE.concat(typeof Work !== 'undefined' ? Work.allCustom().map(f => [f.key, f.label]) : [], TaskFlow.FU_FIELDS);
   },
   /* the rule library: key → label (the editor shows these; config sits on the rule object) */
   CONDS: {
@@ -525,7 +542,7 @@ const TaskFlow = {
         : [];
     TaskFlow._running = true;
     try {
-      Schemas.ptask.beforeSave(r, t);
+      (Schemas[t.c] || Schemas.ptask).beforeSave(r, t);
     } finally {
       TaskFlow._running = false;
     }
@@ -649,8 +666,11 @@ const TaskFlow = {
     opts = opts || {};
     const tr = opts.approving ? TaskFlow.forTask(t).trs.find(x => x.id === trId) : (TaskFlow.moves(t).find(x => x.tr.id === trId) || {}).tr;
     if (!tr) return 'That move is not allowed from ' + (t.status || 'here');
-    if (!opts.approving && !Scrum.canWork(t) && !(Scrum.member(Scrum.proj(t.project)) && !t.assignee))
-      return 'You can only move your own tasks';
+    if (
+      !opts.approving &&
+      !(TaskFlow.canMove ? TaskFlow.canMove(t) : Scrum.canWork(t) || (Scrum.member(Scrum.proj(t.project)) && !t.assignee))
+    )
+      return 'You can only move your own items';
     if (!opts.approving && t.pending) return 'Waiting for an approval — ' + (t.pending.trName || '');
     const miss = opts.approving ? (tr.valid || []).map(v => TaskFlow.validFail(v, t, form)).filter(Boolean) : TaskFlow.check(t, tr, form);
     if (miss.length) return 'First ' + miss.join(', ');
@@ -684,7 +704,7 @@ const TaskFlow = {
         }));
       TaskFlow._running = true;
       try {
-        Schemas.ptask.beforeSave(r, t);
+        (Schemas[t.c] || Schemas.ptask).beforeSave(r, t);
       } finally {
         TaskFlow._running = false;
       }
@@ -709,7 +729,7 @@ const TaskFlow = {
     }
     TaskFlow._running = true;
     try {
-      Schemas.ptask.beforeSave(r, t);
+      (Schemas[t.c] || Schemas.ptask).beforeSave(r, t);
     } finally {
       TaskFlow._running = false;
     }

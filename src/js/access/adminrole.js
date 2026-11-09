@@ -106,6 +106,7 @@ const AdminRole = {
       const t = String(id || '').match(/^settings-task(?:flow|fields)(?:-(.+))?$/);
       if (t) return ['workflows', t[1] || '*'];
     }
+    if (id === 'settings-fuflow') return ['workflows', '*'];
     if (id === 'settings-holidays') return ['timerules', '*'];
     if (id === 'settings-projectlists') return ['lists', '*'];
     if (['settings-teams', 'settings-depts', 'settings-requests', 'settings-userdepts'].includes(id)) return ['teams', '*'];

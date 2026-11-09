@@ -657,3 +657,13 @@ select.xs {
     grid-template-columns: 1fr;
   }
 }
+.tf-st {
+  white-space: nowrap;
+}
+[data-tbl='riy'] tbody td:first-child {
+  white-space: nowrap;
+}
+[data-tbl='riy'] .row-btns {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}

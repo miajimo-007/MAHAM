@@ -51,7 +51,11 @@ const Handover = {
       r => r.analyst === id && !qwHistory(r) && U.lc(r.status) !== 'completed' && U.lc(r.status) !== 'rejected'
     ))
       out.push({ c: 'quickwin', id: r.id, title: r.subject, kind: 'Quick win' });
-    for (const r of Store.all('central', '*').filter(r => r.analyst === id && ['Under Review', 'Accepted', ''].includes(r.status || '')))
+    for (const r of Store.all('central', '*').filter(
+      r =>
+        r.analyst === id &&
+        (typeof FollowUp !== 'undefined' ? FollowUp.isOpen(r) : ['Under Review', 'Accepted', ''].includes(r.status || ''))
+    ))
       out.push({ c: 'central', id: r.id, title: r.subject || r.reqId || 'Follow-up', kind: 'Follow-up' });
     for (const r of Store.all('action', '*').filter(r => r.who === id && r.status !== 'Done'))
       out.push({ c: 'action', id: r.id, title: r.text || r.title || 'Meeting action', kind: 'Meeting action' });
