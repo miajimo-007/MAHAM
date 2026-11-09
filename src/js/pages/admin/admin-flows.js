@@ -6,7 +6,7 @@ const WF = { draft: null, maps: {} };
 
 function adminFlows() {
   if (WF.draft) return flowEditor();
-  const list = Flow.list();
+  const list = Flow.list().filter(AdminUI.flowVisible);
   const html = `<div class="page-actions"><span class="muted small">A workflow is the path a project follows — its stages, which moves are allowed, who may make them, which need an approval and what must be done first. Pick it in the project form.</span><span class="grow"></span><button class="btn" id="wfex">Start from example</button><button class="btn primary" id="wfnew">＋ New workflow</button></div>
   ${
     list.length
@@ -37,7 +37,7 @@ function adminFlows() {
         open({
           id: U.uid('wf'),
           name: '',
-          team: '',
+          team: AdminUI.flowTeam(),
           start: 's1',
           statuses: [
             { id: 's1', name: 'To Do', color: '#64748b', group: 'Not Started', alert: 0 },
@@ -87,7 +87,7 @@ function flowEditor() {
   const has = (f, t) => (w.moves || []).some(m => m.from === f && m.to === t);
   const sOpt = (sel, list) => list.map(([v, l]) => `<option value="${h(v)}" ${v === sel ? 'selected' : ''}>${h(l)}</option>`).join('');
   const html = `<div class="page-actions"><button class="btn ghost" id="wfback">← Workflows</button><span class="grow"></span><button class="btn" id="wfcancel">Cancel</button><button class="btn primary" id="wfsave">Save workflow</button></div>
-  ${card('Workflow', `<form class="grid-form" id="wfh">${UI.field({ key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. Enhancement (SRS)' }, w.name)}${UI.field({ key: 'team', label: 'For', type: 'select', options: [['', 'Every team'], ...Store.teams().map(t => [t.id, t.name])], blank: false }, w.team || '')}</form>`)}
+  ${card('Workflow', `<form class="grid-form" id="wfh">${UI.field({ key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. Enhancement (SRS)' }, w.name)}${UI.field({ key: 'team', label: 'For', type: 'select', options: AdminUI.flowTeamOpts(Store.teams()), blank: false }, w.team || '')}</form>`)}
   ${card(
     '1 · Stages',
     `<p class="muted small">In order. The <b>group</b> tells the rest of the app what the stage means (progress, Director Desk, Performance). <b>Alert after</b> = warn the project owner when a project stays longer than this many days (0 = never).</p>

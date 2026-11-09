@@ -71,6 +71,7 @@ Object.assign(Store, {
     'chainTask',
     'stepNo',
     'stepName',
+    'extensions',
   ],
   QW_MGR_FIELDS: ['approval', 'qwId', 'managerComment'],
   QW_LOCKED_FIELDS: ['subject', 'date', 'expected', 'module', 'type', 'impact', 'analyst', 'coWorkers'],

@@ -448,12 +448,18 @@ App.navHtml = function () {
       sec(x.g, x.g === 'Home' ? homeName : Custom.groupName(x.g), x.g === 'Home' && deskName ? '★' : Config.NAV_ICONS[x.g] || '•', x.items)
     )
     .join('');
-  const admin = App.isSuper()
-    ? sec('Admin', 'Admin', '⚙', [
-        a('#/admin', 'admin', '⛨', 'Admin'),
-        a('#/syscheck', 'syscheck', '✓', 'System Check'),
-        ...(App.isDir() ? [] : [a('#/importdata', 'importdata', '⇪', 'Import Old Data')]),
-      ])
-    : '';
+  const admin =
+    !App.isSuper() && AdminRole.any(App.me)
+      ? sec('Admin', 'Admin', '⚙', [
+          a('#/admin', 'admin', '⛨', 'Admin'),
+          ...(AdminRole.can(App.me, 'syscheck') ? [a('#/syscheck', 'syscheck', '✓', 'System Check')] : []),
+        ])
+      : App.isSuper()
+        ? sec('Admin', 'Admin', '⚙', [
+            a('#/admin', 'admin', '⛨', 'Admin'),
+            a('#/syscheck', 'syscheck', '✓', 'System Check'),
+            ...(App.isDir() ? [] : [a('#/importdata', 'importdata', '⇪', 'Import Old Data')]),
+          ])
+        : '';
   return `<nav>${body}<div class="nav-bottom">${admin}<div class="nav-mini">${a('#/feedback', 'feedback', '💡', 'Feedback')}${a('#/about', 'about', '✦', 'About ' + U.h(Store.appName()))}</div></div></nav>`;
 };

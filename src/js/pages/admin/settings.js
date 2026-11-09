@@ -67,8 +67,8 @@ P.settings = mode => {
       if (ea) ea.onclick = exportAll;
       const sp = root.querySelector('#setmypin');
       if (sp) sp.onclick = () => App.setPin();
-      if (!App.can('manageTeam')) return;
-      bindPerms(root);
+      if (!App.can('manageTeam') && !AdminRole.any(App.me)) return;
+      if (App.isSuper() || App.can('manageTeam')) bindPerms(root);
       (root.querySelector('#addmember') || {}).onclick = () => {
         UI.modal({
           title: 'Add team member',

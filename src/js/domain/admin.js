@@ -10,7 +10,7 @@ const Admin = {
   LOGGED: r => r && ((r.c === 'settings' && !/^settings-meta(-|$)/.test(r.id)) || (r.c === 'userpin' && r.member !== App.me)),
   /* called by Store.saveMany (before the records are stamped) → log records to save with them */
   logFor(list) {
-    if (!App.me || App.preview || !Store.isSuper(App.me)) return [];
+    if (!App.me || App.preview || !(Store.isSuper(App.me) || (typeof AdminRole !== 'undefined' && AdminRole.any(App.me)))) return []; // super admin and Admins: their setting changes can be undone
     const out = [];
     for (const r of list) {
       if (!Admin.LOGGED(r) || r._nolog) continue;

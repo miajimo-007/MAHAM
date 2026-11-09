@@ -2,6 +2,19 @@
 
 Versions are dates (`YYYY.MM.DD.n`).
 
+## 2026.11.09.1
+
+- **Admin role** (shared-folder and this-device copies): the super admin gives a person some admin areas (Scoring, Time
+  rules, Workflows, People limited, Lists, Teams, Help desk months, Announcements, Feedback, System Check / Activity log
+  view), for their own team or all teams; templates; acting managers inherit them; checked by the trust rules at the
+  time of each change. Online companies keep their database roles (admin / user).
+- **Time rules & holidays**: per-team rules for when work is late, working days (weekend, holidays, leave, confirmed
+  holds), on hold, extensions with reasons, asking for more time, escalation to the manager and director desks,
+  preview, Ramadan hours, printable rules.
+- **Projects in the monthly score** (weight 0 until set), no penalty for parts with nothing to score (from November
+  2026), "Why is my score …?".
+- **Analyst handover** with notes, accept, one-click hand on and give back.
+
 ## 2026.11.08.5 — many companies (online)
 
 - **Three levels:** the platform owner (Owner Console: create, pause or delete companies, seats, invite an admin, and

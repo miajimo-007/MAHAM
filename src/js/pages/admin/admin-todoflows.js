@@ -6,7 +6,7 @@
 
 function adminTodoFlows() {
   const set = TodoFlow.set();
-  const list = set.list || [];
+  const list = (set.list || []).filter(AdminUI.flowVisible);
   const types = set.types || [];
   const inUse = id =>
     (Store.byC.todo || []).filter(t => t && !t._del && t.wf === id && t.status !== 'Resolved' && t.status !== 'Canceled').length;
@@ -31,7 +31,7 @@ function adminTodoFlows() {
     }
     <div class="row-btns" style="margin-top:10px"><button class="btn primary sm" id="tfwnew">＋ New To Do workflow</button><button class="btn sm ghost" id="tfwex">Start from example</button></div>
     <div class="tfw-types"><b class="small">To Do types</b> <span class="muted small">(shown as “Type” in the To Do form; a workflow can be used by itself for some types)</span>
-      <div class="row-btns" style="margin-top:6px"><input id="tfwtypes" value="${h(types.join(', '))}" placeholder="e.g. Order set change, Report request, Access request" style="flex:1"><button class="btn sm" id="tfwtsave">Save types</button></div></div>`
+      <div class="row-btns" style="margin-top:6px" ${AdminUI.flowAll() ? '' : 'hidden'}><input id="tfwtypes" value="${h(types.join(', '))}" placeholder="e.g. Order set change, Report request, Access request" style="flex:1"><button class="btn sm" id="tfwtsave">Save types</button></div></div>`
   );
   return {
     html,
@@ -51,7 +51,7 @@ function adminTodoFlows() {
           {
             id: U.uid('tfw'),
             name: '',
-            team: '',
+            team: AdminUI.flowTeam(),
             types: [],
             steps: [{ name: 'Validation', who: 'pick', days: 2, needNote: false, notSame: true, backTo: '' }],
           },
@@ -62,7 +62,7 @@ function adminTodoFlows() {
           {
             id: U.uid('tfw'),
             name: 'Validate and test',
-            team: '',
+            team: AdminUI.flowTeam(),
             types: [],
             steps: [
               { name: 'Validation', who: 'teamleader', days: 2, needNote: false, notSame: true, backTo: '' },
@@ -99,7 +99,7 @@ function tfwEdit(w, isNew) {
   const teams = Store.teams();
   const body = () => `<form class="grid-form" id="tfwf">
       ${UI.field({ key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. Validate and test' }, w.name)}
-      ${UI.field({ key: 'team', label: 'For', type: 'select', options: [['', 'Every team']].concat(teams.map(t => [t.id, t.name])), blank: false }, w.team)}
+      ${UI.field({ key: 'team', label: 'For', type: 'select', options: AdminUI.flowTeamOpts(teams), blank: false }, w.team)}
       <div class="fld span2"><label>Used by itself for these To Do types <span class="muted small">(optional — managers can also pick it in the form)</span></label><div class="row-btns wrap">${
         TodoFlow.types().length
           ? TodoFlow.types()

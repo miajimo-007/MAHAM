@@ -82,6 +82,12 @@ Object.assign(Store, {
         continue;
       }
       if (superIn(cur.members, x.r._by)) cur = x.r;
+      else if (
+        !Array.isArray(Store.trustedPeople) &&
+        typeof AdminRole !== 'undefined' &&
+        AdminRole.peopleOk(cur.members, x.r.members, x.r._by, x.r._ts > 1000 ? U.ds(new Date(x.r._ts)) : '')
+      )
+        cur = Object.assign({}, x.r, { _admin: x.r._by });
       else {
         // not a super admin: keep only their own PIN change, on top of the current trusted list
         const mine = (x.r.members || []).find(m => m.id === x.r._by);
@@ -128,13 +134,47 @@ Object.assign(Store, {
     }
     const members = cur.members || [];
     const isMember = id => members.some(m => m.id === id);
+    const membersAt = ts => {
+      let m = timeline[0][1];
+      for (const [t, mem] of timeline) {
+        if (t <= ts) m = mem;
+        else break;
+      }
+      return m;
+    };
+    const setPrev = new Map(); // settings id → the version in use so far (replayed in time order)
+    for (const x of list.filter(y => y.r.c === 'settings' && !y.owner)) if (Store.newer(x.r, setPrev.get(x.r.id))) setPrev.set(x.r.id, x.r);
+    const setOk = new Set();
+    for (const x of list
+      .filter(y => y.r.c === 'settings' && y.owner && y.r.id !== 'settings-team' && !/^settings-meta(-|$)/.test(y.r.id))
+      .sort((a, b) => (a.r._ts || 0) - (b.r._ts || 0))) {
+      const ts = x.r._ts || 0;
+      if (superAt(x.r._by, ts)) {
+        setOk.add(x);
+        setPrev.set(x.r.id, x.r);
+        continue;
+      }
+      if (
+        !Array.isArray(Store.trustedPeople) &&
+        typeof AdminRole !== 'undefined' &&
+        AdminRole.settingOk(x.r, setPrev.get(x.r.id), x.r._by, membersAt(ts), ts > 1000 ? U.ds(new Date(ts)) : '')
+      ) {
+        setOk.add(x);
+        setPrev.set(x.r.id, x.r);
+        continue;
+      }
+      bad(
+        x,
+        typeof AdminRole !== 'undefined' && AdminRole.areaOfSetting(x.r.id)
+          ? 'changed by someone without that Admin area (or for another team)'
+          : 'settings can only be changed by the super admin'
+      );
+    }
     list = list
       .filter(x => {
         if (x.r.c !== 'settings' || !x.owner || x.r.id === 'settings-team') return true;
         if (/^settings-meta(-|$)/.test(x.r.id)) return isMember(x.r._by) || legacy(x.owner) || (bad(x, 'not a team member'), false);
-        if (superAt(x.r._by, x.r._ts || 0)) return true;
-        bad(x, 'settings can only be changed by the super admin');
-        return false;
+        return setOk.has(x);
       })
       .filter(x => x.r.id !== 'settings-team' || !x.owner); // replaced by the replayed version below
 
@@ -194,10 +234,22 @@ Object.assign(Store, {
           if (r.c === 'scoresnap')
             return Store.can(by, 'lockScores', 1) || (bad(x, 'locked scores without the "Lock monthly scores" permission'), false);
           if (r.c === 'userpin')
-            return Store.isSuper(by) || (r.id === 'userpin-' + by && r.member === by) || (bad(x, "set someone else's PIN"), false);
+            return (
+              Store.isSuper(by) ||
+              (r.id === 'userpin-' + by && r.member === by) ||
+              (typeof AdminRole !== 'undefined' &&
+                r.id === 'userpin-' + r.member &&
+                !r.pin &&
+                AdminRole.pinOk(r, by, null, day(r._ts || 0))) ||
+              (bad(x, "set someone else's PIN"), false)
+            );
           if (r.c === 'nudge') return r.from === by || (bad(x, 'reminder written for someone else'), false);
           if (r.c === 'adminlog')
-            return Store.isSuper(by) || (bad(x, 'admin change log written by someone who is not the administrator'), false);
+            return (
+              Store.isSuper(by) ||
+              (typeof AdminRole !== 'undefined' && AdminRole.of(by, null, day(r._ts || 0))) ||
+              (bad(x, 'admin change log written by someone who is not the administrator'), false)
+            );
           if (r.c === 'usage') return r.id === 'usage-' + by || (bad(x, 'usage written for someone else'), false);
           if (r.c === 'actlog')
             return (
@@ -207,7 +259,36 @@ Object.assign(Store, {
             return (
               Store.isSuper(by) ||
               Store.privileged(by, 'postAnnouncements', x.r._ts) ||
+              (typeof AdminRole !== 'undefined' && AdminRole.can(by, 'announcements', null, null, day(x.r._ts || 0))) ||
               (bad(x, 'announcement posted without the "Post announcements" permission'), false)
+            );
+          if (r.c === 'handover')
+            return (
+              (r.by === by && String(r.id).startsWith('handover-' + by + '-')) ||
+              (r.to === by && String(r.id).startsWith('handover-' + r.by + '-')) ||
+              Store.privileged(by, 'assignTodo', r._ts) ||
+              (bad(x, 'handover changed by someone else'), false)
+            );
+          if (r.c === 'todohold')
+            return (
+              (r.by === by &&
+                String(r.id).startsWith('todohold-' + by + '-') &&
+                (!r.okBy || (r.okBy === by && Store.privileged(by, 'assignTodo', r._ts))) &&
+                !r.declined) ||
+              Store.privileged(by, 'assignTodo', r._ts) ||
+              (bad(x, 'a To Do hold confirmed by someone who is not a manager'), false)
+            );
+          if (r.c === 'todoext')
+            return (
+              (r.by === by && String(r.id).startsWith('todoext-' + by + '-') && !r.decided) ||
+              Store.privileged(by, 'assignTodo', r._ts) ||
+              (bad(x, 'more time decided by someone who is not a manager'), false)
+            );
+          if (r.c === 'adminask')
+            return (
+              Store.isSuper(by) ||
+              (r.by === by && String(r.id).startsWith('adminask-' + by + '-') && !r.decided) ||
+              (bad(x, "Admin request written in someone else's name"), false)
             );
           if (r.c === 'todoask')
             return (

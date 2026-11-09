@@ -773,7 +773,7 @@ function adminTeams() {
           .filter(x => x.from)
           .map(x => Object.assign(x, { to: x.to && x.to >= x.from ? x.to : x.from }));
       const saveHol = (list, msg) => {
-        Store.save({ id: 'settings-holidays', c: 'settings', list });
+        Store.save(Object.assign({}, Store.get('settings-holidays') || {}, { id: 'settings-holidays', c: 'settings', list }));
         UI.toast(msg, 'good');
         App.render();
       };

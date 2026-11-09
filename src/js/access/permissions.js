@@ -9,13 +9,17 @@ Object.assign(Store, {
      Others may only: record the help-desk import date, lock scores (with permission), and change their OWN PIN. */
   /* announcements: only the super admin posts; a read receipt only for yourself */
   announceAllowed(r) {
-    if (r.c === 'announcement') return Store.isSuper(App.me) || Store.can(App.me, 'postAnnouncements');
+    if (r.c === 'announcement')
+      return Store.isSuper(App.me) || Store.can(App.me, 'postAnnouncements') || AdminRole.can(App.me, 'announcements');
     if (r.c === 'annread') return String(r.id || '').startsWith('annread-' + App.me + '-');
     if (r.c === 'nudge') return r.from === App.me;
-    if (r.c === 'adminlog') return Store.isSuper(App.me);
+    if (r.c === 'adminlog') return Store.isSuper(App.me) || AdminRole.any(App.me);
     if (r.c === 'usage') return r.id === 'usage-' + App.me;
     if (r.c === 'actlog') return String(r.id || '').startsWith('actlog-' + App.me + '-');
-    if (r.c === 'userpin') return Store.isSuper(App.me) || r.id === 'userpin-' + App.me;
+    if (r.c === 'userpin')
+      return (
+        Store.isSuper(App.me) || r.id === 'userpin-' + App.me || (r.id === 'userpin-' + r.member && !r.pin && AdminRole.pinOk(r, App.me))
+      );
     return true;
   },
   /* requests: people raise their own; only the right approver may move a request to the next status */
@@ -38,6 +42,8 @@ Object.assign(Store, {
   settingAllowed(r) {
     if (r.c !== 'settings' || Store.isSuper(App.me)) return true;
     if (/^settings-meta(-|$)/.test(r.id)) return true;
+    if (r.id === 'settings-team' && AdminRole.peopleOk(Store.members(), r.members, App.me)) return true;
+    if (r.id !== 'settings-team' && AdminRole.settingOk(r, Store.get(r.id), App.me)) return true;
     if (r.id === 'settings-team') {
       const strip = (list, keepPinFor) =>
         JSON.stringify(

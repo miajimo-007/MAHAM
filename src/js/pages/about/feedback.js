@@ -54,7 +54,7 @@ const FB = {
       const p = r.id && Store.db.get(r.id);
       return (p ? p.by : r.by) === App.me;
     }
-    if (Store.isSuper(App.me)) return true;
+    if (Store.isSuper(App.me) || AdminRole.can(App.me, 'feedback')) return true;
     const p = r.id ? Store.db.get(r.id) : null;
     if (!p) return r.from === App.me && !FB.ADMIN_FIELDS.some(k => r[k] && k !== 'status') && (!r.status || r.status === 'New');
     if (p.from !== App.me || (p.status || 'New') !== 'New') return false;

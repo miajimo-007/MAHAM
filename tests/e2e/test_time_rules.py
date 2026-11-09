@@ -1,0 +1,78 @@
+"""Time rules: the admin page (per team / department default), default due days in the To Do form, working days (weekend,
+holidays, the person's leave, confirmed holds not counted), due-date changes kept with a reason, asking for more time,
+the preview, holidays + Ramadan, an Admin with "Time rules" for their own team only, and late work on the Manager and
+Director desks."""
+from harness import app_session, Check, run, SHOTS
+
+async def main():
+    c = Check('time rules')
+    async with app_session() as s:
+        pg = s.page
+        t = await s.go('#/admin/timerules', 600)
+        c('Admin → Time rules & holidays opens', 'Time rules' in await pg.inner_text('.adm-tabs') and 'Escalation' in t and 'Public holidays and Ramadan' in t)
+        await pg.select_option('#trscope', 'apps'); await pg.wait_for_timeout(300)
+        await pg.fill('#trf [name=p_Normal]', '3'); await pg.fill('#trf [name=p_High]', '1'); await pg.fill('#trf [name=e_mgr]', '2'); await pg.fill('#trf [name=e_dir]', '4')
+        await pg.click('#trprev'); await pg.wait_for_timeout(300)
+        c('preview shows the effect', 'This month' in await pg.inner_text('#trout'))
+        await pg.click('#trsave'); await s.js("Store.flush()"); await pg.wait_for_timeout(300)
+        rec = await s.js("Store.get('settings-timerules-apps')")
+        c('saved for APPS, in force from today', rec and rec['rules']['todo']['byPriority']['Normal'] == 3 and rec['from'] == await s.js("U.todayStr()"), rec)
+        # holidays + Ramadan
+        await pg.fill('#trhol', '2026-11-19 = Test holiday'); await pg.fill('[name=rm_from]', '2027-02-18'); await pg.fill('[name=rm_to]', '2027-03-19')
+        await pg.click('#trholsave'); await s.js("Store.flush()"); await pg.wait_for_timeout(300)
+        c('holidays and Ramadan saved', await s.js("Store.holidayOf('2026-11-19')") == 'Test holiday' and await s.js("TimeRules.ramadanHrs(6, '2027-03-01')") == 8)
+        # ---------- the To Do form: default due days ----------
+        await s.go('#/manager', 500); await s.sign_in_as('apps-mgr'); await s.go('#/todo', 500)
+        await s.js("UI.editRecord('todo', null)")
+        await pg.wait_for_selector('#modal [name=duration]', timeout=5000)
+        c('a new To Do starts with the rule (Normal = 3 days)', await pg.input_value('#modal [name=duration]') == '3')
+        await pg.select_option('#modal [name=priority]', 'High'); await pg.wait_for_timeout(100)
+        c('…High priority → 1 day', await pg.input_value('#modal [name=duration]') == '1')
+        await s.js("UI.closeModal()")
+        # ---------- working days ----------
+        await s.js("Store.save({ c: 'todo', id: 'td-tr', task: 'Rule test', analyst: 'yousef', team: 'apps', assigned: '2026-11-12', duration: 2, priority: 'Normal', status: 'In Progress' })")
+        c('working days: Thu + 2 skips Fri/Sat → due Mon', await s.js("Calc.todoDerive(Store.get('td-tr')).due") == '2026-11-16')
+        await s.js("Store.save({ c: 'attendance', id: 'att-tr', analyst: 'yousef', team: 'apps', date: '2026-11-15', status: 'OFF', leave: 'Annual' })")
+        c("the person's leave day is not counted → due Tue", await s.js("Calc.todoDerive(Store.get('td-tr')).due") == '2026-11-17')
+        await s.js("Store.save({ c: 'todo', id: 'td-tr2', task: 'Over a holiday', analyst: 'yousef', team: 'apps', assigned: '2026-11-18', duration: 1, status: 'In Progress' })")
+        c('a public holiday is not counted', await s.js("Calc.todoDerive(Store.get('td-tr2')).due") == '2026-11-22')
+        await s.js("Store.flush()")
+        # ---------- hold: waits for the manager, then the clock stops ----------
+        await s.sign_in_as('yousef', 'analyst')
+        await s.js("TodoTime.hold(Store.get('td-tr'), 'Waiting for the vendor')"); await s.js("Store.flush()"); await pg.wait_for_timeout(200)
+        c('an analyst hold does not stop the clock until confirmed', not await s.js("Calc.todoDerive(Store.get('td-tr')).held"))
+        await s.js("TodoTime.ask(Store.get('td-tr'), 2, 'Big change')"); await s.js("Store.flush()")
+        await s.sign_in_as('apps-mgr'); await s.js("Store.sync(true)"); await pg.wait_for_timeout(300)
+        t = await s.go('#/manager', 600)
+        c('Manager Desk: the hold and the ask wait for him', 'holds to confirm' in t and 'asks for more time' in t and 'Holds and time asks' in t)
+        await pg.click('[data-dhok]'); await pg.wait_for_timeout(300); await pg.click('[data-dxok]'); await pg.wait_for_timeout(300); await s.js("Store.flush()")
+        d = await s.js("Calc.todoDerive(Store.get('td-tr'))"); r = await s.js("Store.get('td-tr')")
+        c('confirmed hold: the clock is stopped', d.get('held'))
+        c('approved ask: 2 more days, kept in the history', r['duration'] == 4 and r['extensions'][-1]['asked'] == 'yousef' and r['extensions'][-1]['reason'] == 'Big change', r.get('extensions'))
+        # a due-date change by the manager is kept with its reason
+        await s.js("UI.closeModal()"); await pg.wait_for_timeout(400)
+        await s.js("UI.editRecord('todo', Store.get('td-tr2'))"); await pg.wait_for_timeout(300)
+        await pg.wait_for_selector('#modal [name=duration]', timeout=5000)
+        await pg.fill('#modal [name=duration]', '3'); await pg.wait_for_timeout(100)
+        c('changing the due days asks for a reason', await pg.is_visible('#modal [name=extReason]'))
+        await pg.fill('#modal [name=extReason]', 'Scope grew'); await pg.click('#modal [data-save], #modal button.primary'); await pg.wait_for_timeout(400); await s.js("Store.flush()")
+        x = await s.js("(Store.get('td-tr2').extensions || []).slice(-1)[0]")
+        c('…kept: old date → new date, reason, who', x and x['reason'] == 'Scope grew' and x['by'] == 'apps-mgr' and x['from'] != x['to'], x)
+        # ---------- an Admin with "Time rules" for his team only ----------
+        await s.sign_in_as('adam'); await s.js("saveMembersAll(Store.members().map(m => m.id === 'layla' ? Object.assign({}, m, { admin: true, adminAreas: ['timerules'], adminReach: 'team' }) : m))"); await s.js("Store.flush()")
+        await s.sign_in_as('layla', 'analyst'); t = await s.go('#/admin/timerules', 500)
+        opts = await s.js("[...document.querySelectorAll('#trscope option')].map(o => o.value)")
+        c('an Admin (own team) sets rules only for APPS — no department default, no holidays', opts == ['apps'] and 'Public holidays' not in t, opts)
+        await pg.fill('#trf [name=p_Low]', '12'); await pg.click('#trsave'); await s.js("Store.flush()")
+        await s.sign_in_as('adam'); await s.js("Store.sync(true)"); await pg.wait_for_timeout(300)
+        c('…his change is live', (await s.js("Store.get('settings-timerules-apps').rules.todo.byPriority.Low")) == 12)
+        # ---------- late work on the desks ----------
+        await s.js("TimeRules.START = '2026-01-01'; Store.save({ c: 'todo', id: 'td-late', task: 'Very late To Do', analyst: 'layla', team: 'apps', assigned: '2026-10-01', duration: 1, status: 'In Progress' })"); await s.js("Store.flush()")
+        await s.sign_in_as('apps-mgr'); t = await s.go('#/manager', 600)
+        c('Manager Desk: "Late work" with the late To Do', 'Late work' in t and 'Very late To Do' in t)
+        await s.sign_in_as('khalid'); t = await s.go('#/director', 700)
+        c('Director Desk: escalated late work per team', 'Late work' in t and 'Very late To Do' in t)
+        await pg.screenshot(path=f'{SHOTS}/time_rules_director.png', full_page=True)
+    c.done(s)
+
+run(main())
