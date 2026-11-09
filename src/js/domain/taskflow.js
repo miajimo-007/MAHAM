@@ -11,7 +11,9 @@
  *   settings-taskflow          — department: resolutions list, shared workflows, the department default
  *   settings-taskflow-<team>   — that team's workflows and its default (the "scheme")
  *   settings-taskflow-<team>.types[type]   — a task type can have its own workflow (Task / Story / Bug)
- *   settings-taskflow-<team>.projects[pid] — a project can use another workflow for all its tasks (override)
+ *   settings-taskflow-<team>.projects[pid] — a project's own scheme: { all: wfId, types: { Bug: wfId, Task: wfId } }
+ *                                            (older copies saved just wfId = all types; still read)
+ * Lookup: project + type → project (all types) → team + type → team default → department default → board columns.
  * Categories: To Do · Waiting · In Progress · Done. When a project's tasks follow more than one workflow (or a
  * workflow asks for it) the board shows one column per category, each card with its own status.
  * With nothing set, a team uses its board columns as before (first = To Do, last = Done, others = In Progress)
@@ -312,18 +314,30 @@ const TaskFlow = {
   },
   /* which workflow a project uses: the project's choice → its team's default → the department default → board columns */
   _cache: null,
-  /* the project's choice → the team's workflow for that task type → the team default → the department default → board columns */
+  /* a project's own choice in settings-taskflow-<team>.projects[pid]: { all, types: { Bug: wfId … } }
+     (older copies saved just a workflow id = for all types — still read the same) */
+  projPick(tr, pid) {
+    const x = (tr.projects || {})[pid];
+    if (!x) return { all: '', types: {} };
+    if (typeof x === 'string') return { all: x, types: {} };
+    return { all: x.all || '', types: x.types || {} };
+  },
+  /* this project + this type → this project (all types) → the team's workflow for that type → the team default → the department default → board columns */
   of(p, type) {
     if (!TaskFlow._cache || TaskFlow._cache.ver !== Store.ver) TaskFlow._cache = { ver: Store.ver, m: new Map() };
     const team = p ? Scrum.teamOf(p) : App.viewTeam || 'apps';
     const tr = TaskFlow.teamRec(team),
       d = TaskFlow.dept();
-    const pick = p ? (tr.projects || {})[p.id] || '' : '';
-    const ty = (tr.types || {})[type || 'Task'] || '';
-    const key = team + '|' + pick + '|' + ty;
+    type = type || 'Task';
+    const pp = p ? TaskFlow.projPick(tr, p.id) : { all: '', types: {} };
+    const pty = pp.types[type] || '',
+      pick = pp.all,
+      ty = (tr.types || {})[type] || '';
+    const key = team + '|' + pty + '|' + pick + '|' + ty;
     if (TaskFlow._cache.m.has(key)) return TaskFlow._cache.m.get(key);
     const w = TaskFlow.norm(
-      TaskFlow.find(team, pick) ||
+      TaskFlow.find(team, pty) ||
+        TaskFlow.find(team, pick) ||
         TaskFlow.find(team, ty) ||
         TaskFlow.find(team, tr.use) ||
         TaskFlow.find(team, d.use) ||

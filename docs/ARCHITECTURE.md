@@ -44,15 +44,15 @@ Methods always refer to their namespace by name (`Store.get(…)`, never `this`)
 | ------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------- |
 | `Config`, `APP_VERSION`                          | config/app-config.js                 | constants; frozen                                              |
 | `U`, `h`                                         | util/utils.js, util/dates.js         | helpers; `h()` escapes text for HTML                           |
-| `IDB`, `LS`, `XL`, `parseDelimited`              | util/\*                              | browser storage, Excel, CSV                                    |
-| `Store`                                          | data/\*, access/permissions.js       | records, sync, people, permissions                             |
+| `IDB`, `LS`, `XL`, `parseDelimited`              | util/*                               | browser storage, Excel, CSV                                    |
+| `Store`                                          | data/*, access/permissions.js        | records, sync, people, permissions                             |
 | `Calc`                                           | domain/metrics.js, domain/scoring.js | derived values and scores (memoised)                           |
 | `Scrum`                                          | domain/scrum.js                      | project roles, sprints, story points                           |
-| `UI`                                             | ui/\*                                | rendering helpers                                              |
-| `Schemas`                                        | schemas/\*                           | record type definitions                                        |
-| `Importer`, `HD_COLS`, `parseDT`, `parseElapsed` | importers/\*                         | imports                                                        |
-| `P`                                              | pages/\*                             | page registry: `P.todo = () => ({ title, html, mount(root) })` |
-| `App`                                            | app/\*                               | the running app: who is signed in, routing, rendering          |
+| `UI`                                             | ui/*                                 | rendering helpers                                              |
+| `Schemas`                                        | schemas/*                            | record type definitions                                        |
+| `Importer`, `HD_COLS`, `parseDT`, `parseElapsed` | importers/*                          | imports                                                        |
+| `P`                                              | pages/*                              | page registry: `P.todo = () => ({ title, html, mount(root) })` |
+| `App`                                            | app/*                                | the running app: who is signed in, routing, rendering          |
 
 ## Data flow
 

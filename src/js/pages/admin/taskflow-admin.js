@@ -66,7 +66,22 @@ const TaskFlowAdmin = {
         `Which workflow ${h(Store.teamName(sc))} uses`,
         `<form class="grid-form" id="tfuse"><label class="fld"><span>Team default</span><select name="use">${opt('', 'Board columns (simple — any move)', tr.use || '')}${all.map(w => opt(w.id, w.name + (w.shared ? ' (shared)' : ''), tr.use || '')).join('')}</select></label>${types.map(ty => `<label class="fld"><span>${h(ty)} tasks</span><select data-tftype="${h(ty)}">${wopts((tr.types || {})[ty] || '')}</select></label>`).join('')}</form>
         <p class="muted small">Each task type can follow its own workflow. When a project mixes workflows, its board shows one column per category (To Do · Waiting · In Progress · Done) and each card shows its own status.</p>
-        ${ps.length ? `<details ${Object.keys(tr.projects || {}).length ? 'open' : ''}><summary class="small"><b>Projects with their own workflow</b> (${Object.keys(tr.projects || {}).filter(id => ps.some(p => p.id === id)).length})</summary><table class="tbl"><tbody>${ps.map(p => `<tr><td>${h(p.name)}</td><td><select data-tfproj="${h(p.id)}">${wopts((tr.projects || {})[p.id] || '')}</select></td></tr>`).join('')}</tbody></table></details>` : ''}
+        ${
+          ps.length
+            ? (() => {
+                const own = ps.filter(p => {
+                  const x = TaskFlow.projPick(tr, p.id);
+                  return x.all || Object.values(x.types).some(Boolean);
+                }).length;
+                return `<details ${own ? 'open' : ''}><summary class="small"><b>Projects with their own workflow</b> (${own})</summary><p class="muted small">A project can follow its own workflow for all its tasks (<b>All types</b>) or for one task type. A type's own choice wins over All types; <b>Team default</b> follows the team's choice above.</p><div style="overflow-x:auto"><table class="tbl" id="tfprojs"><thead><tr><th>Project</th><th>All types</th>${types.map(ty => `<th>${h(ty)}</th>`).join('')}</tr></thead><tbody>${ps
+                  .map(p => {
+                    const x = TaskFlow.projPick(tr, p.id);
+                    return `<tr><td>${h(p.name)}</td><td><select data-tfproj="${h(p.id)}" data-tfpty="">${wopts(x.all)}</select></td>${types.map(ty => `<td><select data-tfproj="${h(p.id)}" data-tfpty="${h(ty)}">${wopts(x.types[ty] || '')}</select></td>`).join('')}</tr>`;
+                  })
+                  .join('')}</tbody></table></div></details>`;
+              })()
+            : ''
+        }
         <div class="row-btns"><button class="btn primary" id="tfusesave">Save</button></div>`
       );
     }
@@ -106,12 +121,6 @@ const TaskFlowAdmin = {
         const us = root.querySelector('#tfusesave');
         if (us)
           us.onclick = () => {
-            const projects = {};
-            root.querySelectorAll('[data-tfproj]').forEach(s => {
-              if (s.value) projects[s.dataset.tfproj] = s.value;
-            });
-            const keep = Object.assign({}, TaskFlow.teamRec(sc).projects || {});
-            root.querySelectorAll('[data-tfproj]').forEach(s => delete keep[s.dataset.tfproj]);
             const types = {};
             root.querySelectorAll('[data-tftype]').forEach(s => {
               if (s.value) types[s.dataset.tftype] = s.value;
@@ -119,7 +128,7 @@ const TaskFlowAdmin = {
             TaskFlowAdmin.switchTo(sc, {
               use: root.querySelector('#tfuse [name=use]').value,
               types,
-              projects: Object.assign(keep, projects),
+              projects: TaskFlowAdmin.projectsFrom(root, sc),
             });
           };
         const open = w => {
@@ -376,6 +385,29 @@ const TaskFlowAdmin = {
     };
   },
 
+  /* the "Projects with their own workflow" table → settings-taskflow-<team>.projects, as { all, types }.
+     Projects not in the table (finished or canceled) and task types not in the team's list keep what they had. */
+  projectsFrom(root, team) {
+    const old = TaskFlow.teamRec(team).projects || {};
+    const out = Object.assign({}, old);
+    const rows = {};
+    root.querySelectorAll('[data-tfproj]').forEach(s => {
+      const pid = s.dataset.tfproj;
+      const r = rows[pid] || (rows[pid] = { all: '', types: {}, shown: new Set() });
+      const ty = s.dataset.tfpty;
+      if (ty) {
+        r.shown.add(ty);
+        if (s.value) r.types[ty] = s.value;
+      } else r.all = s.value;
+    });
+    for (const [pid, r] of Object.entries(rows)) {
+      const was = TaskFlow.projPick({ projects: old }, pid).types;
+      for (const [ty, w] of Object.entries(was)) if (w && !r.shown.has(ty)) r.types[ty] = w;
+      if (r.all || Object.keys(r.types).length) out[pid] = { all: r.all, types: r.types };
+      else delete out[pid];
+    }
+    return out;
+  },
   /* changing which workflow projects use: tasks whose status is not in the new one are moved (asked first) */
   switchTo(team, patch) {
     const cur = TaskFlow.teamRec(team);

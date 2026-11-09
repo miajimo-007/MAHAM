@@ -34,6 +34,13 @@ P.todo = sub => {
     bulk: todoBulk(),
     cols: [
       {
+        key: 'tdid',
+        label: 'ID',
+        html: t => `<span class="nw">${h(TodoId.key(t.r))}</span>`,
+        get: t => TodoId.key(t.r),
+        sortVal: t => TodoId.no(t.r),
+      },
+      {
         key: 'status',
         label: 'Status',
         html: t => {

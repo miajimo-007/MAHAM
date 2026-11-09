@@ -270,7 +270,7 @@ const FollowUp = {
     for (const t of Store.all('todo')
       .filter(t => t.analyst === me && t.status !== 'Done')
       .slice(-40))
-      out.push(['todo|' + t.id, 'To Do · ' + (t.task || '')]);
+      out.push(['todo|' + t.id, `To Do · ${TodoId.key(t)} ${t.task || ''}`]);
     for (const q of Store.all('quickwin')
       .filter(q => q.analyst === me)
       .slice(-30))
@@ -288,7 +288,7 @@ const FollowUp = {
     const r = Store.get(id);
     if (!r) return '';
     return c === 'todo'
-      ? 'To Do: ' + r.task
+      ? `To Do ${TodoId.key(r)}: ${r.task}`
       : c === 'quickwin'
         ? 'Quick win: ' + r.subject
         : c === 'ptask'

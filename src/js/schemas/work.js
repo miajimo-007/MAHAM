@@ -4,6 +4,7 @@
 Object.assign(Schemas, {
   todo: {
     single: 'To Do task',
+    keyOf: r => TodoId.key(r),
     mgrCreate: true,
     mgrDelete: true,
     mgrPerm: 'assignTodo',
