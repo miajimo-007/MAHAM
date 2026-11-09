@@ -554,7 +554,7 @@ select.xs {
   margin-bottom: 4px;
 }
 .tf-rules {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 10px;
 }
 .tf-kind {
@@ -589,4 +589,71 @@ select.xs {
 }
 .pc-stat {
   margin: 2px 0;
+}
+.pc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0;
+}
+.pc-b.ep {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+.pc-b.warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+.ep-key {
+  color: #5b21b6;
+  font-family: var(--mono, monospace);
+  font-size: 13px;
+}
+.ep-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.ep-bar > :first-child {
+  flex: 0 0 220px;
+}
+.tf-appr {
+  margin: 8px 0;
+}
+.cf-row,
+.au-row {
+  display: grid;
+  gap: 6px;
+  align-items: start;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 6px;
+}
+.cf-row {
+  grid-template-columns: 1.2fr 0.8fr 1.2fr 2fr 30px;
+}
+.au-row {
+  grid-template-columns: 1fr;
+}
+.au-row .tf-rule {
+  flex-wrap: wrap;
+}
+.cf-row input,
+.cf-row select,
+.au-row input,
+.au-row select {
+  width: auto;
+  max-width: 100%;
+}
+.wd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .cf-row {
+    grid-template-columns: 1fr;
+  }
 }

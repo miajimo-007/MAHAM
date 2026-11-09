@@ -26,7 +26,7 @@ Object.assign(App, {
     if (k === 'syscheck') return App.isSuper() || AdminRole.can(App.me, 'syscheck');
     if (k === 'adminperson' || k === 'settings' || k === 'importdata') return App.isSuper();
     if (k === 'director') return App.isDir() || App.isSuper();
-    if (k === 'project') return Store.pageOn(App.me, 'projects', App.viewTeam);
+    if (k === 'project' || k === 'workdash') return Store.pageOn(App.me, 'projects', App.viewTeam);
     if (k === 'manager') return App.isMgr() || App.isSuper() || App.isActing();
     if (k === 'meetings' || k === 'meeting')
       return (

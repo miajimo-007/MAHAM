@@ -70,6 +70,7 @@ const TaskFlowAdmin = {
         <div class="row-btns"><button class="btn primary" id="tfusesave">Save</button></div>`
       );
     }
+    if (sc) html += TaskFlowAdmin.fieldsCard(sc) + TaskFlowAdmin.autosCard(sc);
     html += card(
       `Workflows ${sc ? 'of ' + h(Store.teamName(sc)) : '(shared)'}`,
       `<div class="row-btns"><button class="btn" id="tfnew">＋ New from the standard example</button><button class="btn ghost" id="tfnewb">＋ New from the board columns</button><button class="btn ghost" id="tfset" title="New → To Do → In Progress → Completed; Story: Analysis → In Testing; Bug: Troubleshooting → Waiting → UAT → Deployed; On hold / Waiting approval / Feedback / Waiting access / Rejected / Canceled from any status">＋ Task, Story and Bug set</button></div>
@@ -98,6 +99,10 @@ const TaskFlowAdmin = {
           TFE.scope = e.target.value;
           App.render();
         };
+        if (sc) {
+          TaskFlowAdmin.bindFields(root, sc);
+          TaskFlowAdmin.bindAutos(root, sc);
+        }
         const us = root.querySelector('#tfusesave');
         if (us)
           us.onclick = () => {
@@ -168,6 +173,209 @@ const TaskFlowAdmin = {
     };
   },
 
+  /* ---------- custom fields (per team) ---------- */
+  fieldsCard(sc) {
+    const fsrc = JSON.stringify(Work.custom(sc));
+    if (!TFE.fields || TFE.fields.team !== sc || (TFE.fields.src !== fsrc && !TFE.fields.dirty))
+      TFE.fields = { team: sc, src: fsrc, list: JSON.parse(fsrc) };
+    const types = Work.teamTypes(sc);
+    const L = TFE.fields.list;
+    const chk = (cls, list, sel) =>
+      list
+        .map(
+          t =>
+            `<label class="chk small"><input type="checkbox" class="${cls}" value="${h(t)}" ${(sel || []).includes(t) ? 'checked' : ''}> ${h(t)}</label>`
+        )
+        .join(' ');
+    return card(
+      `Fields on work items <span class="count">${L.length}</span>`,
+      `<p class="muted small">Extra fields for ${h(Store.teamName(sc))}'s work items — e.g. Requesting department, Component, Labels, UAT required, Vendor reference. Pick the types it shows on, and on which types it must be filled. They can also be asked on a move's screen and checked by "This field is filled".</p>
+      ${L.map((f, i) => `<div class="cf-row" data-cf="${i}"><input class="cf-l" value="${h(f.label)}" placeholder="Field name"><select class="cf-k">${Work.KINDS.map(([v, l]) => `<option value="${v}" ${v === (f.kind || 'text') ? 'selected' : ''}>${l}</option>`).join('')}</select><input class="cf-o" value="${h((f.options || []).join(', '))}" placeholder="choices, comma separated" ${f.kind === 'select' ? '' : 'hidden'}><div class="small"><div><b>Shows on:</b> ${chk('cf-t', types, f.types)} <span class="muted">(none = all)</span></div><div><b>Required on:</b> ${chk('cf-r', types, f.req)}</div></div><button class="btn xs ghost" data-cfdel="${i}">✕</button></div>`).join('')}
+      <div class="row-btns"><button class="btn xs" id="cfadd">＋ Field</button><span class="grow"></span><button class="btn primary" id="cfsave">Save fields</button></div>`
+    );
+  },
+  readFields(root) {
+    return [...root.querySelectorAll('[data-cf]')].map(r => {
+      const o = TFE.fields.list[+r.dataset.cf] || {};
+      const label = r.querySelector('.cf-l').value.trim();
+      return {
+        key:
+          o.key ||
+          'cf_' +
+            (U.lc(label)
+              .replace(/[^a-z0-9]+/g, '_')
+              .replace(/^_|_$/g, '')
+              .slice(0, 24) || 'field') +
+            '_' +
+            Math.random().toString(36).slice(2, 5),
+        label,
+        kind: r.querySelector('.cf-k').value,
+        options: r
+          .querySelector('.cf-o')
+          .value.split(',')
+          .map(x => x.trim())
+          .filter(Boolean),
+        types: [...r.querySelectorAll('.cf-t:checked')].map(c => c.value),
+        req: [...r.querySelectorAll('.cf-r:checked')].map(c => c.value),
+      };
+    });
+  },
+  bindFields(root, sc) {
+    const keep = () => {
+      TFE.fields.list = TaskFlowAdmin.readFields(root);
+      TFE.fields.dirty = true;
+    };
+    root.querySelector('#cfadd').onclick = () => {
+      keep();
+      TFE.fields.list.push({ label: '', kind: 'text' });
+      App.render();
+    };
+    root.querySelectorAll('[data-cfdel]').forEach(
+      b =>
+        (b.onclick = () => {
+          keep();
+          TFE.fields.list.splice(+b.dataset.cfdel, 1);
+          App.render();
+        })
+    );
+    root.querySelectorAll('.cf-k').forEach(
+      s =>
+        (s.onchange = () => {
+          keep();
+          App.render();
+        })
+    );
+    root.querySelector('#cfsave').onclick = () => {
+      keep();
+      const l = TFE.fields.list.filter(f => f.label);
+      if (new Set(l.map(f => U.lc(f.label))).size !== l.length) return UI.toast('Two fields have the same name', 'bad');
+      if (l.some(f => f.kind === 'select' && !(f.options || []).length))
+        return UI.toast('A "pick from a list" field needs its choices', 'bad');
+      Store.save(
+        Object.assign({ id: 'settings-taskfields-' + sc, c: 'settings' }, Work.customRec(sc), {
+          id: 'settings-taskfields-' + sc,
+          c: 'settings',
+          list: l,
+        })
+      );
+      TFE.fields = null;
+      UI.toast('Fields saved', 'good');
+      App.render();
+    };
+  },
+  /* ---------- automation rules (per team) ---------- */
+  autosCard(sc) {
+    const asrc = JSON.stringify(TaskFlow.teamRec(sc).autos || []);
+    if (!TFE.autos || TFE.autos.team !== sc || (TFE.autos.src !== asrc && !TFE.autos.dirty))
+      TFE.autos = { team: sc, src: asrc, list: JSON.parse(asrc) };
+    const L = TFE.autos.list;
+    const types = Work.teamTypes(sc);
+    const sts = [
+      ...new Set(
+        TaskFlow.listFor(sc)
+          .concat([TaskFlow.seed(sc)])
+          .flatMap(w => TaskFlow.norm(w).statuses.map(s => s.name))
+      ),
+    ];
+    const opt = (v, l, sel) => `<option value="${h(v)}" ${v === sel ? 'selected' : ''}>${h(l)}</option>`;
+    return card(
+      `Automation rules <span class="count">${L.length}</span>`,
+      `<p class="muted small">When something happens to a work item in ${h(Store.teamName(sc))}'s projects, do things by itself. E.g. <i>Bug created + High → tell the team manager</i>; <i>reaches UAT → assign the reporter, add the testing checklist</i>; <i>overdue → tell the team manager</i>.</p>
+      ${L.map(
+        (
+          a,
+          i
+        ) => `<div class="au-row" data-au="${i}"><div class="tf-rule"><input class="au-n" value="${h(a.name || '')}" placeholder="Rule name"> <b class="small">When</b> <select class="au-on">${opt('created', 'it is created', a.on)}${opt('status', 'it reaches a status', a.on)}${opt('overdue', 'it is overdue', a.on)}${opt('epicDone', 'all items of its epic are done (runs on the epic)', a.on)}</select>${a.on === 'status' ? `<select class="au-st">${sts.map(s => opt(s, s, a.status)).join('')}</select>` : ''}
+        <b class="small">if type</b> <select class="au-ty">${opt('', 'any', a.type || '')}${types.map(t => opt(t, t, a.type)).join('')}</select> <b class="small">and priority</b> <select class="au-pr">${opt('', 'any', a.priority || '')}${['High', 'Medium', 'Normal', 'Low'].map(t => opt(t, t, a.priority)).join('')}</select>
+        <label class="chk small"><input type="checkbox" class="au-off" ${a.off ? 'checked' : ''}> paused</label><span class="grow"></span><button class="btn xs ghost" data-audel="${i}">Remove</button></div>
+        <div class="tf-kind"><b class="small">⚙ Then</b>${(a.do || []).map((x, ri) => TaskFlowAdmin.ruleRow('post', x, 'a' + i, ri)).join('')}<select data-auadd="${i}"><option value="">＋ add…</option>${Object.entries(
+          TaskFlow.POSTS
+        )
+          .filter(([k]) => !['clearRes'].includes(k))
+          .map(([k, l]) => `<option value="${k}">${h(l)}</option>`)
+          .join('')}</select></div></div>`
+      ).join('')}
+      <div class="row-btns"><button class="btn xs" id="auadd">＋ Rule</button><span class="grow"></span><button class="btn primary" id="ausave">Save rules</button></div>`
+    );
+  },
+  readAutos(root) {
+    return [...root.querySelectorAll('[data-au]')].map(r => {
+      const i = +r.dataset.au;
+      const o = TFE.autos.list[i] || {};
+      const q = s => r.querySelector(s);
+      return {
+        id: o.id || U.uid('au'),
+        name: q('.au-n').value.trim(),
+        on: q('.au-on').value,
+        status: q('.au-st') ? q('.au-st').value : '',
+        type: q('.au-ty').value,
+        priority: q('.au-pr').value,
+        off: q('.au-off').checked,
+        do: [...r.querySelectorAll(`[data-r^="a${i}|post|"]`)].map(el => TaskFlowAdmin.readRule(el)),
+      };
+    });
+  },
+  bindAutos(root, sc) {
+    const keep = () => {
+      TFE.autos.list = TaskFlowAdmin.readAutos(root);
+      TFE.autos.dirty = true;
+    };
+    root.querySelector('#auadd').onclick = () => {
+      keep();
+      TFE.autos.list.push({ name: '', on: 'created', do: [] });
+      App.render();
+    };
+    root.querySelectorAll('[data-audel]').forEach(
+      b =>
+        (b.onclick = () => {
+          keep();
+          TFE.autos.list.splice(+b.dataset.audel, 1);
+          App.render();
+        })
+    );
+    root.querySelectorAll('.au-on').forEach(
+      s =>
+        (s.onchange = () => {
+          keep();
+          App.render();
+        })
+    );
+    root.querySelectorAll('[data-auadd]').forEach(
+      s =>
+        (s.onchange = () => {
+          if (!s.value) return;
+          keep();
+          const a = TFE.autos.list[+s.dataset.auadd];
+          (a.do = a.do || []).push({ k: s.value });
+          App.render();
+        })
+    );
+    root.querySelectorAll('[data-rdel^="a"]').forEach(
+      b =>
+        (b.onclick = () => {
+          keep();
+          const [ti, , ri] = b.dataset.rdel.split('|');
+          TFE.autos.list[+ti.slice(1)].do.splice(+ri, 1);
+          App.render();
+        })
+    );
+    root.querySelector('#ausave').onclick = () => {
+      keep();
+      const l = TFE.autos.list.filter(a => (a.do || []).length);
+      if (l.length < TFE.autos.list.length) UI.toast('Rules with no "Then" were left out', 'warn');
+      TaskFlowAdmin.save(sc, {
+        autos: l.map(a =>
+          Object.assign(a, {
+            name: a.name || { created: 'Created', status: 'Reaches ' + a.status, overdue: 'Overdue', epicDone: 'Epic done' }[a.on],
+          })
+        ),
+      });
+      TFE.autos = null;
+      UI.toast('Rules saved', 'good');
+      App.render();
+    };
+  },
+
   /* changing which workflow projects use: tasks whose status is not in the new one are moved (asked first) */
   switchTo(team, patch) {
     const cur = TaskFlow.teamRec(team);
@@ -218,7 +426,7 @@ const TaskFlowAdmin = {
 
   /* ---------- the editor ---------- */
   ruleRow(kind, r, ti, ri, names) {
-    const lib = kind === 'cond' ? TaskFlow.CONDS : kind === 'valid' ? TaskFlow.VALIDS : TaskFlow.POSTS;
+    const lib = TaskFlowAdmin.lib(kind);
     const sel = (cls, list, v) =>
       `<select class="${cls}">${list.map(([a, b]) => `<option value="${h(a)}" ${a === v ? 'selected' : ''}>${h(b)}</option>`).join('')}</select>`;
     const ppl = Store.visible()
@@ -249,6 +457,7 @@ const TaskFlowAdmin = {
         [
           ['reporter', 'the person who created it'],
           ['owner', 'the project owner'],
+          ['teamlead', 'the team manager'],
           ['me', 'the person making the move'],
           ['none', 'nobody (unassign)'],
         ].concat(ppl),
@@ -261,9 +470,18 @@ const TaskFlowAdmin = {
           ['assignee', 'the person assigned'],
           ['reporter', 'the person who created it'],
           ['owner', 'the project owner'],
+          ['teamlead', 'the team manager'],
         ].concat(ppl),
         r.who
       );
+    else if (r.k === 'priority')
+      cfg = sel(
+        'rk-value',
+        ['High', 'Medium', 'Normal', 'Low'].map(x => [x, x]),
+        r.value
+      );
+    else if (r.k === 'checklist')
+      cfg = `<textarea class="rk-value" rows="2" placeholder="one item per line">${h(r.value || '')}</textarea>`;
     else if (r.k === 'set')
       cfg =
         sel(
@@ -273,13 +491,32 @@ const TaskFlowAdmin = {
         ) + `<input class="rk-value" placeholder="value · @today · @me" value="${h(r.value || '')}">`;
     return `<div class="tf-rule" data-r="${ti}|${kind}|${ri}" data-k="${h(r.k)}"><span class="small">${h(lib[r.k] || r.k)}</span>${cfg}<button type="button" class="btn xs ghost" data-rdel="${ti}|${kind}|${ri}">✕</button></div>`;
   },
+  lib(kind) {
+    return kind === 'cond' ? TaskFlow.CONDS : kind === 'valid' ? TaskFlow.VALIDS : kind === 'approve' ? TaskFlow.APPROVE : TaskFlow.POSTS;
+  },
+  readRule(el) {
+    const k = el.dataset.k;
+    const x = { k };
+    const q = s => el.querySelector(s);
+    if (k === 'roles') x.roles = [...el.querySelectorAll('.rk-roles:checked')].map(c => c.value);
+    if (k === 'people') x.ids = [...q('.rk-ids').selectedOptions].map(o2 => o2.value);
+    if (k === 'stage')
+      x.stages = q('.rk-stages')
+        .value.split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+    if (q('.rk-field')) x.field = q('.rk-field').value;
+    if (q('.rk-value')) x.value = q('.rk-value').value;
+    if (q('.rk-who')) x.who = q('.rk-who').value;
+    return x;
+  },
   editor() {
     const w = TFE.draft;
     const names = w.statuses.map(s => s.name).filter(Boolean);
     const sc = TFE.scope;
     const opt = (v, l, sel) => `<option value="${h(v)}" ${v === sel ? 'selected' : ''}>${h(l)}</option>`;
     const addSel = (kind, ti) => {
-      const lib = kind === 'cond' ? TaskFlow.CONDS : kind === 'valid' ? TaskFlow.VALIDS : TaskFlow.POSTS;
+      const lib = TaskFlowAdmin.lib(kind);
       return `<select data-addr="${ti}|${kind}"><option value="">＋ add…</option>${Object.entries(lib)
         .map(([k, l]) => `<option value="${h(k)}">${h(l)}</option>`)
         .join('')}</select>`;
@@ -310,6 +547,7 @@ const TaskFlowAdmin = {
             ['cond', '🔒 Who may'],
             ['valid', '✔ Must be true'],
             ['post', '⚙ Then'],
+            ['approve', '⏳ Needs approval by'],
           ]
             .map(
               ([kind, lab]) =>
@@ -425,22 +663,7 @@ const TaskFlowAdmin = {
     d.trs = [...root.querySelectorAll('[data-ti]')].map(r => {
       const ti = +r.dataset.ti;
       const o = w.trs[ti] || {};
-      const rule = (kind, el) => {
-        const k = el.dataset.k;
-        const x = { k };
-        const q = s => el.querySelector(s);
-        if (k === 'roles') x.roles = [...el.querySelectorAll('.rk-roles:checked')].map(c => c.value);
-        if (k === 'people') x.ids = [...q('.rk-ids').selectedOptions].map(o2 => o2.value);
-        if (k === 'stage')
-          x.stages = q('.rk-stages')
-            .value.split(',')
-            .map(s => s.trim())
-            .filter(Boolean);
-        if (q('.rk-field')) x.field = q('.rk-field').value;
-        if (q('.rk-value')) x.value = q('.rk-value').value;
-        if (q('.rk-who')) x.who = q('.rk-who').value;
-        return x;
-      };
+      const rule = (kind, el) => TaskFlowAdmin.readRule(el);
       const by = kind => [...r.querySelectorAll(`[data-r^="${ti}|${kind}|"]`)].map(el => rule(kind, el));
       const from = [...r.querySelectorAll('.tft-from:checked')].map(c => c.value);
       return {
@@ -452,6 +675,7 @@ const TaskFlowAdmin = {
         cond: by('cond'),
         valid: by('valid'),
         post: by('post'),
+        approve: by('approve'),
       };
     });
     d._ren = Object.assign({}, w._ren || {}, ren);

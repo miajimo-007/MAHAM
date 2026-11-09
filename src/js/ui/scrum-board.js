@@ -1,7 +1,7 @@
 /* MAHAM — Scrum board pieces: task cards, moving tasks, drag & drop, burndown chart. */
 'use strict';
 
-const ptKey = t => '#' + (t.n || '');
+const ptKey = t => (typeof Work !== 'undefined' ? Work.key(t) : '#' + (t.n || ''));
 
 const typeIcon = t => ({ Story: '◆', Bug: '✱', Task: '▪' })[t] || '▪';
 

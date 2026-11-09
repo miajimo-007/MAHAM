@@ -103,7 +103,7 @@ const AdminRole = {
     const m = String(id || '').match(/^settings-(scoring|timerules|lists)(?:-(.+))?$/);
     if (m) return [m[1] === 'scoring' ? 'scoring' : m[1] === 'timerules' ? 'timerules' : 'lists', m[2] || '*'];
     {
-      const t = String(id || '').match(/^settings-taskflow(?:-(.+))?$/);
+      const t = String(id || '').match(/^settings-task(?:flow|fields)(?:-(.+))?$/);
       if (t) return ['workflows', t[1] || '*'];
     }
     if (id === 'settings-holidays') return ['timerules', '*'];

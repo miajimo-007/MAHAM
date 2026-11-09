@@ -27,7 +27,7 @@ const TaskFlow = {
   ],
   CAT_COLOR: { todo: '#64748b', wait: '#d97706', doing: '#2563eb', done: '#16a34a' },
   RESOLUTIONS: ['Done', 'Rejected', 'Canceled', 'Duplicate'],
-  SCREEN: [
+  SCREEN_BASE: [
     ['resolution', 'Resolution'],
     ['comment', 'Comment'],
     ['assignee', 'Assigned to'],
@@ -35,6 +35,13 @@ const TaskFlow = {
     ['points', 'Story points'],
     ['actual', 'Actual hours'],
   ],
+  /* the screen / field lists include the custom fields admins add (Work.custom) */
+  get SCREEN() {
+    return TaskFlow.SCREEN_BASE.concat(typeof Work !== 'undefined' ? Work.allCustom().map(f => [f.key, f.label]) : []);
+  },
+  get FIELDS() {
+    return TaskFlow.FIELDS_BASE.concat(typeof Work !== 'undefined' ? Work.allCustom().map(f => [f.key, f.label]) : []);
+  },
   /* the rule library: key → label (the editor shows these; config sits on the rule object) */
   CONDS: {
     assignee: 'Only the person assigned',
@@ -49,15 +56,20 @@ const TaskFlow = {
     comment: 'A comment is written',
     checklist: 'The checklist is all ticked',
     blockers: 'The task it depends on is done',
+    approved: 'An approval is recorded (since it was last reopened)',
+    children: 'All its work items are done (epic)',
   },
   POSTS: {
     resolution: 'Set the resolution',
     clearRes: 'Clear the resolution',
     assign: 'Assign to',
     set: 'Set a field',
+    priority: 'Set the priority',
+    checklist: 'Add checklist items',
     notify: 'Tell someone',
   },
-  FIELDS: [
+  APPROVE: { planner: 'The project owner / team manager', roles: 'These roles', people: 'These people' },
+  FIELDS_BASE: [
     ['due', 'Due date'],
     ['points', 'Story points'],
     ['assignee', 'Assigned to'],
@@ -390,7 +402,7 @@ const TaskFlow = {
     return '';
   },
   validFail(v, t, form) {
-    const val = k => (form && form[k] != null && form[k] !== '' ? form[k] : t[k]);
+    const val = k => (form && form[k] != null && form[k] !== '' ? form[k] : t[k]); // custom fields (cf_…) work the same
     switch (v.k) {
       case 'field': {
         const x = val(v.field);
@@ -407,6 +419,15 @@ const TaskFlow = {
       case 'blockers': {
         const b = t.after && Store.get(t.after);
         return b && !Scrum.isDone(b) ? `${ptKey(b)} must be done first` : '';
+      }
+      case 'approved': {
+        const since = [...(t.hist || [])].reverse().find(x => x.tr === 'Reopen' || /reopen/i.test(x.tr || ''));
+        const ok = (t.approvals || []).some(a => a.ok && (!since || a.at > since.at));
+        return ok ? '' : 'get an approval first';
+      }
+      case 'children': {
+        const open = Scrum.items(t.project).filter(x => x.epic === t.id && !Scrum.isDone(x));
+        return open.length ? `${open.length} work item(s) in this epic still open` : '';
       }
     }
     return '';
@@ -430,6 +451,96 @@ const TaskFlow = {
     return out;
   },
   /* a direct move to a status (board drag / the status field): the transitions that reach it */
+  /* approvals: the "needs approval by" rules of a move — anyone matching one of them approves */
+  approver(t, tr, who) {
+    who = who || App.me;
+    if (App.isSuper() && who === App.me) return true;
+    return (tr.approve || []).some(c => !TaskFlow.condFail(c, t, who));
+  },
+  approvers(t, tr) {
+    const p = Scrum.proj(t.project);
+    const team = p ? Scrum.teamOf(p) : 'apps';
+    const out = new Set();
+    for (const c of tr.approve || []) {
+      if (c.k === 'planner' && p) {
+        if (p.manager) out.add(p.manager);
+        const tm = Scrum.teamManagerOf(p);
+        if (tm) out.add(tm);
+      }
+      if (c.k === 'people') (c.ids || []).forEach(id => out.add(id));
+      if (c.k === 'roles')
+        Store.members()
+          .filter(m => m.active !== false && (m.team || 'apps') === team && (c.roles || []).includes(m.role || 'analyst'))
+          .forEach(m => out.add(m.id));
+    }
+    return [...out];
+  },
+  decide(t, ok, note) {
+    const pd = t.pending;
+    if (!pd) return 'Nothing waits for approval';
+    const tr = TaskFlow.forTask(t).trs.find(x => x.id === pd.tr);
+    if (!tr) return 'That move is no longer in the workflow';
+    if (!TaskFlow.approver(t, tr)) return 'Only ' + (tr.approve || []).map(c => TaskFlow.CONDS[c.k] || c.k).join(' / ') + ' can approve';
+    if (ok) return TaskFlow.run(t, tr.id, Object.assign({}, pd.form, { note }), { approving: true });
+    const r = Object.assign({}, t, {
+      pending: null,
+      approvals: [
+        ...(t.approvals || []),
+        {
+          tr: tr.id,
+          trName: tr.name || tr.to,
+          by: App.me,
+          at: Date.now(),
+          ok: false,
+          asked: pd.by,
+          note: String(note || '').slice(0, 200),
+        },
+      ].slice(-30),
+      hist: [
+        ...(t.hist || []),
+        {
+          at: Date.now(),
+          by: App.me,
+          from: t.status,
+          to: t.status,
+          tr: 'Approval refused: ' + (tr.name || tr.to),
+          note: String(note || '').slice(0, 200),
+        },
+      ].slice(-60),
+    });
+    const side =
+      pd.by && pd.by !== App.me
+        ? [
+            {
+              id: U.uid('nudge'),
+              c: 'nudge',
+              to: pd.by,
+              from: App.me,
+              about: t.id,
+              kind: 'flow',
+              text: `${ptKey(t)} “${t.title}”: approval refused — ${tr.name || tr.to}${note ? ': ' + note : ''}`,
+              at: Date.now(),
+            },
+          ]
+        : [];
+    TaskFlow._running = true;
+    try {
+      Schemas.ptask.beforeSave(r, t);
+    } finally {
+      TaskFlow._running = false;
+    }
+    Store.saveMany([r, ...side]);
+    return '';
+  },
+  /* waiting for me to approve */
+  toApprove() {
+    return Store.all('ptask')
+      .filter(t => t.pending && Scrum.canSee(Scrum.proj(t.project)))
+      .filter(t => {
+        const tr = TaskFlow.forTask(t).trs.find(x => x.id === t.pending.tr);
+        return tr && TaskFlow.approver(t, tr);
+      });
+  },
   movesTo(t, to, who) {
     return TaskFlow.moves(t, who).filter(m => m.tr.to === to);
   },
@@ -456,32 +567,10 @@ const TaskFlow = {
     form = form || {};
     const p = Scrum.proj(t.project);
     const r = Object.assign({}, t, { status: tr.to });
-    for (const k of ['assignee', 'due', 'points', 'actual', 'resolution'])
-      if ((tr.screen || []).includes(k) && form[k] != null && form[k] !== '') r[k] = k === 'points' ? +form[k] : form[k];
+    for (const k of tr.screen || []) if (k !== 'comment' && form[k] != null && form[k] !== '') r[k] = k === 'points' ? +form[k] : form[k];
     const side = [];
     const tell = new Set();
-    for (const a of tr.post || []) {
-      if (a.k === 'resolution') r.resolution = a.value || TaskFlow.resolutions()[0];
-      else if (a.k === 'clearRes') r.resolution = '';
-      else if (a.k === 'assign') {
-        const to =
-          a.who === 'reporter'
-            ? t.reporter || t._by
-            : a.who === 'owner'
-              ? p && p.manager
-              : a.who === 'me'
-                ? who
-                : a.who === 'none'
-                  ? ''
-                  : a.who;
-        if (to !== undefined) r.assignee = to || '';
-      } else if (a.k === 'set' && a.field) r[a.field] = a.value === '@today' ? U.todayStr() : a.value === '@me' ? who : a.value || '';
-      else if (a.k === 'notify') {
-        const to =
-          a.who === 'assignee' ? r.assignee : a.who === 'reporter' ? t.reporter || t._by : a.who === 'owner' ? p && p.manager : a.who;
-        if (to && to !== who) tell.add(to);
-      }
-    }
+    for (const a of tr.post || []) TaskFlow.doPost(a, r, t, p, who, tell);
     const done = TaskFlow.catOf(t, tr.to) === 'done',
       wasDone = Scrum.isDone(t);
     if (done && !r.resolution) r.resolution = form.resolution || TaskFlow.resolutions()[0];
@@ -514,14 +603,110 @@ const TaskFlow = {
       });
     return { r, side };
   },
+  /* one "then" action (moves and automation rules share them) */
+  who(a, r, t, p, me) {
+    const w = a.who;
+    return w === 'assignee'
+      ? r.assignee
+      : w === 'reporter'
+        ? t.reporter || t._by
+        : w === 'owner'
+          ? p && p.manager
+          : w === 'teamlead'
+            ? p && Scrum.teamManagerOf(p)
+            : w === 'me'
+              ? me
+              : w === 'none'
+                ? ''
+                : w;
+  },
+  doPost(a, r, t, p, who, tell) {
+    if (a.k === 'resolution') r.resolution = a.value || TaskFlow.resolutions()[0];
+    else if (a.k === 'clearRes') r.resolution = '';
+    else if (a.k === 'assign') {
+      const to = TaskFlow.who(a, r, t, p, who);
+      if (to !== undefined) r.assignee = to || '';
+    } else if (a.k === 'set' && a.field) r[a.field] = a.value === '@today' ? U.todayStr() : a.value === '@me' ? who : a.value || '';
+    else if (a.k === 'priority' && a.value) r.priority = a.value;
+    else if (a.k === 'checklist') {
+      const have = new Set((r.checklist || []).map(x => U.lc(x.t)));
+      r.checklist = [
+        ...(r.checklist || []),
+        ...String(a.value || '')
+          .split('\n')
+          .map(x => x.trim())
+          .filter(x => x && !have.has(U.lc(x)))
+          .map(x => ({ t: x, done: false })),
+      ];
+    } else if (a.k === 'notify') {
+      const to = TaskFlow.who(a, r, t, p, who);
+      if (to && to !== who) tell.add(to);
+    }
+  },
   /* run a transition: checks, one save, history, notices → '' or the reason it did not run */
-  run(t, trId, form) {
-    const m = TaskFlow.moves(t).find(x => x.tr.id === trId);
-    if (!m) return 'That move is not allowed from ' + (t.status || 'here');
-    if (!Scrum.canWork(t) && !(Scrum.member(Scrum.proj(t.project)) && !t.assignee)) return 'You can only move your own tasks';
-    const miss = TaskFlow.check(t, m.tr, form);
+  /* opts.approving: the approver runs a move someone asked for (their "who may" rules are what the approval replaces) */
+  run(t, trId, form, opts) {
+    opts = opts || {};
+    const tr = opts.approving ? TaskFlow.forTask(t).trs.find(x => x.id === trId) : (TaskFlow.moves(t).find(x => x.tr.id === trId) || {}).tr;
+    if (!tr) return 'That move is not allowed from ' + (t.status || 'here');
+    if (!opts.approving && !Scrum.canWork(t) && !(Scrum.member(Scrum.proj(t.project)) && !t.assignee))
+      return 'You can only move your own tasks';
+    if (!opts.approving && t.pending) return 'Waiting for an approval — ' + (t.pending.trName || '');
+    const miss = opts.approving ? (tr.valid || []).map(v => TaskFlow.validFail(v, t, form)).filter(Boolean) : TaskFlow.check(t, tr, form);
     if (miss.length) return 'First ' + miss.join(', ');
-    const { r, side } = TaskFlow.apply(t, m.tr, form);
+    // a move that needs approval, made by someone who is not an approver → it waits
+    if (!opts.approving && (tr.approve || []).length && !TaskFlow.approver(t, tr)) {
+      const r = Object.assign({}, t, {
+        pending: { tr: tr.id, trName: tr.name || tr.to, to: tr.to, by: App.me, at: Date.now(), form: Object.assign({}, form || {}) },
+      });
+      r.hist = [
+        ...(t.hist || []),
+        {
+          at: Date.now(),
+          by: App.me,
+          from: t.status,
+          to: t.status,
+          tr: 'Asked approval: ' + (tr.name || tr.to),
+          note: String((form || {}).comment || '').slice(0, 200),
+        },
+      ].slice(-60);
+      const side = TaskFlow.approvers(t, tr)
+        .filter(id => id !== App.me)
+        .map(to => ({
+          id: U.uid('nudge'),
+          c: 'nudge',
+          to,
+          from: App.me,
+          about: t.id,
+          kind: 'flow',
+          text: `${ptKey(t)} “${t.title}”: approval asked — ${tr.name || tr.to} → ${tr.to}`,
+          at: Date.now(),
+        }));
+      TaskFlow._running = true;
+      try {
+        Schemas.ptask.beforeSave(r, t);
+      } finally {
+        TaskFlow._running = false;
+      }
+      Store.saveMany([r, ...side]);
+      return 'pending';
+    }
+    const { r, side } = TaskFlow.apply(t, tr, form);
+    if ((tr.approve || []).length) {
+      r.approvals = [
+        ...(t.approvals || []),
+        {
+          tr: tr.id,
+          trName: tr.name || tr.to,
+          by: App.me,
+          at: Date.now(),
+          ok: true,
+          asked: t.pending ? t.pending.by : App.me,
+          note: String((form || {}).note || '').slice(0, 200),
+        },
+      ].slice(-30);
+      r.pending = null;
+    }
     TaskFlow._running = true;
     try {
       Schemas.ptask.beforeSave(r, t);

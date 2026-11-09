@@ -51,14 +51,17 @@ const TaskFlowUI = {
       (tr.valid || []).some(
         v =>
           v.k === 'comment' ||
-          (v.k === 'field' && ['due', 'points', 'assignee', 'actual', 'resolution'].includes(v.field) && TaskFlow.validFail(v, t, {}))
+          (v.k === 'field' &&
+            (['due', 'points', 'assignee', 'actual', 'resolution'].includes(v.field) || /^cf_/.test(v.field)) &&
+            TaskFlow.validFail(v, t, {}))
       )
     );
   },
   start(t, tr) {
     if (TaskFlowUI.needsScreen(t, tr)) return TaskFlowUI.screen(t, tr);
     const err = TaskFlow.run(t, tr.id, {});
-    if (err) UI.toast(err, 'bad');
+    if (err === 'pending') UI.toast(`Sent for approval — ${tr.name || tr.to}`, 'good');
+    else if (err) UI.toast(err, 'bad');
     else TaskFlowUI.done(t, tr);
     App.render();
   },
@@ -95,7 +98,12 @@ const TaskFlowUI = {
       points: { key: 'points', label: 'Story points', type: 'select', options: Scrum.POINTS.map(String), blank: false },
       actual: { key: 'actual', label: 'Actual hours', type: 'number', min: 0, step: 0.5 },
     };
-    const order = TaskFlow.SCREEN.map(x => x[0]).filter(k => sc.has(k));
+    for (const k of sc)
+      if (!F[k] && /^cf_/.test(k)) {
+        const d = Work.def(k, p ? Scrum.teamOf(p) : undefined);
+        if (d) F[k] = Work.ui(d, { required: (tr.valid || []).some(v => v.k === 'field' && v.field === k) });
+      }
+    const order = TaskFlow.SCREEN.map(x => x[0]).filter(k => sc.has(k) && F[k]);
     const rules = (tr.valid || [])
       .map(v =>
         TaskFlow.validFail(v, t, {}) && v.k !== 'comment' && !(v.k === 'field' && sc.has(v.field))
@@ -115,12 +123,13 @@ const TaskFlowUI = {
         w.querySelector('#tfgo').onclick = () => {
           const form = Object.fromEntries(new FormData(w.querySelector('#tfscr')));
           const err = TaskFlow.run(Store.get(t.id), tr.id, form);
-          if (err) {
+          if (err && err !== 'pending') {
             w.querySelector('#tferr').textContent = err;
             return;
           }
           UI.closeModal();
-          TaskFlowUI.done(t, tr);
+          if (err === 'pending') UI.toast(`Sent for approval — ${tr.name || tr.to}`, 'good');
+          else TaskFlowUI.done(t, tr);
           App.render();
         };
       },
@@ -128,6 +137,7 @@ const TaskFlowUI = {
   },
   /* the buttons on a task: allowed moves (planners and the assignee); blocked ones show why on hover */
   buttons(t, max) {
+    if (t.pending) return '';
     const ms = TaskFlow.moves(t);
     const ok = ms.filter(m => m.ok);
     return ok

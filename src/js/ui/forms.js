@@ -80,6 +80,17 @@ Object.assign(UI, {
         input = `<div class="pick members-pick" id="${id}">${ms.map(m => `<label class="check"><input type="checkbox" name="${f.key}" value="${h(m.id)}" ${sel.has(m.id) ? 'checked' : ''}> ${h(m.short || m.name)}</label>`).join('') || '<span class="muted small">Nobody else in the team</span>'}</div>`;
         break;
       }
+      case 'checks': {
+        const sel = new Set(Array.isArray(val) ? val : []);
+        const opts = typeof f.options === 'function' ? f.options() : f.options || [];
+        input = `<div class="pick" id="${id}">${opts
+          .map(o => {
+            const [v, l] = Array.isArray(o) ? o : [o, o];
+            return `<label class="check"><input type="checkbox" name="${f.key}" value="${h(v)}" ${sel.has(v) ? 'checked' : ''}> ${h(l)}</label>`;
+          })
+          .join('')}</div>`;
+        break;
+      }
       case 'readonly':
         input = `<input id="${id}" value="${h(val)}" readonly class="ro" title="Only the manager can change this">`;
         break;
@@ -110,6 +121,10 @@ Object.assign(UI, {
     const out = {};
     for (const f of fields) {
       if (f.type === 'readonly') continue;
+      if (f.type === 'checks') {
+        out[f.key] = [...form.querySelectorAll(`[name="${f.key}"]:checked`)].map(c => c.value);
+        continue;
+      }
       if (f.type === 'members') {
         out[f.key] = [...form.querySelectorAll(`[name="${f.key}"]:checked`)].map(c => c.value);
         continue;

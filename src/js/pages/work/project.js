@@ -76,6 +76,7 @@ P.project = pid => {
     ['overview', 'Overview'],
     ['timeline', 'Timeline'],
     ['board', 'Board'],
+    ...(typeof WorkUI !== 'undefined' ? [['epics', 'Epics']] : []),
     ['backlog', scrum ? 'Backlog' : 'List'],
     ...(scrum ? [['sprints', 'Sprints']] : []),
     ['raid', 'Risks & issues'],
@@ -90,7 +91,7 @@ P.project = pid => {
   const d = projDerive(p),
     prog = Scrum.progress(p),
     today = U.todayStr();
-  const canAdd = plan || mem;
+  const canAdd = plan || mem || (typeof Work !== 'undefined' && Work.canAdd(p));
   const ctx = { plan, canAdd, items, prog };
   const sprintPts = s => {
     const it = items.filter(t => t.sprint === s.id);
@@ -100,6 +101,7 @@ P.project = pid => {
   if (tab === 'overview') body = PMV.overview(p, ctx);
   else if (tab === 'timeline') body = PMV.timeline(p, ctx);
   else if (tab === 'raid') body = PMV.raid(p, ctx);
+  else if (tab === 'epics') body = WorkUI.epics(p, ctx);
   else if (tab === 'status') body = PMV.status(p, ctx);
   else if (tab === 'board' && !scrum) {
     const mineOnly = ps('prj').mine;
