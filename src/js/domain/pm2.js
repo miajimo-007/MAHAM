@@ -172,7 +172,7 @@ const PM2 = {
       after: ids.get(t.after) || '',
       description: t.description,
       checklist: t.checklist || [],
-      status: col0,
+      status: Scrum.startOf ? Scrum.startOf(Store.get(pid), t.type || 'Task') : col0,
       sprint: '',
       createdOn: U.todayStr(),
     }));

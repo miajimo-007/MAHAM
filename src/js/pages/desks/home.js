@@ -114,7 +114,7 @@ P.home = () => {
         : card(
             'Log shadow work',
             `<form id="quicksw" class="quick">
-      <div class="q-row">${UI.field({ key: 'date', label: 'Date', type: 'date' }, today)}${UI.field({ key: 'taskType', label: 'Task type', type: 'tasktype', required: true }, ps('home').lastType || '')}${UI.field({ key: 'source', label: 'Source', type: 'select', options: Store.list('sources'), required: true }, ps('home').lastSource || '')}</div>
+      <div class="q-row">${UI.field({ key: 'date', label: 'Date', type: 'date' }, today)}${UI.field({ key: 'taskType', label: 'Task type', type: 'tasktype', required: true }, Store.list('taskTypes').includes(ps('home').lastType) ? ps('home').lastType : '')}${UI.field({ key: 'source', label: 'Source', type: 'select', options: Store.list('sources'), required: true }, ps('home').lastSource || '')}</div>
       <div class="q-row">${UI.field({ key: 'subject', label: 'Subject', type: 'text', required: true, placeholder: 'What did you work on?' }, '')}${UI.field({ key: 'ref', label: 'Reference', type: 'text', placeholder: 'Req ID / caller / SRS…' }, '')}</div>
       <div class="q-row end">${UI.field({ key: 'minutes', label: 'Duration (minutes)', type: 'minutes', required: true }, 30)}<button class="btn primary" type="submit">Add entry</button></div>
     </form>

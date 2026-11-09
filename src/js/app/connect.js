@@ -13,14 +13,33 @@ Object.assign(App, {
       return App.screen(
         `<h1>Please open this in Microsoft Edge or Google Chrome</h1><p>This app saves to the shared folder using a browser feature that Edge and Chrome have (Firefox and Internet Explorer do not).</p><p class="muted">Right-click <b>MAHAM.html</b> → <b>Open with</b> → <b>Microsoft Edge</b>.</p>`
       );
+    // reopening the remembered folder can hang when the network share does not answer: show each step, give up after a while
+    let opening = true;
+    const step = t => {
+      const p = UI.$('#app .connect-card p');
+      if (p && opening) p.textContent = t;
+    };
+    const late = (pr, ms) => Promise.race([pr, new Promise(res => setTimeout(() => res('timeout'), ms))]);
+    step('Opening the team folder…');
+    const slow = setTimeout(() => step('Still opening the team folder — the network share is slow to answer…'), 4000);
     let st;
     try {
-      st = await Store.tryRestore();
+      st = await late(Store.tryRestore(), 20000);
     } catch (e) {
       st = 'none';
     }
+    clearTimeout(slow);
+    opening = false;
     if (st === 'ok') return App.start();
     App.connectScreen(st === 'needs-permission');
+    if (st === 'timeout') {
+      const c = UI.$('.connect-card h1');
+      if (c)
+        c.insertAdjacentHTML(
+          'afterend',
+          '<div class="insights warnbox"><div>The shared folder did not answer in time. Close other MAHAM tabs, then choose the folder again below.</div></div>'
+        );
+    }
   },
   screen(html) {
     const ready = Store.db && Store.db.size;

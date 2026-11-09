@@ -89,7 +89,7 @@ P.performance = () => {
         pctF
       );
   } else if (tab === 'shadow') {
-    const cats = ['PA', 'PHYSICIAN', 'NURSING', 'PHARMACY', 'ANCILLARIES', 'ACCREDIATATION', 'COMMITTEES', 'OTHER'];
+    const cats = Calc.categories(App.viewTeam, App.year);
     body =
       tbl(
         'Shadow work [hours]',

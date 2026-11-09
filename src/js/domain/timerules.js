@@ -16,6 +16,7 @@ const TimeRules = {
     ptask: { grace: 0, riskLatePct: 20, riskDaysLeft: 7 },
     stuck: { followup: 14, quickwin: 30 },
     escalate: { manager: 2, director: 5 },
+    show: { todo: true, helpdesk: true, requests: true, ptask: true, quickwin: true, followup: true },
   },
   /* ---------- the rules in effect for a team on a day ---------- */
   pickAt(rec, day) {
@@ -145,79 +146,140 @@ const TimeRules = {
   },
 
   /* ---------- late work, for escalation (manager desk at N working days late, director at M) ---------- */
-  lateItems(teams) {
+  /* which kinds of late work show on the desks (Admin → Time rules → "Show on the desks"), per team */
+  KINDS: [
+    ['todo', 'To Do'],
+    ['helpdesk', 'Help desk'],
+    ['requests', 'Requests'],
+    ['ptask', 'Project tasks'],
+    ['quickwin', 'Quick wins'],
+    ['followup', 'Follow-ups'],
+  ],
+  /* "Seen — remind me in 7 days": per person, on this PC */
+  snoozeKey() {
+    return 'bct.lateSeen.' + (App.me || '');
+  },
+  snoozed(id) {
+    const m = LS.get(TimeRules.snoozeKey(), {});
+    return !!(id && m[id] && m[id] >= U.todayStr());
+  },
+  snooze(id, days) {
+    const m = LS.get(TimeRules.snoozeKey(), {});
+    const today = U.todayStr();
+    for (const k of Object.keys(m)) if (m[k] < today) delete m[k];
+    m[id] = U.addDays(today, days || 7);
+    LS.set(TimeRules.snoozeKey(), m);
+  },
+  /* the day an item last moved: its own date, or its last save if later (any note, status change or edit restarts the clock) */
+  lastMove(date, r) {
+    const s = r && r._ts > 1000 ? U.ds(new Date(r._ts)) : '';
+    return [date || '', s].filter(Boolean).sort().pop() || '';
+  },
+  lateItems(teams, all) {
     const today = U.todayStr();
     const out = [];
     const tset = new Set(teams);
+    const S0 = TimeRules.START;
     const lvl = (R, n) => (n >= +R.escalate.director ? 'director' : n >= +R.escalate.manager ? 'manager' : '');
+    const on = (R, k) => !R.show || R.show[k] !== false;
+    const push = x => {
+      if (all || !TimeRules.snoozed(x.id)) out.push(x);
+    };
     for (const t of Calc.todos(new Date().getFullYear())) {
       const r = t.r;
       const team = r.team || (Store.member(r.analyst) || {}).team || 'apps';
       if (!tset.has(team) || r.virtual || t.status !== 'In Progress' || !TimeRules.applies(r.assigned) || t.days <= 0) continue;
       const R = TimeRules.at(team, r.assigned);
+      if (!on(TimeRules.at(team), 'todo')) continue;
       const n = t.days - +(R.todo.grace || 0);
       const l = lvl(R, n);
-      if (l) out.push({ kind: 'To Do', title: r.task, who: r.analyst, team, days: n, level: l, edit: 'todo|' + r.id });
+      if (l) push({ id: r.id, kind: 'To Do', title: r.task, who: r.analyst, team, days: n, level: l, edit: 'todo|' + r.id });
     }
     for (const team of tset) {
       const R = TimeRules.at(team);
       const off = TimeRules.offFn(R, null);
-      for (const x of Calc.helpdesk(new Date().getFullYear())) {
-        const r = x.r;
-        if (x.closed || x.unassigned || !x.mid || ((Store.member(x.mid) || {}).team || 'apps') !== team || !r.created) continue;
-        const lim = TimeRules.ramadanHrs(
-          +((R.helpdesk.byCategory || {})[r.category] || R.helpdesk.longHrs || 24),
-          String(r.created).slice(0, 10)
-        );
-        const ageH = (Date.now() - Date.parse(String(r.created).replace(' ', 'T'))) / 36e5;
-        if (!(ageH > lim)) continue;
-        const n = TimeRules.workBetween(U.ds(new Date(Date.parse(String(r.created).replace(' ', 'T')) + lim * 36e5)), today, off);
-        const l = lvl(R, n);
-        if (l) out.push({ kind: 'Help desk', title: r.subject || r.reqId || 'Request', who: x.mid, team, days: n, level: l });
-      }
-      for (const q of Store.all('request', '*')) {
-        if (!Requests.isPending(q) || ((Store.member(q.requester) || {}).team || 'apps') !== team) continue;
-        const since = q.mgrOn || U.ds(new Date(q._ts || Date.now()));
-        const n = TimeRules.workBetween(since, today, off) - +R.requests.approveDays;
-        const l = lvl(R, n);
-        if (l)
-          out.push({
-            kind: 'Request',
-            title: Requests.type(q.type).label + ' — ' + Store.memberShort(q.requester),
-            who: q.requester,
-            team,
-            days: n,
-            level: l,
-          });
-      }
-      for (const q of Store.all('quickwin', team)) {
-        if (!['In-Progress', 'Under Review', ''].includes(q.status || '') || !q.date) continue;
-        const n = TimeRules.workBetween(q.date, today, off) - +R.stuck.quickwin;
-        const l = lvl(R, n);
-        if (l) out.push({ kind: 'Quick win', title: q.subject, who: q.analyst, team, days: n, level: l, edit: 'quickwin|' + q.id });
-      }
-      for (const q of Store.all('central', team)) {
-        if (!['Under Review', 'Accepted', ''].includes(q.status || '') || !q.date) continue;
-        const n = TimeRules.workBetween(q.date, today, off) - +R.stuck.followup;
-        const l = lvl(R, n);
-        if (l)
-          out.push({
-            kind: 'Follow-up',
-            title: q.subject || q.reqId || 'Central follow-up',
-            who: q.analyst,
-            team,
-            days: n,
-            level: l,
-            edit: 'central|' + q.id,
-          });
-      }
-      if (typeof Scrum !== 'undefined')
+      if (on(R, 'helpdesk'))
+        for (const x of Calc.helpdesk(new Date().getFullYear())) {
+          const r = x.r;
+          if (
+            x.closed ||
+            x.unassigned ||
+            !x.mid ||
+            ((Store.member(x.mid) || {}).team || 'apps') !== team ||
+            !r.created ||
+            String(r.created).slice(0, 10) < S0
+          )
+            continue;
+          const lim = TimeRules.ramadanHrs(
+            +((R.helpdesk.byCategory || {})[r.category] || R.helpdesk.longHrs || 24),
+            String(r.created).slice(0, 10)
+          );
+          const ageH = (Date.now() - Date.parse(String(r.created).replace(' ', 'T'))) / 36e5;
+          if (!(ageH > lim)) continue;
+          const n = TimeRules.workBetween(U.ds(new Date(Date.parse(String(r.created).replace(' ', 'T')) + lim * 36e5)), today, off);
+          const l = lvl(R, n);
+          if (l) push({ id: r.id, kind: 'Help desk', title: r.subject || r.reqId || 'Request', who: x.mid, team, days: n, level: l });
+        }
+      if (on(R, 'requests'))
+        for (const q of Store.all('request', '*')) {
+          if (!Requests.isPending(q) || ((Store.member(q.requester) || {}).team || 'apps') !== team) continue;
+          const since = TimeRules.lastMove(q.mgrOn || q.from, q);
+          if (!since || since < S0) continue;
+          const n = TimeRules.workBetween(since, today, off) - +R.requests.approveDays;
+          const l = lvl(R, n);
+          if (l)
+            push({
+              id: q.id,
+              kind: 'Request',
+              title: Requests.type(q.type).label + ' — ' + Store.memberShort(q.requester),
+              who: q.requester,
+              team,
+              days: n,
+              level: l,
+            });
+        }
+      if (on(R, 'quickwin'))
+        for (const q of Store.all('quickwin', team)) {
+          if (!['In-Progress', 'Under Review', ''].includes(q.status || '') || !q.date || q.date < S0) continue;
+          const n = TimeRules.workBetween(TimeRules.lastMove(q.date, q), today, off) - +R.stuck.quickwin;
+          const l = lvl(R, n);
+          if (l) push({ id: q.id, kind: 'Quick win', title: q.subject, who: q.analyst, team, days: n, level: l, edit: 'quickwin|' + q.id });
+        }
+      if (on(R, 'followup'))
+        for (const q of Store.all('central', team)) {
+          if (!['Under Review', 'Accepted', ''].includes(q.status || '') || !q.date || q.date < S0) continue;
+          const n = TimeRules.workBetween(TimeRules.lastMove(q.date, q), today, off) - +R.stuck.followup;
+          const l = lvl(R, n);
+          if (l)
+            push({
+              id: q.id,
+              kind: 'Follow-up',
+              title: q.subject || q.reqId || 'Central follow-up',
+              who: q.analyst,
+              team,
+              days: n,
+              level: l,
+              edit: 'central|' + q.id,
+            });
+        }
+      if (on(R, 'ptask') && typeof Scrum !== 'undefined')
         for (const p of Store.all('project').filter(p => (p.team || 'apps') === team && p.status !== 'Canceled'))
-          for (const k of Store.all('ptask').filter(k => k.project === p.id && !Scrum.isDone(k) && k.due && k.due < today)) {
+          for (const k of Store.all('ptask').filter(
+            k => k.project === p.id && !Scrum.isDone(k) && k.due && k.due < today && (k.createdOn || '') >= S0
+          )) {
             const n = TimeRules.workBetween(k.due, today, off) - +R.ptask.grace;
             const l = lvl(R, n);
             if (l)
-              out.push({ kind: 'Project task', title: k.title + ' · ' + p.name, who: k.assignee, team, days: n, level: l, proj: p.id });
+              push({
+                id: k.id,
+                kind: 'Project task',
+                title: k.title + ' · ' + p.name,
+                who: k.assignee,
+                team,
+                days: n,
+                level: l,
+                proj: p.id,
+              });
           }
     }
     return out.sort((a, b) => b.days - a.days);

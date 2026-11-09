@@ -262,6 +262,25 @@ Object.assign(Store, {
               (typeof AdminRole !== 'undefined' && AdminRole.can(by, 'announcements', null, null, day(x.r._ts || 0))) ||
               (bad(x, 'announcement posted without the "Post announcements" permission'), false)
             );
+          if (r.c === 'ptaskset')
+            return (
+              Store.isSuper(by) ||
+              Store.privileged(by, 'manageTemplates', r._ts) ||
+              (typeof AdminRole !== 'undefined' && AdminRole.can(by, 'lists', r.team || '*', null, day(r._ts || 0))) ||
+              (bad(x, 'task set changed by someone who may not manage templates'), false)
+            );
+          if (r.c === 'mrating')
+            return (
+              Store.isSuper(by) ||
+              (Store.privileged(by, 'assignTodo', r._ts) && r.mid !== by && r.id === `mrating-${r.year}-${U.pad(r.month)}-${r.mid}`) ||
+              (bad(x, 'a rating given by someone who is not a manager'), false)
+            );
+          if (r.c === 'scoreadj')
+            return (
+              Store.isSuper(by) ||
+              (typeof AdminRole !== 'undefined' && r.mid !== by && AdminRole.can(by, 'scoring', r.team || 'apps', null, day(r._ts || 0))) ||
+              (bad(x, 'bonus / penalty points given without the Scoring area'), false)
+            );
           if (r.c === 'handover')
             return (
               (r.by === by && String(r.id).startsWith('handover-' + by + '-')) ||

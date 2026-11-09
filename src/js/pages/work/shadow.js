@@ -18,11 +18,7 @@ P.shadow = () => {
   const html = `<div class="page-actions">${filterBar('shadow', [
     { key: 'analyst', type: 'member' },
     { key: 'month', type: 'month' },
-    {
-      key: 'cat',
-      label: 'Category',
-      options: ['PA', 'PHYSICIAN', 'NURSING', 'PHARMACY', 'ANCILLARIES', 'ACCREDIATATION', 'COMMITTEES', 'OTHER'],
-    },
+    { key: 'cat', label: 'Category', options: Calc.categories(App.viewTeam, App.year) },
     { key: 'src', label: 'Source', options: Store.list('sources') },
     { key: 'fu', type: 'toggle', label: 'FU only' },
     { key: 'ms', type: 'toggle', label: '⭐ Milestones only' },

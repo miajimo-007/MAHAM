@@ -47,7 +47,7 @@ async def main():
         await s.go('#/admin/months', 500)
         c('month lock grid shown', await pg.locator('[data-lockm], [data-unlock]').count() > 0)
         # scoring what-if
-        await s.go('#/admin/scoring', 500); await pg.fill('[name=w_todo]', '0'); await pg.wait_for_timeout(500)
+        await s.go('#/admin/scoring', 500); await pg.fill('.wif [name=w_todo]', '0'); await pg.wait_for_timeout(500)
         c('what-if warns when weights do not add up', 'must add up to 100' in await pg.inner_text('#main'))
         # technician names
         await s.js("Store.save({id: 'hd-x1', c: 'helpdesk', number: 'X1', technician: 'Baitalmal Abulaziz', team: 'apps', created: U.todayStr()})")

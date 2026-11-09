@@ -77,7 +77,11 @@ const TimeRulesUI = {
       </div><div>
       ${card('Project tasks', `<div class="grid-form">${n('k_grace', 'Grace days after the due date', R.ptask.grace)}<div></div>${n('k_pct', 'Project at risk: % of tasks late', R.ptask.riskLatePct)}${n('k_left', '…or working days to its due date (with work left)', R.ptask.riskDaysLeft)}</div>`)}
       ${card('Follow-ups and quick wins', `<div class="grid-form">${n('s_fu', 'Follow-up stuck after (days)', R.stuck.followup)}${n('s_qw', 'Quick win stuck after (days)', R.stuck.quickwin)}</div>`)}
-      ${card('Escalation', `<div class="grid-form">${n('e_mgr', 'On the Manager Desk at (days late)', R.escalate.manager)}${n('e_dir', 'On the Director Desk at (days late)', R.escalate.director)}</div><p class="muted small">Counted after the grace days, in working days.</p>`)}
+      ${card(
+        'Escalation',
+        `<div class="grid-form">${n('e_mgr', 'On the Manager Desk at (days late)', R.escalate.manager)}${n('e_dir', 'On the Director Desk at (days late)', R.escalate.director)}</div><p class="muted small">Counted after the grace days, in working days, from the item's <b>last update</b> (any note, status change or edit restarts the clock). Only work opened after the time rules started counts.</p>
+        <div class="fld"><label>Show on the desks</label><div class="row-btns wrap">${TimeRules.KINDS.map(([k, l]) => `<label class="check chip-check"><input type="checkbox" data-show="${k}" ${!R.show || R.show[k] !== false ? 'checked' : ''}> ${h(l)}</label>`).join('')}</div><p class="muted small">Untick what your team cannot act on (e.g. follow-ups waiting on Central).</p></div>`
+      )}
       </div></div>
       <div class="row-btns"><button type="button" class="btn" id="trprev">Preview the effect</button><span class="grow"></span><button type="button" class="btn primary" id="trsave">Save time rules${s ? ' for ' + h(Store.teamName(s)) : ' (department default)'}</button></div><div id="trout"></div></form>
       ${
@@ -115,6 +119,7 @@ const TimeRulesUI = {
             ptask: { grace: num('k_grace'), riskLatePct: num('k_pct'), riskDaysLeft: num('k_left') },
             stuck: { followup: num('s_fu'), quickwin: num('s_qw') },
             escalate: { manager: num('e_mgr'), director: Math.max(num('e_dir'), num('e_mgr')) },
+            show: Object.fromEntries([...root.querySelectorAll('[data-show]')].map(i => [i.dataset.show, i.checked])),
           };
         };
         root.querySelector('#trsave').onclick = () => {
@@ -179,32 +184,37 @@ const TimeRulesUI = {
     return `<div class="insights ${after > before ? 'warnbox' : 'goodbox'}"><div>This month's To Dos (${todos.length}): <b>${before}</b> late with the current rules → <b>${after}</b> with these. ${after > before ? `${after - before} more would count as delayed.` : after < before ? `${before - after} fewer would count as delayed.` : 'No change.'} · Late work on desks right now: ${lateNow}.</div></div>`;
   },
   /* ---------- where late work shows ---------- */
-  deskCard(level) {
-    const teams = App.isSuper()
+  deskTeams(level) {
+    return App.isSuper()
       ? Store.teams().map(t => t.id)
       : level === 'director'
         ? (Store.teamsFor(App.me) || []).map(t => t.id)
         : (Store.teamsFor(App.me) || []).map(t => t.id).filter(t => t === App.viewTeam || !App.viewTeam);
-    const items = TimeRules.lateItems(teams).filter(x => (level === 'director' ? x.level === 'director' : true));
+  },
+  /* late work, grouped by kind and folded; "Seen — remind me in 7 days" hides an item for you for a week */
+  deskCard(level) {
+    const items = TimeRules.lateItems(TimeRulesUI.deskTeams(level)).filter(x => (level === 'director' ? x.level === 'director' : true));
     if (!items.length) return '';
+    const kinds = [...new Set(items.map(x => x.kind))];
     const byTeam = {};
     for (const x of items) byTeam[x.team] = (byTeam[x.team] || 0) + 1;
+    const row = x =>
+      `<div class="li ${x.edit || x.proj ? 'click' : ''}" ${x.edit ? `data-edit="${h(x.edit)}"` : x.proj ? `data-proj="${h(x.proj)}"` : ''}><div class="grow"><b>${h(x.title)}</b><div class="muted small">${h(Store.memberShort(x.who) || '')} · ${x.days} working day${x.days > 1 ? 's' : ''} without a move${level === 'director' ? ' · ' + h(Store.teamName(x.team)) : ''}</div></div>${x.level === 'director' ? UI.badge('escalated', 'bad') : ''}<button class="btn xs ghost" data-lseen="${h(x.id)}" title="Hide it from your desk for 7 days">Seen · 7 days</button></div>`;
     return card(
       `⏰ Late work <span class="count">${items.length}</span>`,
-      `${
+      `<p class="small">${kinds.map(k => `<b>${h(k)}</b> ${items.filter(x => x.kind === k).length}`).join(' · ')}${
         level === 'director'
-          ? `<p class="small">${Object.entries(byTeam)
-              .map(([t, n]) => `<b>${h(Store.teamName(t))}</b> ${n}`)
-              .join(' · ')}</p>`
+          ? ` <span class="muted">— ${Object.entries(byTeam)
+              .map(([t, n]) => `${h(Store.teamName(t))} ${n}`)
+              .join(', ')}</span>`
           : ''
-      }
-      ${items
-        .slice(0, 12)
-        .map(
-          x =>
-            `<div class="li ${x.edit ? 'click' : ''}" ${x.edit ? `data-edit="${h(x.edit)}"` : x.proj ? `data-proj="${h(x.proj)}"` : ''}><span class="ag-kind">${h(x.kind)}</span><div class="grow"><b>${h(x.title)}</b><div class="muted small">${h(Store.memberShort(x.who) || '')} · ${x.days} working day${x.days > 1 ? 's' : ''} past the rule${level === 'director' ? ' · ' + h(Store.teamName(x.team)) : ''}</div></div>${x.level === 'director' ? UI.badge('escalated', 'bad') : UI.badge('late', 'warn')}</div>`
-        )
-        .join('')}${items.length > 12 ? `<p class="muted small">…and ${items.length - 12} more</p>` : ''}`
+      }</p>
+      ${kinds
+        .map(k => {
+          const l = items.filter(x => x.kind === k);
+          return `<details class="late-grp"><summary><b>${h(k)}</b> <span class="count">${l.length}</span></summary>${l.slice(0, 25).map(row).join('')}${l.length > 25 ? `<p class="muted small">…and ${l.length - 25} more</p>` : ''}</details>`;
+        })
+        .join('')}`
     );
   },
   /* projects at risk (time rules: share of late tasks, or close to the due date with work left) */
@@ -270,6 +280,10 @@ const TimeRulesUI = {
             App.render(true);
           })
       );
+    go('[data-lseen]', b => {
+      TimeRules.snooze(b.dataset.lseen, 7);
+      UI.toast('Hidden for 7 days', 'good');
+    });
     go('[data-dhok]', b => TodoTime.decideHold(Store.get(b.dataset.dhok), true));
     go('[data-dhno]', b => TodoTime.decideHold(Store.get(b.dataset.dhno), false));
     go('[data-dxok]', b => TodoTime.decideAsk(Store.get(b.dataset.dxok), true));
@@ -297,10 +311,7 @@ const TimeRulesUI = {
       out.html = addChips(out.html, [
         [w.holds.length, 'holds to confirm'],
         [w.asks.length, 'asks for more time'],
-        [
-          late ? TimeRules.lateItems((Store.teamsFor(App.me) || []).map(t => t.id).filter(t => t === App.viewTeam)).length : 0,
-          'late items',
-        ],
+        [late ? TimeRules.lateItems(TimeRulesUI.deskTeams('manager')).length : 0, 'late items'],
         [TimeRulesUI.missingPts().length, 'project tasks missing a due date or points'],
       ]);
       const at = out.html.indexOf('<div class="needs-you');
@@ -321,6 +332,11 @@ const TimeRulesUI = {
       const out = base.apply(this, arguments);
       if (!out || !out.html) return out;
       out.html += TimeRulesUI.deskCard('director');
+      const m0 = out.mount;
+      out.mount = root => {
+        if (m0) m0(root);
+        TimeRulesUI.bindDesk(root);
+      };
       return out;
     };
   }

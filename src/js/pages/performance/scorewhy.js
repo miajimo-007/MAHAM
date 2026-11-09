@@ -188,18 +188,23 @@ const RulesPrint = {
       const mo = new Date().getMonth() + 1;
       const c = Calc.monthScore(y, App.me, mo);
       if (!c) return out;
-      const btn = `<div class="row-btns" style="margin:4px 0 10px"><button class="btn sm ghost" id="whyscore">Why is my score ${U.num(c.score, 1)}?</button></div>`;
-      const at = out.html.indexOf('<div class="kpis');
-      const end = at >= 0 ? out.html.indexOf('</div>\n', at) : -1;
-      out.html = at >= 0 ? out.html.replace(/(<div class="kpis[\s\S]*?<\/div>\s*<\/div>)/, '$1' + btn) : btn + out.html;
-      if (!out.html.includes('id="whyscore"')) out.html = btn + out.html;
-      void end;
+      // a small "why?" link inside the score tile (never a separate box in the row of tiles)
+      const link = ` · <a href="#" class="link" id="whyscore" title="Why is my score ${U.num(c.score, 1)}?">why?</a>`;
+      if (out.html.includes('live — updates as you work'))
+        out.html = out.html.replace('live — updates as you work', 'live — updates as you work' + link);
+      else
+        out.html = out.html.replace(
+          /(<h1[^>]*>[^<]*<\/h1>)/,
+          `$1<p class="small"><a href="#" class="link" id="whyscore">Why is my score ${U.num(c.score, 1)}?</a></p>`
+        );
       const m0 = out.mount;
       out.mount = root => {
         if (m0) m0(root);
         const b = root.querySelector('#whyscore');
         if (b)
-          b.onclick = () =>
+          b.onclick = e => {
+            e.preventDefault();
+            e.stopPropagation();
             UI.modal({
               title: 'Your score this month',
               wide: true,
@@ -210,6 +215,7 @@ const RulesPrint = {
                 if (x) x.onclick = () => UI.closeModal();
               },
             });
+          };
       };
       return out;
     };

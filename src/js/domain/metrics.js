@@ -64,15 +64,52 @@ const Calc = {
     );
   },
   /* ---------- Shadow ---------- */
-  category(taskType) {
-    const t = String(taskType || '');
+  /* the groups a team's shadow work falls into: from its task type list (in that order), then any other group in the data */
+  categories(team, year) {
+    const out = [];
+    const add = c => {
+      if (c && !out.includes(c)) out.push(c);
+    };
+    try {
+      for (const x of Store.lists(team).taskTypes || []) {
+        if (/^>>>/.test(x)) continue;
+        add(Calc.category(x, team));
+      }
+    } catch (e) {
+      /* */
+    }
+    for (const s of Calc.shadow(year || App.year))
+      if (!team || (s.r.team || (Store.member(s.r.analyst) || {}).team || 'apps') === team) add(s.cat);
+    return out;
+  },
+  /* the group of a task type: "PA >> Meeting" → PA; a type without ">>" → the ">>>" heading it sits under in its team's
+   * list, else the type itself (so a team whose types have no groups still gets one line per type, not "OTHER") */
+  category(taskType, team) {
+    const t = String(taskType || '').trim();
+    if (!t) return '';
     const i = t.indexOf(' >>');
-    return i > 0 ? t.slice(0, i) : t ? 'OTHER' : '';
+    if (i > 0) return t.slice(0, i);
+    let head = '';
+    try {
+      for (const x of Store.lists(team || App.viewTeam).taskTypes || []) {
+        if (/^>>>/.test(x)) head = x.replace(/[<>]/g, '').trim();
+        else if (String(x).trim() === t) return head || t;
+      }
+    } catch (e) {
+      /* lists not ready */
+    }
+    return t; // not in the list (an old type): its own group
   },
   shadow(year) {
     return Calc.memo('sw' + year, () =>
       Store.all('shadow')
-        .map(r => ({ r, month: U.month(r.date), year: U.year(r.date), cat: Calc.category(r.taskType), hrs: (+r.minutes || 0) / 60 }))
+        .map(r => ({
+          r,
+          month: U.month(r.date),
+          year: U.year(r.date),
+          cat: Calc.category(r.taskType, r.team || (Store.member(r.analyst) || {}).team),
+          hrs: (+r.minutes || 0) / 60,
+        }))
         .filter(x => !year || x.year === year)
     );
   },

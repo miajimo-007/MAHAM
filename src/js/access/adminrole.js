@@ -102,6 +102,10 @@ const AdminRole = {
   areaOfSetting(id) {
     const m = String(id || '').match(/^settings-(scoring|timerules|lists)(?:-(.+))?$/);
     if (m) return [m[1] === 'scoring' ? 'scoring' : m[1] === 'timerules' ? 'timerules' : 'lists', m[2] || '*'];
+    {
+      const t = String(id || '').match(/^settings-taskflow(?:-(.+))?$/);
+      if (t) return ['workflows', t[1] || '*'];
+    }
     if (id === 'settings-holidays') return ['timerules', '*'];
     if (id === 'settings-projectlists') return ['lists', '*'];
     if (['settings-teams', 'settings-depts', 'settings-requests', 'settings-userdepts'].includes(id)) return ['teams', '*'];

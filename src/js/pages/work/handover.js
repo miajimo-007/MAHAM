@@ -221,11 +221,14 @@ const Handover = {
     P.home = function () {
       const out = base.apply(this, arguments);
       if (!out || !out.html || App.isDir() || App.isMgr()) return out;
+      // the handover button sits with "Today: On duty / Off / Permission"; handover cards go above the desk
       const cards = Handover.homeCards();
       const btn = Handover.mine().length
         ? ''
-        : '<div class="row-btns" style="margin:0 0 10px"><button class="btn sm" id="hoNew">🤝 Hand over my work</button></div>';
-      out.html = btn + cards + out.html;
+        : '<button class="btn sm" id="hoNew" title="Before leave: pass your open work to a colleague">🤝 Hand over</button>';
+      if (btn && /Today:/.test(out.html)) out.html = out.html.replace(/(<span[^>]*>Today:<\/span>)/, btn + ' $1');
+      else if (btn) out.html = `<div class="row-btns" style="justify-content:flex-end;margin:0 0 6px">${btn}</div>` + out.html;
+      out.html = cards + out.html;
       const m0 = out.mount;
       out.mount = root => {
         if (m0) m0(root);

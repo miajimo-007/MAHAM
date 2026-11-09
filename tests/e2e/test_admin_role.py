@@ -33,7 +33,7 @@ async def main():
         c('Admin is in his menu', await pg.locator('nav a[href="#/admin"]').count() >= 1)
         t = await s.go('#/admin', 500)
         tabs = await s.js("[...document.querySelectorAll('.adm-tabs .tab')].map(a => a.textContent.trim())")
-        c('only his tabs: Home, People, Workflows, Scoring', set(tabs) == {'Home', 'People', 'Workflows', 'Scoring'} and 'You are an Admin' in t, tabs)
+        c('only his tabs: Home, People, Workflows, Task workflows, Scoring', set(tabs) == {'Home', 'People', 'Workflows', 'Task workflows', 'Scoring'} and 'You are an Admin' in t, tabs)
         t = await s.go('#/admin/teams', 400); c('a tab he was not given opens his Home instead', 'Your Admin areas' in t)
         c('System Check is not open to him', not await s.js("App.pageAllowed('syscheck')"))
         # scoring for his team: goes live
@@ -98,6 +98,18 @@ async def main():
         c('acting for the manager: Admin with the manager\'s area', await s.js("AdminRole.can('layla', 'scoring', 'apps')") and not await s.js("AdminRole.can('layla', 'people', 'apps')"))
         await s.sign_in_as('adam'); await s.js("Store.save({ id: 'settings-delegations', c: 'settings', list: [] })"); await s.js("Store.flush()")
         await s.sign_in_as('layla', 'analyst'); c('…and no longer once the delegation ends', not await s.js("AdminRole.any('layla')"))
+        # ---------- People table: the ⛨ Admin button, and "Save people" keeps the role ----------
+        await s.sign_in_as('adam'); await s.go('#/admin/people', 700)
+        c('People table: ⛨ Admin button, highlighted for Yousef', 'primary' in (await pg.get_attribute('[data-adminrole="yousef"]', 'class') or '') and 'Scoring' in (await pg.get_attribute('[data-adminrole="yousef"]', 'title') or ''))
+        await pg.click('[data-adminrole="nora"]'); await pg.wait_for_selector('.modal #ar-on')
+        await pg.check('.modal #ar-on'); await pg.check('.modal [data-area="workflows"]'); await pg.click('.modal #ar-save'); await s.js("Store.flush()"); await pg.wait_for_timeout(400)
+        c('…opens the role editor; saving it gives Nora the role', await s.js("(Store.member('nora').adminAreas || []).join()") == 'workflows')
+        await s.go('#/admin/people', 600); await pg.click('#saveppl, [id^=savepeople], button:has-text("Save people")'); await pg.wait_for_timeout(400)
+        if await pg.locator('.modal [data-yes], .modal [data-ok]').count(): await pg.click('.modal [data-yes], .modal [data-ok]')
+        await s.js("Store.flush()"); await pg.wait_for_timeout(300)
+        c('"Save people" keeps the Admin roles', await s.js("!!(Store.member('nora').admin && Store.member('yousef').admin)"))
+        t = await s.go('#/adminperson/yousef', 600)
+        c('person card shows "⛨ Admin for APPS: …"', 'Admin for APPS' in t)
         # ---------- removing the role ----------
         await s.sign_in_as('adam'); await s.go('#/adminperson/yousef', 500); await pg.uncheck('#ar-on'); await pg.click('#ar-save'); await s.js("Store.flush()")
         await s.sign_in_as('yousef', 'analyst')

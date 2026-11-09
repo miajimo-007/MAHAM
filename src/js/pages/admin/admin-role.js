@@ -72,6 +72,7 @@ const AdminUI = {
       const isOn = on.checked && v.areas.length;
       if (on.checked && !v.areas.length) return UI.toast('Tick at least one area (or untick Admin)', 'bad');
       if (isOn && v.areas.includes('teams') && v.reach !== 'all') return UI.toast('“Teams & departments” needs “All teams”', 'bad');
+      if (document.querySelector('.modal #ar-on')) UI.closeModal();
       saveMembersAll(
         Store.members().map(x => {
           if (x.id !== m.id) return x;
@@ -91,6 +92,28 @@ const AdminUI = {
       );
     };
   },
+  summary(m) {
+    const g = AdminRole.own(m);
+    return g
+      ? `Admin for ${g.reach === 'all' ? 'all teams' : Store.teamName(m.team || 'apps')}: ${g.areas.map(a => AdminRole.label(a)).join(', ')}`
+      : '';
+  },
+  /* the role editor in a dialog (People table → ⛨ Admin) */
+  roleDialog(id) {
+    const m = Store.member(id);
+    if (!m) return;
+    UI.modal({
+      title: `Admin role — ${m.name}`,
+      wide: true,
+      body: AdminUI.roleCard(m),
+      actions: '<span class="grow"></span><button class="btn" data-close>Close</button>',
+      onMount: w => {
+        AdminUI.bindRoleCard(w, m);
+        const c = w.querySelector('[data-close]');
+        if (c) c.onclick = () => UI.closeModal();
+      },
+    });
+  },
   saveTemplate(name, v) {
     name = String(name || '').trim();
     if (!name) return;
@@ -101,6 +124,51 @@ const AdminUI = {
     UI.toast(`Template “${name}” saved`, 'good');
   },
 
+  /* Scoring & months: weights and parts (+ bonus / penalty), the scoring rules (tiers as tables), the what-if */
+  settingsPart(keep) {
+    const x = P.settings('lists');
+    return {
+      html: x.html.replace(/<div class="insights"><div>Scoring rules and dropdown lists[\s\S]*?<\/div><\/div>/, ''),
+      mount(root) {
+        x.mount(root);
+        const drop = id => {
+          const b = root.querySelector(id);
+          const c = b && b.closest('.card');
+          if (c) c.remove();
+        };
+        if (!keep.includes('scoring')) drop('#savescore');
+        if (!keep.includes('lists')) drop('#savelists');
+        root.querySelectorAll('#saveteam, #addmember, #teamrows').forEach(e => {
+          const c = e.closest('.card');
+          if (c) c.remove();
+        });
+        if (keep.includes('scoring')) {
+          // weights are set in "Weights and parts": keep the fields (the save reads them) but out of sight
+          const sc = root.querySelector('#savescore');
+          const cardEl = sc && sc.closest('.card');
+          if (cardEl) {
+            cardEl.querySelectorAll('[name^="w_"]').forEach(i => {
+              const f = i.closest('.fld');
+              if (f) f.style.display = 'none';
+            });
+            const g = cardEl.querySelector('.grid-form');
+            if (g) g.insertAdjacentHTML('afterbegin', '<p class="muted small span2">Weights: in <b>Weights and parts</b> above.</p>');
+          }
+          TierEdit.mountSettings(root);
+        }
+      },
+    };
+  },
+  scoringPage() {
+    const sp = ScorePartsUI.page();
+    const rules = AdminUI.settingsPart(['scoring']);
+    const wif = adminScoring();
+    wif.html = wif.html.replace(
+      /<a class="link small" href="#\/admin\/lists">[^<]*<\/a>/,
+      '<span class="muted small">Try weights here; save them in Weights and parts.</span>'
+    );
+    return adminJoin(sp, rules, wif);
+  },
   /* ---------- the limited Admin's head (only their tabs) ---------- */
   head(tab, tabs) {
     return `<div class="adm-top"><div class="tabs adm-tabs">${tabs.map(([k, n]) => `<a class="tab ${tab === k ? 'on' : ''}" href="#/admin/${k}">${n}</a>`).join('')}</div></div>
@@ -342,6 +410,25 @@ const AdminUI = {
   P.admin = sub => {
     const timeRules = () => (typeof TimeRulesUI !== 'undefined' ? TimeRulesUI.page() : { html: empty('Time rules are not available.') });
     if (App.isSuper()) {
+      if (sub === 'scoring' || sub === 'months' || sub === 'lists') {
+        const tab = sub === 'lists' ? 'lists' : 'scoring';
+        const pg =
+          tab === 'lists'
+            ? adminJoin(AdminUI.settingsPart(['lists']), adminUserDepts())
+            : adminJoin(adminMonths(), adminScoreMonths(), AdminUI.scoringPage());
+        if (typeof WF !== 'undefined') {
+          WF.draft = null;
+          WF.maps = {};
+        }
+        return {
+          title: 'Admin',
+          html: adminHead(tab) + pg.html,
+          mount(root) {
+            bindAdminSearch(root);
+            if (pg.mount) pg.mount(root);
+          },
+        };
+      }
       if (sub === 'timerules') {
         const pg = timeRules();
         return {
@@ -354,6 +441,29 @@ const AdminUI = {
         };
       }
       const out = base(sub);
+      if (sub === 'people') {
+        out.html = out.html.replace(/<button class="btn xs[^"]*" data-perm="([^"]+)">Permissions<\/button>/g, (all, id) => {
+          const m = Store.member(id);
+          if (!m || m.superAdmin) return all;
+          const on = !!AdminRole.own(m);
+          return (
+            `<button class="btn xs ${on ? 'primary' : ''}" data-adminrole="${h(id)}" title="${h(on ? AdminUI.summary(m) : 'Give some admin areas')}">⛨ Admin</button> ` +
+            all
+          );
+        });
+        const m1 = out.mount;
+        out.mount = root => {
+          if (m1) m1(root);
+          root.querySelectorAll('[data-adminrole]').forEach(
+            b =>
+              (b.onclick = e => {
+                e.preventDefault();
+                e.stopPropagation();
+                AdminUI.roleDialog(b.dataset.adminrole);
+              })
+          );
+        };
+      }
       if (!sub || sub === 'home') {
         const ch = AdminUI.changesCard();
         if (ch) {
@@ -383,31 +493,12 @@ const AdminUI = {
       WF.draft = null;
       WF.maps = {};
     }
-    const settingsPart = keep => {
-      const x = P.settings('lists');
-      return {
-        html: x.html,
-        mount(root) {
-          x.mount(root);
-          const drop = id => {
-            const b = root.querySelector(id);
-            const c = b && b.closest('.card');
-            if (c) c.remove();
-          };
-          if (!keep.includes('scoring')) drop('#savescore');
-          if (!keep.includes('lists')) drop('#savelists');
-          root.querySelectorAll('#saveteam, #addmember, #teamrows').forEach(e => {
-            const c = e.closest('.card');
-            if (c) c.remove();
-          });
-        },
-      };
-    };
+    const settingsPart = AdminUI.settingsPart;
     const pg = {
       home: () => AdminUI.homeLite(tabs),
       people: AdminUI.peopleLite,
       lists: () => settingsPart(['lists']),
-      scoring: () => adminJoin(adminScoring(), settingsPart(['scoring'])),
+      scoring: AdminUI.scoringPage,
       teams: adminTeams,
       workflows: () => (WF.draft ? adminFlows() : adminJoin(adminTodoFlows(), adminFlows())),
       hdmonths: adminHdMonths,
@@ -446,6 +537,14 @@ const AdminUI = {
     const out = pc(id);
     const m = Store.member(id);
     if (!m || !App.isSuper()) return out;
+    const sm = AdminUI.summary(m);
+    if (sm) {
+      out.html = out.html.replace('</h1>', `</h1><p>${UI.badge('⛨ Admin', 'good')} <span class="small">${h(sm)}</span></p>`);
+      out.html = out.html.replace(
+        /(<details class="card guide"><summary><b>Explain access<\/b>[^]*?<\/summary>)/,
+        `$1<div class="insights goodbox"><div>⛨ <b>${h(sm)}</b> — an <b>Admin</b> menu with only these areas, on top of the access below.</div></div>`
+      );
+    }
     out.html += AdminUI.roleCard(m);
     const m0 = out.mount;
     out.mount = root => {
