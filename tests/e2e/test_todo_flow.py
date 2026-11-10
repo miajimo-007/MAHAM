@@ -13,7 +13,7 @@ async def main():
         nxt = lambda i: J(f"(TodoFlow.nextOf(Store.get('{i}')) || {{}})")
         act = lambda who, i, a, extra='{}': J(f"(() => {{ const was = App.me; App.me = '{who}'; try {{ TodoFlow.act(Store.get('{i}'), '{a}', {extra}); }} finally {{ App.me = was; }} }})()")
         # ---------- the super admin builds a workflow ----------
-        await s.go('#/admin/workflows', 500)
+        await s.go('#/admin/work/todo', 500)
         await pg.fill('#tfwtypes', 'Order set change, Report request'); await pg.click('#tfwtsave'); await pg.wait_for_timeout(300)
         await pg.click('#tfwex'); await pg.wait_for_selector('#tfwf')
         await pg.check('#modal [data-tfwty="Order set change"]'); await pg.select_option('#modal [name=swho0]', 'm:layla')

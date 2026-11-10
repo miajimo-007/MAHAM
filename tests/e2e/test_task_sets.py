@@ -24,10 +24,12 @@ async def main():
         await pg.click('.modal [data-ok]'); await s.js("Store.flush()"); await pg.wait_for_timeout(300)
         b = await s.js("Scrum.items('pj-b').sort((x, y) => x.n - y.n)")
         c('added to Ward B: 2 tasks, dates from the start day, checklist reset, given to the owner', len(b) == 2 and b[0]['due'] == await s.js(f"U.addDays('{start}', {st['tasks'][0]['dueOff']})") and b[0]['assignee'] == 'apps-mgr' and not b[0]['checklist'][0]['done'], b)
-        t = await s.go('#/admin/lists', 700)
-        c('Admin → Lists: Project task sets', 'Project task sets' in t and 'Go-live checklist' in t)
-        await pg.click('[data-tsedit]'); await pg.wait_for_selector('#tse'); await pg.click('#tseadd'); await pg.wait_for_selector('#tse')
-        await pg.fill('#tserows tr:last-child [data-f=title]', 'Sign-off'); await pg.fill('#tserows tr:last-child [data-f=dueOff]', '12'); await pg.click('.modal [data-ok]'); await s.js("Store.flush()"); await pg.wait_for_timeout(300)
+        t = await s.go('#/admin/work/projects', 700)
+        c('Admin → Work & workflows → Projects: Project task sets', 'Project task sets' in t and 'Go-live checklist' in t)
+        await pg.click('[data-tsedit]'); await pg.wait_for_selector('#tse'); await pg.click('#tseadd'); await pg.wait_for_selector('#tse'); await pg.wait_for_timeout(150)   # the dialog puts the cursor in its first field first (a person never clicks within 30 ms)
+        await pg.fill('#tserows tr:last-child [data-f=title]', 'Sign-off'); await pg.fill('#tserows tr:last-child [data-f=dueOff]', '12'); await pg.click('.modal [data-ok]'); await s.js("Store.flush()")
+        try: await pg.wait_for_function("(TaskSets.all()[0] || { tasks: [] }).tasks.length === 3", timeout=5000)
+        except Exception: pass
         c('edit: a task added to the set', [x['title'] for x in (await s.js("TaskSets.all()[0]"))['tasks']] == ['Build order sets', 'Train users', 'Sign-off'])
         # an analyst cannot make sets (hand-edit ignored), and sees no buttons on a project he does not plan
         await s.sign_in_as('yousef', 'analyst'); t = await s.go('#/project/pj-a', 700)

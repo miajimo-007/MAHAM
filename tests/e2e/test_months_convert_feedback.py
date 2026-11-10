@@ -10,14 +10,15 @@ async def main():
         # ---------- folded tabs
         t = await s.go('#/admin/people', 600)
         c('Manager leave is on People', 'Manager leave & delegation' in t and await pg.locator('.tabs a, .adm-tabs a').filter(has_text='Manager leave').count() == 0)
-        t = await s.go('#/admin/scoring', 600)
-        c('Month locks + Months + what-if on Scoring', 'Month locks' in t and 'Months — ' in t and 'Scoring what-if' in t)
+        t = await s.go('#/admin/scoring/months', 600)
+        c('Scoring → Months: month locks + months', 'Month locks' in t and 'Months — ' in t)
+        t = await s.go('#/admin/scoring/rules', 600); c('Scoring → Rules: what-if', 'Scoring what-if' in t)
         t = await s.go('#/admin/months', 500); c('old link still works', 'Month locks' in t)
         # ---------- months: give Yousef some work in month 1 so he has a score
         await J(f"Store.saveMany([{{c:'shadow', id:'sm-s1', analyst:'yousef', team:'apps', date:'{y}-01-10', taskType:(L('taskTypes')()[0]||'Support'), subject:'x', minutes:600}}, {{c:'shadow', id:'sm-s2', analyst:'yousef', team:'apps', date:'{y}-02-10', taskType:(L('taskTypes')()[0]||'Support'), subject:'y', minutes:600}}])"); await J("Calc.invalidate()")
         a1 = await J(f"(Calc.score({y}, 'yousef', 1) || {{}}).score")
         c('January has a calculated score', a1 is not None)
-        await s.go('#/admin/scoring', 600)
+        await s.go('#/admin/scoring/months', 600)
         # whole-team: January not counted
         await pg.click('[data-smm="1"]'); await pg.wait_for_selector('#smf'); await pg.check('#smf [name=kind][value=skip]'); await pg.fill('#smf [name=note]', 'Go-live month'); await pg.click('.modal [data-ok]'); await pg.wait_for_timeout(500)
         c('January not counted for the team', await J(f"Calc.score({y}, 'yousef', 1)") is None and await J(f"Calc.monthMark({y}, 'layla', 1).kind") == 'skip')

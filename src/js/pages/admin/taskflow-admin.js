@@ -6,13 +6,17 @@
 const TFE = { scope: null, draft: null };
 
 const TaskFlowAdmin = {
+  /* the teams (and "Shared") an Admin may open here: any of the Project tasks areas, at view or edit level */
+  AREAS: ['task-workflows', 'workitem-fields', 'automation'],
   scopes() {
-    const all = App.isSuper() || AdminRole.can(App.me, 'workflows', '*');
+    const all = App.isSuper() || TaskFlowAdmin.AREAS.some(a => AdminRole.can(App.me, a, '*', null, null, 'view'));
     const teams = Store.teams().filter(t => all || AdminRole.teamsOf(App.me).includes(t.id));
     return (all ? [['', 'Shared (every team can use)']] : []).concat(teams.map(t => [t.id, t.name]));
   },
-  can(scope) {
-    return App.isSuper() || AdminRole.can(App.me, 'workflows', scope || '*');
+  /* may change workflows here (follow-ups: the Follow-ups area, for every team) */
+  can(scope, area) {
+    if (App.isSuper()) return true;
+    return scope === 'fu' ? AdminRole.can(App.me, 'followups', '*') : AdminRole.can(App.me, area || 'task-workflows', scope || '*');
   },
   recId(scope) {
     return scope ? 'settings-taskflow-' + scope : 'settings-taskflow';
@@ -42,9 +46,9 @@ const TaskFlowAdmin = {
 
   page() {
     const scopes = TaskFlowAdmin.scopes();
-    if (!scopes.length) return { html: empty('No teams to manage.') };
-    if (TFE.scope == null || !scopes.some(s => s[0] === TFE.scope))
-      TFE.scope = scopes.some(s => s[0] === App.viewTeam) ? App.viewTeam : scopes[0][0];
+    if (!scopes.length && TFE.scope !== 'fu') return { html: empty('No teams to manage.') };
+    if (TFE.scope !== 'fu' && (TFE.scope == null || !scopes.some(s => s[0] === TFE.scope)))
+      TFE.scope = scopes.some(s => s[0] === App.viewTeam) ? App.viewTeam : scopes[0][0]; // 'fu' = Admin → Follow-ups
     if (TFE.draft) return TaskFlowAdmin.editor();
     const sc = TFE.scope;
     const rec = TaskFlowAdmin.rec(sc);
@@ -802,42 +806,4 @@ const TaskFlowAdmin = {
   },
 };
 
-/* the tab: Admin → Task workflows (Organisation) — area "Workflows" */
-(function wireAdmin() {
-  const g = ADMIN_GROUPS.find(x => x[0] === 'Organisation');
-  const i = g[1].findIndex(t => t[0] === 'workflows');
-  g[1].splice(i + 1, 0, ['taskflows', 'Task workflows']);
-  ADMIN_TABS.splice(ADMIN_TABS.findIndex(t => t[0] === 'workflows') + 1, 0, ['taskflows', 'Task workflows']);
-  AdminUI.TAB_AREA.taskflows = 'workflows';
-  ADMIN_FIND.push(['Task workflows — statuses, moves, resolutions', 'taskflows']);
-  const base = P.admin;
-  P.admin = sub => {
-    if (sub !== 'taskflows') {
-      if (TFE.draft && sub !== 'taskflows') TFE.draft = null;
-      return base(sub);
-    }
-    const ok = App.isSuper() || AdminRole.mine().includes('workflows');
-    if (!ok) return base(sub);
-    const pg = TaskFlowAdmin.page();
-    let head;
-    if (App.isSuper()) head = adminHead('taskflows');
-    else {
-      const mine = AdminRole.mine();
-      const tabs = [['home', 'Home']].concat(
-        ADMIN_TABS.filter(([k]) => AdminUI.TAB_AREA[k] && mine.includes(AdminUI.TAB_AREA[k])).map(([k, n]) => [
-          k,
-          k === 'scoring' ? 'Scoring' : n,
-        ])
-      );
-      head = AdminUI.head('taskflows', tabs);
-    }
-    return {
-      title: 'Admin',
-      html: head + pg.html,
-      mount(root) {
-        if (App.isSuper()) bindAdminSearch(root);
-        if (pg.mount) pg.mount(root);
-      },
-    };
-  };
-})();
+/* where it shows: Admin → Work & workflows → Project tasks (and Follow-ups) — pages/admin-nav.js */

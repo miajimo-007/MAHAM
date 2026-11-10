@@ -175,7 +175,7 @@ const ScoreParts = {
     return (Store.byC.scoreadj || []).filter(a => a && !a._del && a.mid === mid && +a.year === y && +a.month === mo);
   },
   canAdjust(team) {
-    return App.realSuper() || AdminRole.can(App.me, 'scoring', team);
+    return App.realSuper() || AdminRole.can(App.me, 'adjustments', team);
   },
   canRate(mid) {
     const m = Store.member(mid);

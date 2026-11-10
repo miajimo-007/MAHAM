@@ -1,46 +1,8 @@
-/* MAHAM — Admin (super admin only): tabs Home · People · Permissions · Teams · Leave · Months · Scoring · Data · Log.
+/* MAHAM — Admin screens: People, Teams & departments, Manager leave, Activity log (the tabs are in admin-nav.js).
  * Home / Months / Scoring / Data / Log are in admin-tools.js, Permissions in admin-perms.js, the person card in admin-person.js. */
 'use strict';
 
-/* tabs in groups: who, the organisation, rules, look, the system */
-const ADMIN_GROUPS = [
-  ['', [['home', 'Home']]],
-  [
-    'People & access',
-    [
-      ['people', 'People'],
-      ['permissions', 'Permissions'],
-      ['teamrules', 'Team rules'],
-    ],
-  ],
-  [
-    'Organisation',
-    [
-      ['teams', 'Teams & departments'],
-      ['workflows', 'Workflows'],
-    ],
-  ],
-  [
-    'Rules',
-    [
-      ['lists', 'Lists'],
-      ['scoring', 'Scoring & months'],
-      ['hdmonths', 'Help desk months'],
-    ],
-  ],
-  ['Look', [['custom', 'Customize']]],
-  [
-    'System',
-    [
-      ['data', 'Data'],
-      ['feedback', 'Feedback'],
-      ['log', 'Change log'],
-      ['activity', 'Activity log'],
-    ],
-  ],
-];
-const ADMIN_TABS = ADMIN_GROUPS.flatMap(g => g[1]);
-/* what the search box finds besides people and teams */
+/* extra words the Admin search finds (target = an old tab name or a page; admin-nav.js translates them) */
 const ADMIN_FIND = [
   ['Team rules — what each role can do per team', 'teamrules'],
   ['Team targets', 'teamrules'],
@@ -75,64 +37,6 @@ const ADMIN_FIND = [
   ['Import old data', '#/importdata'],
   ['Findings from MAHAM Lab', 'data'],
 ];
-
-function adminHead(tab) {
-  return `<div class="adm-top"><div class="tabs adm-tabs">${ADMIN_GROUPS.map(([g, l]) => `${g ? `<span class="adm-g">${h(g)}</span>` : ''}${l.map(([k, n]) => `<a class="tab ${tab === k ? 'on' : ''}" href="#/admin/${k}">${n}</a>`).join('')}`).join('')}</div>
-    <div class="adm-search"><input id="adsearch" type="search" placeholder="🔎 Find a person, team or setting…" autocomplete="off"><div id="adresults" class="adm-results" hidden></div></div></div>`;
-}
-function bindAdminSearch(root) {
-  const inp = root.querySelector('#adsearch'),
-    out = root.querySelector('#adresults');
-  if (!inp) return;
-  const go = href => {
-    location.hash = href;
-  };
-  inp.oninput = () => {
-    const q = U.lc(inp.value);
-    if (!q) {
-      out.hidden = true;
-      return;
-    }
-    const hits = [
-      ...Store.members()
-        .filter(m => [m.name, m.short, m.me, m.id, ...(m.aliases || [])].some(x => U.lc(x).includes(q)))
-        .slice(0, 8)
-        .map(m => [
-          `👤 ${m.name}`,
-          `${Store.roleLabel(m.role)}${Store.topRole(m.role) ? '' : ' · ' + Store.teamName(m.team || 'apps')}${m.active === false ? ' · retired' : ''}`,
-          '#/adminperson/' + m.id,
-        ]),
-      ...Store.teams()
-        .filter(t => U.lc(t.name).includes(q) || t.id.includes(q))
-        .map(t => [`👥 ${t.name}`, 'team', '#/admin/teams']),
-      ...ADMIN_FIND.filter(([l]) => U.lc(l).includes(q)).map(([l, t]) => [
-        `⚙ ${l}`,
-        t.startsWith('#') ? t.slice(2) : 'Admin → ' + (ADMIN_TABS.find(x => x[0] === t) || ['', t])[1],
-        t.startsWith('#') ? t : '#/admin/' + t,
-      ]),
-    ];
-    out.innerHTML = hits.length
-      ? hits
-          .map(([a, b, href]) => `<a class="adm-hit" href="${h(href)}"><b>${h(a)}</b><span class="muted small">${h(b)}</span></a>`)
-          .join('')
-      : '<div class="muted small adm-hit">Nothing found</div>';
-    out.hidden = false;
-  };
-  inp.onkeydown = e => {
-    if (e.key === 'Enter') {
-      const a = out.querySelector('a.adm-hit');
-      if (a) go(a.getAttribute('href'));
-    }
-    if (e.key === 'Escape') {
-      inp.value = '';
-      out.hidden = true;
-    }
-  };
-  inp.onblur = () =>
-    setTimeout(() => {
-      out.hidden = true;
-    }, 200);
-}
 
 /* changes that deserve a second look before saving the people list */
 function riskyChanges(before, after) {
@@ -223,44 +127,7 @@ function adminJoin(...parts) {
   };
 }
 
-P.admin = sub => {
-  if (!App.isSuper())
-    return { title: 'Not available', html: '<div class="card"><p>You don\'t have permission to see this page.</p></div>' };
-  if (sub === 'leave') sub = 'people';
-  if (sub === 'months') sub = 'scoring'; // folded into People / Scoring
-  const tab = ADMIN_TABS.some(t => t[0] === sub) ? sub : 'home';
-  if (tab !== 'workflows' && typeof WF !== 'undefined') {
-    WF.draft = null;
-    WF.maps = {};
-  }
-  const pg = {
-    lists: () => {
-      const x = P.settings('lists');
-      return adminJoin({ html: x.html, mount: x.mount }, adminUserDepts());
-    },
-    home: adminHome,
-    people: () => adminJoin(adminPeople(), adminLeave()),
-    permissions: adminPerms,
-    teamrules: adminTeamRules,
-    hdmonths: adminHdMonths,
-    teams: adminTeams,
-    custom: adminCustom,
-    workflows: () => (WF.draft ? adminFlows() : adminJoin(adminTodoFlows(), adminFlows())),
-    feedback: adminFeedback,
-    scoring: () => adminJoin(adminMonths(), adminScoreMonths(), adminScoring()),
-    data: adminData,
-    log: adminLog,
-    activity: adminActivity,
-  }[tab]();
-  return {
-    title: 'Admin',
-    html: adminHead(tab) + pg.html,
-    mount(root) {
-      bindAdminSearch(root);
-      if (pg.mount) pg.mount(root);
-    },
-  };
-};
+/* the page itself (6 main tabs with sub-tabs) is in pages/admin-nav.js */
 
 /* ---------------- People ---------------- */
 function adminPeople() {

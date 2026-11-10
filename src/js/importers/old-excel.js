@@ -51,6 +51,12 @@ const Importer = {
       .replace(/\s*\[f\]$/, '')
       .trim();
   },
+  /* a Staff name that matches nobody in the app (shown on the import screen) */
+  unknown(meta, raw) {
+    if (!raw) return;
+    meta.unknownStaff = meta.unknownStaff || [];
+    if (!meta.unknownStaff.includes(raw)) meta.unknownStaff.push(raw);
+  },
 
   /* find header row: first row (within 40) containing all `need` labels; returns {ri, col(name)} */
   header(rows, need) {
@@ -93,6 +99,8 @@ const Importer = {
     },
     { key: 'todo', label: 'To Do List', names: ['to do list', 'to do list 2025'], need: ['status', 'to do', 'assined to', 'finish date'] },
     { key: 'shadow', label: 'Shadow Works', names: ['shadow works'], need: ['task type', 'source', 'subject', 'duration'] },
+    { key: 'routine', label: 'Routine Tasks → Shadow Works', names: ['routine tasks'], need: ['request id', 'staff', 'task', 'cat/type'] },
+    { key: 'projtasks', label: 'Project Tasks → Projects', names: ['project tasks'], need: ['project', 'task details', 'stage', 'staff'] },
     { key: 'helpdesk', label: 'MEDataSource (ManageEngine)', names: ['medatasource'], need: ['requester', 'subject', 'technician'] },
     { key: 'attendance', label: 'Attendance', names: ['attendance'], need: ['on', 'of', 'pr', 'hrs', 'type'] },
     { key: 'central', label: 'Riyad FU', names: ['riyad fu'], need: ['req id', 'redmine', 'deployed'] },
@@ -217,6 +225,252 @@ const Importer = {
           _k: [date, an, r[c.tt], r[c.sub], r[c.dur]].join('|'),
         });
       }
+      return out;
+    },
+    /* a team's "Routine Tasks" sheet (Init Date, Request ID, Staff, Task, Cat/Type, Status, Complete Date, Comment, Days)
+       → shadow work. The sheet has no time column: minutes are set on the import screen (meta.routineMin, default 30).
+       New Cat/Type values are added to the team's task type list so the shadow form keeps them. */
+    routine(rows, meta) {
+      const H = Importer.header(rows, ['staff', 'task', 'cat/type']);
+      if (!H) return [];
+      const c = {
+        init: H.col('init date', 'date'),
+        rid: H.col('request id'),
+        an: H.col('staff'),
+        task: H.col('task'),
+        cat: H.col('cat/type'),
+        st: H.col('status'),
+        done: H.col('complete date', 'date comp'),
+        com: H.col('comment'),
+      };
+      if (!App.viewTeam || App.viewTeam === '*') {
+        meta.needTeam = true;
+        return [];
+      }
+      const team = App.viewTeam,
+        L = Store.lists(team);
+      const types = new Set(L.taskTypes || []),
+        sources = L.sources || [];
+      const srcReq = sources.includes('IT Request') ? 'IT Request' : sources[0] || 'IT Request',
+        srcOther = sources.includes('To Do') ? 'To Do' : srcReq;
+      const out = [],
+        added = [];
+      for (const r of rows.slice(H.ri + 1)) {
+        const task = Importer.s(r[c.task]);
+        if (!task) continue;
+        const raw = Importer.s(r[c.an]),
+          an = Importer.who(raw);
+        if (!an) {
+          Importer.unknown(meta, raw);
+          continue;
+        }
+        const done = c.done >= 0 ? Importer.d(r[c.done]) : '',
+          date = Importer.d(r[c.init]) || done;
+        if (!date) {
+          meta.noDate = (meta.noDate || 0) + 1;
+          continue;
+        }
+        const rid = c.rid >= 0 ? Importer.s(r[c.rid]) : '',
+          st = c.st >= 0 ? Importer.s(r[c.st]) : '',
+          cat = Importer.s(r[c.cat]),
+          com = c.com >= 0 ? Importer.s(r[c.com]) : '';
+        if (cat && !types.has(cat)) {
+          types.add(cat);
+          added.push(cat);
+        }
+        const note = [st && 'Status: ' + st, done && 'Completed: ' + done, com].filter(Boolean).join(' · ');
+        out.push({
+          c: 'shadow',
+          date,
+          analyst: an,
+          taskType: cat,
+          source: rid ? srcReq : srcOther,
+          subject: task,
+          minutes: null,
+          ref: rid,
+          fu: !done && !/cancel/i.test(st),
+          note,
+          _k: ['routine', date, raw, task, rid].join('|'),
+        });
+      }
+      if (added.length) {
+        const id = 'settings-lists-' + team,
+          cur = Store.get(id) || {};
+        out.push(
+          Object.assign({}, cur, {
+            id,
+            c: 'settings',
+            lists: Object.assign({}, cur.lists || {}, { taskTypes: [...(L.taskTypes || []), ...added] }),
+          })
+        );
+      }
+      return out;
+    },
+    /* a team's "Project Tasks" sheet (Init Date, Project, TASK Details, Stage, Staff, Date Comp, Status, Days)
+       → one project per Project name (owner = the team's manager) with its tasks. Stage is the task status: the stages
+       become the team workflow "<team> project stages" (board columns), used by the imported projects. */
+    projtasks(rows, meta) {
+      const H = Importer.header(rows, ['project', 'task details', 'stage', 'staff']);
+      if (!H) return [];
+      const c = {
+        init: H.col('init date', 'date'),
+        pr: H.col('project'),
+        ti: H.col('task details'),
+        stg: H.col('stage'),
+        an: H.col('staff'),
+        done: H.col('date comp', 'complete date'),
+        st: H.col('status'),
+      };
+      if (!App.viewTeam || App.viewTeam === '*') {
+        meta.needTeam = true;
+        return [];
+      }
+      const team = App.viewTeam,
+        mgr = (Store.teamManager(team) || {}).id || App.me,
+        today = U.todayStr();
+      const items = [];
+      for (const r of rows.slice(H.ri + 1)) {
+        const proj = Importer.s(r[c.pr]).replace(/\s+/g, ' '),
+          title = Importer.s(r[c.ti]);
+        if (!proj || !title) continue;
+        const raw = Importer.s(r[c.an]),
+          an = Importer.who(raw);
+        if (raw && !an) Importer.unknown(meta, raw);
+        items.push({
+          proj,
+          key: U.lc(proj),
+          title,
+          stage: Importer.s(r[c.stg]).replace(/\s+/g, ' '),
+          raw,
+          an: an || '',
+          init: Importer.d(r[c.init]),
+          done: c.done >= 0 ? Importer.d(r[c.done]) : '',
+          st: c.st >= 0 ? Importer.s(r[c.st]) : '',
+        });
+      }
+      if (!items.length) return [];
+      /* the stages → a workflow (kept and added to on the next import) */
+      const wfId = 'tf-imported-' + team,
+        trec = Store.get('settings-taskflow-' + team) || {},
+        old = (trec.flows || []).find(w => w.id === wfId);
+      const catOf = name => {
+        if (/cancel|reject|drop/i.test(name)) return 'done';
+        if (/\b(done|complete|completed|closed|finished|resolved|delivered|deployed)\b/i.test(name)) return 'done';
+        if (/hold|wait|pending|blocked/i.test(name)) return 'wait';
+        if (/not started|^new$|to ?do|backlog|planned|^open$/i.test(name)) return 'todo';
+        const rs = items.filter(x => x.stage === name);
+        return rs.every(x => x.done) ? 'done' : 'doing';
+      };
+      const st = (old ? old.statuses : []).map(s => Object.assign({}, s));
+      for (const x of items) if (x.stage && !st.some(s => U.lc(s.name) === U.lc(x.stage))) st.push({ name: x.stage, cat: catOf(x.stage) });
+      if (!st.some(s => s.cat === 'done')) st.push({ name: 'Done', cat: 'done' });
+      const ORDER = ['todo', 'wait', 'doing', 'done'];
+      st.sort((a, b) => ORDER.indexOf(a.cat) - ORDER.indexOf(b.cat));
+      const start = (st.find(s => s.cat === 'todo') || st[0]).name,
+        doneName = st.find(s => s.cat === 'done' && !/cancel|reject|drop/i.test(s.name)) || st.find(s => s.cat === 'done');
+      const wf = {
+        id: wfId,
+        name: `${Store.teamName(team)} project stages`,
+        start,
+        statuses: st,
+        trs: st.map((s, i) => ({ id: 'to' + i, name: s.name, from: ['*'], to: s.name })),
+      };
+      const statusOf = x => {
+        if (!x.stage) return x.done ? doneName.name : start;
+        return st.find(s => U.lc(s.name) === U.lc(x.stage)).name;
+      };
+      const catName = n => (st.find(s => s.name === n) || {}).cat || 'todo';
+      /* projects (an existing project of this team with the same name is used, not copied) */
+      const out = [],
+        picks = Object.assign({}, trec.projects || {}),
+        seen = {};
+      const groups = new Map();
+      for (const x of items) {
+        if (!groups.has(x.key)) groups.set(x.key, []);
+        groups.get(x.key).push(x);
+      }
+      for (const [key, list] of groups) {
+        const ex = Store.all('project').find(
+          p =>
+            Scrum.teamOf(p) === team &&
+            U.lc(
+              String(p.name || '')
+                .replace(/\s+/g, ' ')
+                .trim()
+            ) === key
+        );
+        const pid = ex ? ex.id : `xlp-${team}-${Importer.hash(key)}`;
+        const tasks = list.map(x => Object.assign(x, { status: statusOf(x) }));
+        const allDone = tasks.every(x => catName(x.status) === 'done');
+        const dates = tasks
+            .map(x => x.init)
+            .filter(Boolean)
+            .sort(),
+          ends = tasks
+            .map(x => x.done)
+            .filter(Boolean)
+            .sort();
+        if (!ex)
+          out.push({
+            id: pid,
+            c: 'project',
+            name: list[0].proj,
+            team,
+            manager: mgr,
+            origin: 'team',
+            priority: 'Normal',
+            status: allDone ? 'Done' : 'In Progress',
+            progress: allDone ? 100 : 0,
+            mode: 'kanban',
+            start: dates[0] || today,
+            due: '',
+            description: '',
+            members: [...new Set(tasks.map(x => x.an).filter(Boolean))],
+            updatedOn: today,
+            doneDate: allDone ? ends[ends.length - 1] || today : '',
+          });
+        if (!ex || !picks[pid]) picks[pid] = { all: wfId, types: {} };
+        let n = ex
+          ? Scrum.items(pid)
+              .filter(t => !/^xlt-/.test(t.id))
+              .reduce((a, t) => Math.max(a, t.n || 0), 0)
+          : 0;
+        for (const x of tasks) {
+          const base = `xlt-${team}-${Importer.hash([key, x.title, x.raw, x.init].join('|'))}`;
+          seen[base] = (seen[base] || 0) + 1;
+          const k = catName(x.status);
+          out.push({
+            id: seen[base] > 1 ? `${base}-${seen[base]}` : base,
+            c: 'ptask',
+            project: pid,
+            team,
+            n: ++n,
+            title: x.title,
+            type: 'Task',
+            priority: 'Normal',
+            points: 1,
+            assignee: x.an,
+            status: x.status,
+            start: x.init,
+            due: '',
+            sprint: '',
+            createdOn: x.init || x.done || today,
+            startedOn: k === 'todo' ? '' : x.init || '',
+            doneDate: k === 'done' ? x.done || x.init || today : '',
+            description: '',
+            comment: x.st ? 'Status in the sheet: ' + x.st : '',
+            checklist: [],
+          });
+        }
+      }
+      out.push(
+        Object.assign({}, trec, {
+          id: 'settings-taskflow-' + team,
+          c: 'settings',
+          flows: [...(trec.flows || []).filter(w => w.id !== wfId), wf],
+          projects: picks,
+        })
+      );
       return out;
     },
     helpdesk(rows, meta) {
@@ -695,6 +949,7 @@ const Importer = {
   commit(analysis, overwrite) {
     const all = analysis.results.flatMap(R => R.recs);
     for (const r of all) {
+      if (r.c === 'shadow' && r.minutes == null) r.minutes = Math.max(0, Math.round(+analysis.meta.routineMin || 30)); // routine tasks: time per task chosen on the screen
       if (r.c === 'helpdesk') {
         const m = Store.member(Store.memberByMeName(r.technician));
         r.team = (m && !Store.topRole(m.role) && m.team) || App.viewTeam;

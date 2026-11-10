@@ -5,31 +5,40 @@
 'use strict';
 
 const AdminUI = {
-  TAB_AREA: {
-    people: 'people',
-    lists: 'lists',
-    teams: 'teams',
-    workflows: 'workflows',
-    hdmonths: 'hdmonths',
-    feedback: 'feedback',
-    scoring: 'scoring',
-    activity: 'activity',
-    timerules: 'timerules',
-  },
-  /* ---------- person card: the role ---------- */
+  /* ---------- person card: the role (areas grouped as in Admin, a level per area, reach) ---------- */
   roleCard(m) {
     if (m.superAdmin) return card('Admin role', '<p class="muted small">Super admin — has everything.</p>');
     const on = !!m.admin;
-    const areas = new Set(m.adminAreas || []);
+    const g = { areas: AdminRole.areasOf(m), reach: AdminRole.reachOf(m), teams: m.adminTeams || [] };
     const tpl = AdminRole.templates();
+    const groups = typeof AdminNav !== 'undefined' ? AdminNav.TABS.filter(t => t.key !== 'home') : [];
+    const row = ([k, l, d]) => {
+      const lv = g.areas.get(k);
+      const vo = AdminRole.VIEW_ONLY.includes(k);
+      const all = AdminRole.ALL_ONLY.includes(k);
+      return `<div class="ar-row"><label class="check" title="${h(d)}"><input type="checkbox" data-area="${k}" ${lv ? 'checked' : ''}> ${h(l)}${all ? ' <span class="muted small">(all teams)</span>' : ''} <span class="muted small">— ${h(d)}</span></label>${vo ? '<span class="muted small">view</span>' : `<select data-lv="${k}"><option value="edit" ${lv !== 'view' ? 'selected' : ''}>Edit</option><option value="view" ${lv === 'view' ? 'selected' : ''}>View only</option></select>`}</div>`;
+    };
+    const byTab =
+      groups
+        .map(t => {
+          const l = AdminRole.AREAS.filter(a => a[3] === t.key);
+          return l.length ? `<div class="ar-grp"><b class="small">${h(t.label)}</b>${l.map(row).join('')}</div>` : '';
+        })
+        .join('') || AdminRole.AREAS.map(row).join('');
     return card(
       'Admin role',
-      `<p class="muted small">An Admin keeps working as ${h(Store.roleLabel(m.role || 'analyst'))} and gets an <b>Admin</b> menu with only the areas ticked here. Only you can give it. Changes they make go live at once, are in the Activity and Change logs, and you can undo them.</p>
+      `<p class="muted small">An Admin keeps working as ${h(Store.roleLabel(m.role || 'analyst'))} and gets an <b>Admin</b> menu with only the areas ticked here — <b>Edit</b> or <b>View only</b> (read-only screens, no save buttons). Only you can give it. Changes they make go live at once, are in the Activity and Change logs, show on your Admin home, and you can undo them. Roles &amp; access, team rules, giving Admin roles, import / restore, undo and fixing in System Check stay with you.</p>
       <label class="check"><input type="checkbox" id="ar-on" ${on ? 'checked' : ''}> <b>Admin</b></label>
       <div id="ar-box" ${on ? '' : 'hidden'}>
-        <div class="row-btns" style="margin:8px 0"><label class="small">Reach</label><select id="ar-reach"><option value="team" ${m.adminReach !== 'all' ? 'selected' : ''}>Own team only (${h(Store.teamName(m.team || 'apps'))})</option><option value="all" ${m.adminReach === 'all' ? 'selected' : ''}>All teams</option></select>
+        <div class="row-btns" style="margin:8px 0"><label class="small">Reach</label><select id="ar-reach"><option value="team" ${g.reach === 'team' ? 'selected' : ''}>Own team only (${h(Store.teamName(m.team || 'apps'))})</option><option value="teams" ${g.reach === 'teams' ? 'selected' : ''}>Chosen teams</option><option value="all" ${g.reach === 'all' ? 'selected' : ''}>All teams</option></select>
+          <span id="ar-teams" ${g.reach === 'teams' ? '' : 'hidden'}>${Store.teams()
+            .map(
+              t =>
+                `<label class="check small"><input type="checkbox" data-arteam="${h(t.id)}" ${g.teams.includes(t.id) ? 'checked' : ''}> ${h(t.name)}</label>`
+            )
+            .join(' ')}</span>
           ${tpl.length ? `<select id="ar-tpl"><option value="">Use a template…</option>${tpl.map(t => `<option value="${h(t.id)}">${h(t.name)}</option>`).join('')}</select>` : ''}</div>
-        <div class="ar-areas">${AdminRole.AREAS.map(([k, l, d]) => `<label class="check" title="${h(d)}"><input type="checkbox" data-area="${k}" ${areas.has(k) ? 'checked' : ''}> ${h(l)} <span class="muted small">— ${h(d)}</span></label>`).join('')}</div>
+        <div class="ar-areas">${byTab}</div>
         <div class="row-btns"><button class="btn sm ghost" id="ar-savetpl">Save these as a template…</button><span class="grow"></span></div>
       </div>
       <div class="row-btns"><span class="grow"></span><button class="btn primary sm" id="ar-save">Save Admin role</button></div>`
@@ -40,24 +49,42 @@ const AdminUI = {
     if (!on) return;
     const box = root.querySelector('#ar-box');
     on.onchange = () => (box.hidden = !on.checked);
-    const read = () => ({
-      areas: [...root.querySelectorAll('[data-area]')].filter(i => i.checked).map(i => i.dataset.area),
-      reach: root.querySelector('#ar-reach').value,
-    });
+    const reach = root.querySelector('#ar-reach');
+    const tbox = root.querySelector('#ar-teams');
+    reach.onchange = () => (tbox.hidden = reach.value !== 'teams');
+    const read = () => {
+      const areas = [...root.querySelectorAll('[data-area]')].filter(i => i.checked).map(i => i.dataset.area);
+      const levels = {};
+      for (const a of areas) {
+        const s = root.querySelector(`[data-lv="${a}"]`);
+        if (s && s.value === 'view') levels[a] = 'view';
+      }
+      return {
+        v: 2,
+        areas,
+        levels,
+        reach: reach.value,
+        teams: reach.value === 'teams' ? [...root.querySelectorAll('[data-arteam]')].filter(i => i.checked).map(i => i.dataset.arteam) : [],
+      };
+    };
     const tsel = root.querySelector('#ar-tpl');
     if (tsel)
       tsel.onchange = () => {
         const t = AdminRole.templates().find(x => x.id === tsel.value);
         if (!t) return;
-        root.querySelectorAll('[data-area]').forEach(i => (i.checked = (t.areas || []).includes(i.dataset.area)));
-        root.querySelector('#ar-reach').value = t.reach === 'all' ? 'all' : 'team';
+        const ar = AdminRole.areasOf(t);
+        root.querySelectorAll('[data-area]').forEach(i => (i.checked = ar.has(i.dataset.area)));
+        root.querySelectorAll('[data-lv]').forEach(s => (s.value = ar.get(s.dataset.lv) === 'view' ? 'view' : 'edit'));
+        reach.value = AdminRole.reachOf(t);
+        tbox.hidden = reach.value !== 'teams';
+        root.querySelectorAll('[data-arteam]').forEach(i => (i.checked = (t.teams || []).includes(i.dataset.arteam)));
       };
     root.querySelector('#ar-savetpl').onclick = () => {
       const v = read();
       if (!v.areas.length) return UI.toast('Tick at least one area', 'bad');
       UI.modal({
         title: 'Save as a template',
-        body: `<p class="muted small">${v.areas.map(a => h(AdminRole.label(a))).join(', ')} · ${v.reach === 'all' ? 'all teams' : 'own team'}</p><input id="ar-tname" placeholder="e.g. Manager-Admin" style="width:100%">`,
+        body: `<p class="muted small">${v.areas.map(a => h(AdminRole.label(a)) + (v.levels[a] ? ' (view)' : '')).join(', ')} · ${v.reach === 'all' ? 'all teams' : v.reach === 'teams' ? 'chosen teams' : 'own team'}</p><input id="ar-tname" placeholder="e.g. Manager-Admin" style="width:100%">`,
         actions: '<span class="grow"></span><button class="btn primary" data-ok>Save template</button>',
         onMount: w =>
           (w.querySelector('[data-ok]').onclick = () => {
@@ -71,20 +98,23 @@ const AdminUI = {
       const v = read();
       const isOn = on.checked && v.areas.length;
       if (on.checked && !v.areas.length) return UI.toast('Tick at least one area (or untick Admin)', 'bad');
-      if (isOn && v.areas.includes('teams') && v.reach !== 'all') return UI.toast('“Teams & departments” needs “All teams”', 'bad');
+      const all = v.areas.filter(a => AdminRole.ALL_ONLY.includes(a));
+      if (isOn && all.length && v.reach !== 'all')
+        return UI.toast(
+          `${all.map(a => '“' + AdminRole.label(a) + '”').join(' and ')} need${all.length > 1 ? '' : 's'} “All teams”`,
+          'bad'
+        );
+      if (isOn && v.reach === 'teams' && !v.teams.length) return UI.toast('Tick the teams (or pick another reach)', 'bad');
       if (document.querySelector('.modal #ar-on')) UI.closeModal();
       saveMembersAll(
         Store.members().map(x => {
           if (x.id !== m.id) return x;
           const y = Object.assign({}, x);
+          for (const k of ['admin', 'adminV', 'adminAreas', 'adminLevels', 'adminReach', 'adminTeams']) delete y[k];
           if (isOn) {
-            y.admin = true;
-            y.adminAreas = v.areas;
-            y.adminReach = v.reach;
-          } else {
-            delete y.admin;
-            delete y.adminAreas;
-            delete y.adminReach;
+            Object.assign(y, { admin: true, adminV: 2, adminAreas: v.areas, adminReach: v.reach });
+            if (Object.keys(v.levels).length) y.adminLevels = v.levels;
+            if (v.reach === 'teams') y.adminTeams = v.teams;
           }
           return y;
         }),
@@ -92,13 +122,85 @@ const AdminUI = {
       );
     };
   },
+  reachText(g, m) {
+    return g.reach === 'all' ? 'all teams' : g.teams.map(t => Store.teamName(t)).join(', ') || Store.teamName(m.team || 'apps');
+  },
   summary(m) {
     const g = AdminRole.own(m);
     return g
-      ? `Admin for ${g.reach === 'all' ? 'all teams' : Store.teamName(m.team || 'apps')}: ${g.areas.map(a => AdminRole.label(a)).join(', ')}`
+      ? `Admin for ${AdminUI.reachText(g, m)}: ${[...g.areas].map(([a, lv]) => AdminRole.label(a) + (lv === 'view' && !AdminRole.VIEW_ONLY.includes(a) ? ' (view)' : '')).join(', ')}`
       : '';
   },
-  /* the role editor in a dialog (People table → ⛨ Admin) */
+  /* People → Roles & access: who is an Admin, and the templates */
+  rolesCard() {
+    const admins = Store.members().filter(m => AdminRole.own(m));
+    const tpl = AdminRole.templates();
+    return {
+      html: card(
+        `Admin roles <span class="count">${admins.length}</span>`,
+        `<p class="muted small">Give a person some admin areas on their card (People → ⛨ Admin). Their changes are logged, shown on your Admin home and you can undo them.</p>
+      ${admins.length ? `<div class="li-list">${admins.map(m => `<div class="li"><span class="grow"><b>${h(m.name)}</b> <span class="muted small">${h(AdminUI.summary(m))}</span></span><button class="btn xs" data-adminrole="${h(m.id)}">Edit</button></div>`).join('')}</div>` : empty('Nobody has an Admin role yet.')}
+      <h3 class="small" style="margin-top:12px">Templates <span class="count">${tpl.length}</span></h3>
+      ${
+        tpl.length
+          ? `<div class="li-list">${tpl
+              .map(t => {
+                const ar = AdminRole.areasOf(t);
+                return `<div class="li"><span class="grow"><b>${h(t.name)}</b> <span class="muted small">${[...ar].map(([a, lv]) => h(AdminRole.label(a)) + (lv === 'view' && !AdminRole.VIEW_ONLY.includes(a) ? ' (view)' : '')).join(', ')} · ${AdminRole.reachOf(t) === 'all' ? 'all teams' : AdminRole.reachOf(t) === 'teams' ? 'chosen teams' : 'own team'}</span></span><button class="btn xs ghost" data-tpldel="${h(t.id)}">Delete</button></div>`;
+              })
+              .join('')}</div>`
+          : '<p class="muted small">No templates — save one from an Admin role.</p>'
+      }`
+      ),
+      mount(root) {
+        root.querySelectorAll('[data-adminrole]').forEach(
+          b =>
+            (b.onclick = e => {
+              e.preventDefault();
+              AdminUI.roleDialog(b.dataset.adminrole);
+            })
+        );
+        root.querySelectorAll('[data-tpldel]').forEach(
+          b =>
+            (b.onclick = () =>
+              UI.confirm('Delete this template? Admins given it keep their areas.', () => {
+                Store.save(
+                  Object.assign({}, Store.get('settings-admintemplates'), {
+                    list: AdminRole.templates().filter(t => t.id !== b.dataset.tpldel),
+                  })
+                );
+                UI.toast('Template deleted', 'good');
+                App.render();
+              }))
+        );
+      },
+    };
+  },
+  /* the People table (super admin): a ⛨ Admin button next to Permissions */
+  withRoleButtons(out) {
+    out.html = out.html.replace(/<button class="btn xs[^"]*" data-perm="([^"]+)">Permissions<\/button>/g, (all, id) => {
+      const m = Store.member(id);
+      if (!m || m.superAdmin) return all;
+      const on = !!AdminRole.own(m);
+      return (
+        `<button class="btn xs ${on ? 'primary' : ''}" data-adminrole="${h(id)}" title="${h(on ? AdminUI.summary(m) : 'Give some admin areas')}">⛨ Admin</button> ` +
+        all
+      );
+    });
+    const m1 = out.mount;
+    out.mount = root => {
+      if (m1) m1(root);
+      root.querySelectorAll('[data-adminrole]').forEach(
+        b =>
+          (b.onclick = e => {
+            e.preventDefault();
+            e.stopPropagation();
+            AdminUI.roleDialog(b.dataset.adminrole);
+          })
+      );
+    };
+    return out;
+  },
   roleDialog(id) {
     const m = Store.member(id);
     if (!m) return;
@@ -119,7 +221,7 @@ const AdminUI = {
     if (!name) return;
     const list = AdminRole.templates()
       .filter(t => t.name !== name)
-      .concat([{ id: U.uid('atpl'), name, areas: v.areas, reach: v.reach }]);
+      .concat([{ id: U.uid('atpl'), name, v: 2, areas: v.areas, levels: v.levels || {}, reach: v.reach, teams: v.teams || [] }]);
     Store.save(Object.assign({}, Store.get('settings-admintemplates') || { id: 'settings-admintemplates', c: 'settings' }, { list }));
     UI.toast(`Template “${name}” saved`, 'good');
   },
@@ -168,32 +270,6 @@ const AdminUI = {
       '<span class="muted small">Try weights here; save them in Weights and parts.</span>'
     );
     return adminJoin(sp, rules, wif);
-  },
-  /* ---------- the limited Admin's head (only their tabs) ---------- */
-  head(tab, tabs) {
-    return `<div class="adm-top"><div class="tabs adm-tabs">${tabs.map(([k, n]) => `<a class="tab ${tab === k ? 'on' : ''}" href="#/admin/${k}">${n}</a>`).join('')}</div></div>
-      <div class="insights"><div>⛨ You are an <b>Admin</b> for ${
-        AdminRole.of(App.me).reach === 'all'
-          ? '<b>all teams</b>'
-          : AdminRole.teamsOf(App.me)
-              .map(t => `<b>${h(Store.teamName(t))}</b>`)
-              .join(', ')
-      }. What you change goes live at once and is in the Activity log.</div></div>`;
-  },
-  homeLite(tabs) {
-    const mine = AdminRole.mine();
-    return {
-      html: card(
-        'Your Admin areas',
-        `<div class="li-list">${mine
-          .map(a => {
-            const t = Object.entries(AdminUI.TAB_AREA).find(([, x]) => x === a);
-            const href = a === 'syscheck' ? '#/syscheck' : a === 'announcements' ? '#/announcements' : t ? '#/admin/' + t[0] : '';
-            return `<div class="li"><span class="grow"><b>${h(AdminRole.label(a))}</b> <span class="muted small">${h((AdminRole.AREAS.find(x => x[0] === a) || [])[2] || '')}</span></span>${href ? `<a class="btn xs" href="${href}">Open</a>` : ''}</div>`;
-          })
-          .join('')}</div>`
-      ),
-    };
   },
   /* ---------- People (limited): plain people of my teams ---------- */
   peopleLite() {
@@ -315,9 +391,7 @@ const AdminUI = {
                 e =>
                   `<div class="li"><span class="grow"><b>${h(Store.memberShort(e.who))}</b> ${h(e.act === 'add' ? 'added' : e.act === 'del' ? 'deleted' : 'changed')} ${h(e.what || e.id)} ${e.fields && e.fields.length ? `<span class="muted small">(${h(e.fields.join(', '))})</span>` : ''}</span><span class="muted small">${U.fmtDate(U.ds(new Date(e.at)))}</span></div>`
               )
-              .join(
-                ''
-              )}</div><p class="small"><a class="link" href="#/admin/log">Change log — undo</a> · <a class="link" href="#/admin/activity">Activity log</a></p>`
+              .join('')}</div><p class="small"><a class="link" href="#/admin/system/logs">Change log — undo · Activity log</a></p>`
           : '<p class="muted small">No changes by Admins this week.</p>'
       }`
     );
@@ -394,126 +468,8 @@ const AdminUI = {
   },
 };
 
-/* ---------- wiring ---------- */
+/* ---------- wiring (the Admin page itself, with its tabs, is in pages/admin-nav.js) ---------- */
 (function () {
-  const rules = ADMIN_GROUPS.find(g => g[0] === 'Rules');
-  if (rules && !rules[1].some(t => t[0] === 'timerules')) {
-    rules[1].unshift(['timerules', 'Time rules & holidays']);
-    ADMIN_TABS.push(['timerules', 'Time rules & holidays']);
-  }
-  ADMIN_FIND.push(
-    ['Time rules — when work is late, working days, holidays, escalation', 'timerules'],
-    ['Admin role — give someone some admin areas', 'people'],
-    ['Admin templates', 'people']
-  );
-  const base = P.admin;
-  P.admin = sub => {
-    const timeRules = () => (typeof TimeRulesUI !== 'undefined' ? TimeRulesUI.page() : { html: empty('Time rules are not available.') });
-    if (App.isSuper()) {
-      if (sub === 'scoring' || sub === 'months' || sub === 'lists') {
-        const tab = sub === 'lists' ? 'lists' : 'scoring';
-        const pg =
-          tab === 'lists'
-            ? adminJoin(AdminUI.settingsPart(['lists']), adminUserDepts())
-            : adminJoin(adminMonths(), adminScoreMonths(), AdminUI.scoringPage());
-        if (typeof WF !== 'undefined') {
-          WF.draft = null;
-          WF.maps = {};
-        }
-        return {
-          title: 'Admin',
-          html: adminHead(tab) + pg.html,
-          mount(root) {
-            bindAdminSearch(root);
-            if (pg.mount) pg.mount(root);
-          },
-        };
-      }
-      if (sub === 'timerules') {
-        const pg = timeRules();
-        return {
-          title: 'Admin',
-          html: adminHead('timerules') + pg.html,
-          mount(root) {
-            bindAdminSearch(root);
-            if (pg.mount) pg.mount(root);
-          },
-        };
-      }
-      const out = base(sub);
-      if (sub === 'people') {
-        out.html = out.html.replace(/<button class="btn xs[^"]*" data-perm="([^"]+)">Permissions<\/button>/g, (all, id) => {
-          const m = Store.member(id);
-          if (!m || m.superAdmin) return all;
-          const on = !!AdminRole.own(m);
-          return (
-            `<button class="btn xs ${on ? 'primary' : ''}" data-adminrole="${h(id)}" title="${h(on ? AdminUI.summary(m) : 'Give some admin areas')}">⛨ Admin</button> ` +
-            all
-          );
-        });
-        const m1 = out.mount;
-        out.mount = root => {
-          if (m1) m1(root);
-          root.querySelectorAll('[data-adminrole]').forEach(
-            b =>
-              (b.onclick = e => {
-                e.preventDefault();
-                e.stopPropagation();
-                AdminUI.roleDialog(b.dataset.adminrole);
-              })
-          );
-        };
-      }
-      if (!sub || sub === 'home') {
-        const ch = AdminUI.changesCard();
-        if (ch) {
-          out.html = out.html.replace(/(<\/div><\/div>)/, '$1' + ch);
-          const m0 = out.mount;
-          out.mount = root => {
-            if (m0) m0(root);
-            AdminUI.bindChanges(root);
-          };
-        }
-      }
-      return out;
-    }
-    if (!AdminRole.any(App.me)) return base(sub);
-    // a limited Admin: only their areas, only their teams
-    const mine = AdminRole.mine();
-    const teams = AdminRole.teamsOf(App.me);
-    if (teams.length && !teams.includes(App.viewTeam)) App.setViewTeam(teams[0]);
-    const tabs = [['home', 'Home']].concat(
-      ADMIN_TABS.filter(([k]) => AdminUI.TAB_AREA[k] && mine.includes(AdminUI.TAB_AREA[k])).map(([k, n]) => [
-        k,
-        k === 'scoring' ? 'Scoring' : n,
-      ])
-    );
-    const tab = tabs.some(t => t[0] === sub) ? sub : 'home';
-    if (tab !== 'workflows' && typeof WF !== 'undefined') {
-      WF.draft = null;
-      WF.maps = {};
-    }
-    const settingsPart = AdminUI.settingsPart;
-    const pg = {
-      home: () => AdminUI.homeLite(tabs),
-      people: AdminUI.peopleLite,
-      lists: () => settingsPart(['lists']),
-      scoring: AdminUI.scoringPage,
-      teams: adminTeams,
-      workflows: () => (WF.draft ? adminFlows() : adminJoin(adminTodoFlows(), adminFlows())),
-      hdmonths: adminHdMonths,
-      feedback: adminFeedback,
-      activity: adminActivity,
-      timerules: timeRules,
-    }[tab]();
-    return {
-      title: 'Admin',
-      html: AdminUI.head(tab, tabs) + pg.html,
-      mount(root) {
-        if (pg.mount) pg.mount(root);
-      },
-    };
-  };
   // scoring saved by an Admin who is scored in that team: ask the super admin first if it raises their own score
   const ss = Calc.saveScoring;
   Calc.saveScoring = function (team) {

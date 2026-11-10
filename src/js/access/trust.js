@@ -165,8 +165,8 @@ Object.assign(Store, {
       }
       bad(
         x,
-        typeof AdminRole !== 'undefined' && AdminRole.areaOfSetting(x.r.id)
-          ? 'changed by someone without that Admin area (or for another team)'
+        typeof AdminRole !== 'undefined' && AdminRole.areaOfSetting(x.r.id, x.r, setPrev.get(x.r.id))
+          ? 'changed by someone without that Admin area, at view level only, or for another team'
           : 'settings can only be changed by the super admin'
       );
     }
@@ -266,7 +266,7 @@ Object.assign(Store, {
             return (
               Store.isSuper(by) ||
               Store.privileged(by, 'manageTemplates', r._ts) ||
-              (typeof AdminRole !== 'undefined' && AdminRole.can(by, 'lists', r.team || '*', null, day(r._ts || 0))) ||
+              (typeof AdminRole !== 'undefined' && AdminRole.can(by, 'task-sets', r.team || '*', null, day(r._ts || 0))) ||
               (bad(x, 'task set changed by someone who may not manage templates'), false)
             );
           if (r.c === 'mrating')
@@ -278,8 +278,10 @@ Object.assign(Store, {
           if (r.c === 'scoreadj')
             return (
               Store.isSuper(by) ||
-              (typeof AdminRole !== 'undefined' && r.mid !== by && AdminRole.can(by, 'scoring', r.team || 'apps', null, day(r._ts || 0))) ||
-              (bad(x, 'bonus / penalty points given without the Scoring area'), false)
+              (typeof AdminRole !== 'undefined' &&
+                r.mid !== by &&
+                AdminRole.can(by, 'adjustments', r.team || 'apps', null, day(r._ts || 0))) ||
+              (bad(x, 'bonus / penalty points given without the Adjustments area'), false)
             );
           if (r.c === 'handover')
             return (

@@ -14,7 +14,7 @@ P.importdata = () => {
     <li>Save each sheet of the old workbook as its own Excel file (in Excel: right-click the sheet tab → <b>Move or Copy</b> → <i>(new book)</i> → <b>Create a copy</b>, then save it). Any file name is fine.</li>
     <li>Put all the files in the <b>Import</b> folder inside <b>MAHAM Data</b> on the shared drive — or pick them below.</li>
     <li>Press <b>Read files</b>, check what was recognised, then press <b>Import</b>.</li></ol>
-    <p class="muted small">Sheets used: To Do List (and 2025), Shadow Works, MEDataSource, Attendance, Quick Wins, Riyad FU, Manager Tasks, On-Call Sheet, Courses, IT Directory, EMR Directory, Info &amp; SRS &amp; ECTS, Dashboard (monthly scores), Drops. Calculated sheets (Performance, Details, LazyDays…) are not needed. Importing the same file again does not create duplicates.</p>
+    <p class="muted small">Sheets used: To Do List (and 2025), Shadow Works, MEDataSource, Attendance, Quick Wins, Riyad FU, Manager Tasks, On-Call Sheet, Courses, IT Directory, EMR Directory, Info &amp; SRS &amp; ECTS, Dashboard (monthly scores), Drops — and a team's <b>Routine Tasks</b> (→ Shadow Works) and <b>Project Tasks</b> (→ projects with their tasks; each Stage becomes a board column). Calculated sheets (Performance, Details, LazyDays…) are not needed. Importing the same file again does not create duplicates.</p>
     <div class="row-btns"><button class="btn primary" id="impfolder">📁 Read files from the Import folder</button><label class="btn">📄 Pick files…<input type="file" id="impfiles" multiple accept=".xlsx,.csv" hidden></label></div>
     ${teamNote}<div id="impstatus"></div>`
   )}`;
@@ -31,10 +31,19 @@ P.importdata = () => {
         st.innerHTML = `<table class="tbl" style="margin-top:14px"><thead><tr><th>File</th><th>Sheet</th><th>Recognised as</th><th class="num">Rows</th><th class="num">Already in app</th></tr></thead><tbody>
           ${rows.map(R => `<tr><td>${h(R.file)}</td><td>${h(R.sheet || '')}</td><td>${R.error ? UI.badge('Error: ' + R.error, 'bad') : !R.type ? UI.badge('Not used (not a data sheet?)', '') : R.skipped ? UI.badge(R.type.label, '') : UI.badge(R.type.label, 'good')}</td><td class="num">${R.recs.filter(r => r.c !== 'settings').length || (R.recs.length ? 'lists' : '')}</td><td class="num">${R.recs.filter(r => r.c !== 'settings' && Store.get(r.id)).length || ''}</td></tr>`).join('')}
           </tbody></table>
+          ${analysis.meta.needTeam ? '<p class="t-bad">Routine Tasks / Project Tasks need one team: choose the team at the top (not "All teams") and read the file again.</p>' : ''}
+          ${(analysis.meta.unknownStaff || []).length ? `<p class="t-warn small">Staff names not found in the app: <b>${analysis.meta.unknownStaff.map(h).join(', ')}</b> — their Routine Tasks are left out and their project tasks come in unassigned. Fix the name in the sheet (or add it as the person's alias) and read the file again.</p>` : ''}
+          ${analysis.meta.noDate ? `<p class="t-warn small">${analysis.meta.noDate} Routine Task row(s) have no Init Date or Complete Date and are left out.</p>` : ''}
+          ${rows.some(R => R.type && R.type.key === 'routine' && R.recs.length) ? `<div class="row-btns"><label class="flt">Routine Tasks have no time column — minutes to count for each one: <input type="number" id="impmin" min="0" step="5" value="${+analysis.meta.routineMin || 30}" style="width:80px"></label></div>` : ''}
           ${rows.some(R => !R.type && !R.error) ? '<p class="muted small">"Not used": calculated sheets (Performance, Dashboard Employee, LazyDays…) are fine to skip. If a data sheet shows this, make sure its header row was copied too, or name the file after the sheet (e.g. "Shadow Works.xlsx").</p>' : ''}
           <div class="row-btns"><label class="flt tog"><input type="checkbox" id="impover"> Overwrite records already in the app (normally leave off)</label><span class="grow"></span><button class="btn primary" id="impgo2" ${total ? '' : 'disabled'}>Import ${(total - exist).toLocaleString()} new records</button></div>`;
         const ov = st.querySelector('#impover'),
-          go = st.querySelector('#impgo2');
+          go = st.querySelector('#impgo2'),
+          mn = st.querySelector('#impmin');
+        if (mn)
+          mn.oninput = () => {
+            analysis.meta.routineMin = Math.max(0, +mn.value || 0);
+          };
         ov.onchange = () => {
           go.textContent = `Import ${(ov.checked ? total : total - exist).toLocaleString()} ${ov.checked ? '' : 'new '}records`;
         };

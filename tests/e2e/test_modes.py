@@ -46,7 +46,7 @@ async def main():
         c('back where I was (To Do)', await J("location.hash") == '#/todo')
         await pg.screenshot(path=f'{SHOTS}/analyst_mode.png')
         await pg.click('#modebtn'); await pg.wait_for_timeout(500)
-        c('admin again → last admin page', await J("location.hash") == '#/admin/people')
+        c('admin again → last admin page', (await J("location.hash")).startswith('#/admin/people'))
         # manager sees the request
         await s.sign_in_as('apps-mgr'); t = await s.go('#/home', 500)
         c('manager sees "asked you to confirm"', 'asked you to confirm finished To Dos' in t)

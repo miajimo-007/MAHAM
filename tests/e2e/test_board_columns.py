@@ -7,7 +7,7 @@ async def main():
         await s.js("Store.save({c: 'project', id: 'pj-b', name: 'Board test', manager: 'apps-mgr', team: 'apps', origin: 'team', members: ['yousef']})")
         await s.js("Store.saveMany([{c: 'ptask', id: 'pt-old', project: 'pj-b', title: 'Already done (old Done)', status: 'Done', points: 2, assignee: 'yousef', n: 1}, {c: 'ptask', id: 'pt-rev', project: 'pj-b', title: 'In review task', status: 'In Review', points: 3, assignee: 'yousef', n: 2}])")
         # super admin changes the columns
-        await s.go('#/settings')
+        await s.go('#/admin/work/projects', 600)
         await pg.fill('[data-list="boardColumns"]', 'Backlog\nBuilding\nTesting\nWaiting for vendor\nDeployed'); await pg.click('#savelists'); await pg.wait_for_timeout(400)
         c('columns saved', await s.js("Scrum.columns(Store.get('pj-b')).join('|')") == 'Backlog|Building|Testing|Waiting for vendor|Deployed')
         await s.sign_in_as('yousef'); await s.go('#/project/pj-b'); await pg.click('[data-ptab="board"]'); await pg.wait_for_timeout(300)

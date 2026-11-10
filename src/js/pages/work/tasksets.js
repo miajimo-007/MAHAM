@@ -13,7 +13,7 @@ const TaskSets = {
     return TaskSets.all().filter(s => !s.team || s.team === team);
   },
   canManage(team) {
-    return App.realSuper() || App.can('manageTemplates') || AdminRole.can(App.me, 'lists', team || App.viewTeam);
+    return App.realSuper() || App.can('manageTemplates') || AdminRole.can(App.me, 'task-sets', team || App.viewTeam);
   },
   canAdd(p) {
     return !!p && Scrum.planner(p);
@@ -352,17 +352,5 @@ const TaskSets = {
       return out;
     };
   }
-  // Admin → Lists: the task sets card
-  const base = P.admin;
-  P.admin = sub => {
-    const out = base(sub);
-    if (sub !== 'lists' || !out || !out.html || !TaskSets.canManage(App.viewTeam)) return out;
-    out.html += TaskSets.card();
-    const m0 = out.mount;
-    out.mount = root => {
-      if (m0) m0(root);
-      TaskSets.bindCard(root);
-    };
-    return out;
-  };
+  // the task sets card: Admin → Work & workflows → Projects (pages/admin-nav.js)
 })();

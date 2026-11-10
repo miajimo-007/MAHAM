@@ -22,7 +22,7 @@ async def main():
         c('done = the Done category', await s.js("Scrum.isDone(Store.get('w3')) && !Scrum.isDone(Store.get('w2'))"))
         # ---------- Admin → Task workflows ----------
         t = await s.go('#/admin/taskflows', 700)
-        c('Admin → Task workflows opens', 'Task workflows' in await pg.inner_text('.adm-tabs') and 'Which workflow' in t and 'Resolutions' in t)
+        c('Admin → Work & workflows → Project tasks opens', 'Project tasks' in await pg.inner_text('.adm-sub') and 'Which workflow' in t and 'Resolutions' in t)
         await pg.fill('#tfres', 'Done\nNot needed\nDuplicate'); await pg.click('#tfressave'); await s.js("Store.flush()"); await pg.wait_for_timeout(200)
         c('resolutions are the admins\' own list', await s.js("TaskFlow.resolutions()") == ['Done', 'Not needed', 'Duplicate'])
         await pg.click('#tfnew'); await pg.wait_for_selector('#tfname')

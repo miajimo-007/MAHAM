@@ -66,7 +66,7 @@ async def main():
             r = await pg.evaluate("""(async () => { const o = UI.memberOptions(''); Store.save({ c: 'shadow', id: 'admin-test', analyst: App.me, team: Store.teams()[0].id, date: U.todayStr(), taskType: 'TRAINING >> x', source: 'Call', subject: 'Admin tries it', minutes: 10 }); await Store.flush();
               return { pick: o.includes('value="' + App.me + '"'), saved: !!Store.get('admin-test'), all: ['shadow', 'todo', 'helpdesk', 'meeting', 'settings'].every(c => App.canEdit(c)) }; })()""")
             c('…but has every function and can pick themself to try things', r == {'pick': True, 'saved': True, 'all': True}, r)
-            c('…and opened Admin → Company & accounts', 'Company & accounts' in await pg.inner_text('.adm-tabs') and 'Accounts' in await pg.inner_text('#coadm'))
+            c('…and opened Admin → People → Company & accounts', 'Company & accounts' in await pg.inner_text('.adm-sub') and 'Accounts' in await pg.inner_text('#coadm'))
             c('seats: 1 used of 3', '1 used of 3' in await pg.inner_text('#coadm'))
             # invite a new person
             await pg.click('#co-inv'); await modal_fill(email='sara@acme.test', who='__new', name='Sara Saleh', short='Sara', role='user'); await pg.click('.modal [data-ok]')

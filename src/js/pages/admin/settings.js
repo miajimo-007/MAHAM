@@ -2,7 +2,12 @@
 'use strict';
 
 P.settings = mode => {
-  if (mode !== 'lists') return P.admin('lists'); // Settings now lives in Admin → Lists & scoring
+  if (mode !== 'lists') {
+    setTimeout(() => {
+      location.hash = '#/admin/settings/lists';
+    }, 0);
+    return { title: 'Admin', html: '' };
+  } // Settings now lives in Admin → Settings → Lists
   const lists = Store.lists();
   const S = Calc.scoring();
   const LISTS = [

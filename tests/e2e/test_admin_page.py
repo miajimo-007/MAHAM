@@ -58,7 +58,7 @@ async def main():
         c('ignored technician no longer listed', not await s.js("Admin.unmatched().some(x => x.name === 'Baitalmal Abulaziz')"))
         # duplicates
         await s.js("Store.saveMany([{id: 'td-d1', c: 'todo', task: 'Same task', analyst: 'yousef', team: 'apps', assigned: '2026-10-01', status: 'In Progress'}, {id: 'td-d2', c: 'todo', task: 'Same task', analyst: 'yousef', team: 'apps', assigned: '2026-10-01', status: 'In Progress'}])")
-        await s.go('#/admin/home'); await s.go('#/admin/data', 500)
+        await s.go('#/admin/home'); await s.go('#/admin/system/check', 500)
         c('duplicates found', await s.js("Admin.duplicates().some(g => g.list.some(r => r.id === 'td-d1'))"))
         await pg.click('#dupall'); await pg.click('[data-yes]'); await pg.wait_for_timeout(300)
         c('duplicates removed (newest kept)', (await s.js("[!!Store.get('td-d1'), !!Store.get('td-d2')].filter(Boolean).length")) == 1)

@@ -85,7 +85,7 @@ const TimeRulesUI = {
       </div></div>
       <div class="row-btns"><button type="button" class="btn" id="trprev">Preview the effect</button><span class="grow"></span><button type="button" class="btn primary" id="trsave">Save time rules${s ? ' for ' + h(Store.teamName(s)) : ' (department default)'}</button></div><div id="trout"></div></form>
       ${
-        TimeRulesUI.canDept()
+        App.realSuper() || AdminRole.sees('holidays')
           ? card(
               `Public holidays and Ramadan <span class="count">${(hol.list || []).length}</span>`,
               `<p class="muted small">Holidays are days off for everyone (with the weekend: ${h(Custom.weekendName())}). During Ramadan the help desk hour targets stretch by normal ÷ Ramadan hours.</p>

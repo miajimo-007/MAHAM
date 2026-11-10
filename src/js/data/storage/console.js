@@ -562,7 +562,7 @@ const CompanySetup = {
             );
             await Store.flush();
             UI.closeModal();
-            location.hash = '#/admin/company';
+            location.hash = '#/admin/people/company';
           } catch (e) {
             CloudUI.err(e);
           }
@@ -572,41 +572,24 @@ const CompanySetup = {
   },
 };
 
-/* wire into the app: an Admin tab (online only), the People table's admin box follows the database, setup on first open */
+/* wire into the app: Admin → People → Company & accounts (online only), the People table's admin box follows the database */
 (function () {
-  if (typeof ADMIN_GROUPS === 'undefined' || typeof P === 'undefined' || !P.admin) return;
-  const grp = ADMIN_GROUPS.find(g => g[0] === 'People & access');
-  if (grp) grp[1].unshift(['company', 'Company & accounts']);
-  const base = P.admin;
-  P.admin = sub => {
-    if (!CloudUI.on()) return base(sub === 'company' ? 'home' : sub);
-    if (sub === 'company' && App.isSuper()) {
-      const pg = CompanyAdmin.page();
-      return {
-        title: 'Admin',
-        html: adminHead('company') + pg.html,
-        mount: root => {
-          bindAdminSearch(root);
-          pg.mount(root);
-        },
-      };
-    }
-    const out = base(sub);
-    const m = out.mount;
-    out.mount = root => {
-      if (m) m(root);
-      root.querySelectorAll('[data-k=superAdmin]').forEach(i => {
-        i.disabled = true;
-        i.title = 'Set in Admin → Company & accounts';
-      });
-    };
-    return out;
-  };
-  // the tab exists only online: hide it from the tab bar otherwise
-  const head = adminHead;
-  window.adminHead = tab => {
-    const h0 = head(tab);
-    return CloudUI.on() ? h0 : h0.replace(/<a class="tab[^"]*" href="#\/admin\/company">[^<]*<\/a>/, '');
-  };
-  ADMIN_FIND.push(['Company & accounts — invite people, admins, audit log', 'company']);
+  if (typeof AdminNav === 'undefined' || typeof P === 'undefined') return;
+  AdminNav.addSub(
+    'people',
+    {
+      key: 'company',
+      label: 'Company & accounts',
+      find: ['Company & accounts — invite people, admins, audit log'],
+      parts: [{ title: 'Company & accounts', area: null, only: () => CloudUI.on(), render: () => CompanyAdmin.page() }],
+    },
+    0
+  );
+  AdminNav.onMount(root => {
+    if (!CloudUI.on()) return;
+    root.querySelectorAll('[data-k=superAdmin]').forEach(i => {
+      i.disabled = true;
+      i.title = 'Set in Admin → People → Company & accounts';
+    });
+  });
 })();

@@ -25,7 +25,7 @@ const COLL_LABEL = {
 };
 
 P.syscheck = () => {
-  if (!App.isSuper() && !AdminRole.can(App.me, 'syscheck'))
+  if (!App.isSuper() && !AdminRole.sees('syscheck'))
     return { title: 'Not available', html: '<div class="card"><p>You don\'t have permission to see this page.</p></div>' };
   const today = U.todayStr(),
     now = Date.now(),

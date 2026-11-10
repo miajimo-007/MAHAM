@@ -915,3 +915,52 @@ td.sm-cell.own .btn {
 .hl-grp .scroll-list {
   margin: 6px 0 4px 14px;
 }
+
+/* Admin: 6 main tabs, a row of sub-tabs, foldable sections, read-only screens, the Admin role editor */
+.adm-main .tab {
+  font-weight: 600;
+}
+.adm-sub {
+  margin: -6px 0 14px;
+  flex-wrap: wrap;
+}
+.adm-sub .tab {
+  font-size: 13px;
+  padding: 6px 12px;
+}
+details.adm-sec {
+  margin-bottom: 12px;
+}
+details.adm-sec > summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 4px;
+  color: var(--ink);
+}
+details.adm-sec > summary:hover {
+  color: var(--accent, #0f766e);
+}
+.adm-view {
+  opacity: 0.96;
+}
+.adm-viewnote {
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 0 0 10px;
+  color: var(--muted, #64748b);
+}
+.ar-grp {
+  border-top: 1px solid var(--line);
+  padding: 8px 0 4px;
+}
+.ar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+.ar-row select {
+  flex: 0 0 auto;
+}

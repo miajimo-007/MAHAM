@@ -143,8 +143,8 @@ Object.assign(Admin, {
     return `<span class="small" title="It was on their screen but they have not clicked into it">👁 seen ${tm(x.s)}, not opened</span>`;
   },
   canSee() {
-    return App.isSuper() || App.can('seeUsage');
-  },
+    return App.isSuper() || App.can('seeUsage') || (typeof AdminRole !== 'undefined' && AdminRole.sees('logs'));
+  }, // an Admin with Logs sees usage too
 });
 if (typeof document !== 'undefined') {
   const act = () => {

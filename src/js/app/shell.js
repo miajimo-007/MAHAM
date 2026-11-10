@@ -452,7 +452,7 @@ App.navHtml = function () {
     !App.isSuper() && AdminRole.any(App.me)
       ? sec('Admin', 'Admin', '⚙', [
           a('#/admin', 'admin', '⛨', 'Admin'),
-          ...(AdminRole.can(App.me, 'syscheck') ? [a('#/syscheck', 'syscheck', '✓', 'System Check')] : []),
+          ...(AdminRole.sees('syscheck') ? [a('#/syscheck', 'syscheck', '✓', 'System Check')] : []),
         ])
       : App.isSuper()
         ? sec('Admin', 'Admin', '⚙', [

@@ -5,8 +5,8 @@ async def main():
     async with app_session() as s:
         pg = s.page
         c('default categories available', 'Enhancement' in await s.js("Store.list('projectCategories')"))
-        # super admin adds a category and a task type in Settings
-        await s.go('#/settings')
+        # super admin adds a category and a task type in Admin → Work & workflows → Projects
+        await s.go('#/admin/work/projects', 600)
         cats = await pg.input_value('[data-list="projectCategories"]')
         await pg.fill('[data-list="projectCategories"]', cats + '\nEPIC Go-live')
         types = await pg.input_value('[data-list="ptaskTypes"]')

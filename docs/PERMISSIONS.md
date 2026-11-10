@@ -81,10 +81,39 @@ are listed in System Check.
 - **Editing:** `UI.editRecord` opens read-only without Edit; `Store.saveMany` drops any record the person
   may not change, so a blocked change is never saved, whatever the screen shows.
 - **New records:** `Store.createAllowed()` applies a schema's `canCreate` rule (e.g. projects need `createProjects`).
-- **Settings:** `Store.settingAllowed()` lets only the super admin save settings.
+- **Settings:** `Store.settingAllowed()` lets the super admin save settings, and an Admin only inside their areas, at edit level, for their teams (`AdminRole.settingOk`).
 - **Scrum:** `Scrum.planner()` (owner manager, director, super admin) plans; members move only their own tasks (`Scrum.canWork`).
 
 ## Admin tools (super admin)
 
 Change log (`adminlog`, only the super admin may write it; undo for 15 min), usage (`usage-<id>`, only that person),
 "View as" preview (App.preview — Store.saveMany and Store.flush refuse everything while it is on).
+
+## The Admin role (`access/adminrole.js`, `pages/admin-nav.js`, `pages/admin-role.js`)
+
+The super admin can give a person some Admin areas on their card. One area per Admin section:
+
+| Main tab         | Sub-tab                                   | Areas                                                                                                |
+| ---------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| People           | People                                    | `people`, `acting-leave`                                                                             |
+| People           | Teams & departments                       | `teams` (all teams only)                                                                             |
+| Work & workflows | To Do · Projects · Project tasks          | `todo-workflows` · `project-stages`, `task-sets` · `task-workflows`, `workitem-fields`, `automation` |
+| Work & workflows | Follow-ups · Time rules                   | `followups` · `timerules`, `holidays` (all teams only)                                               |
+| Scoring          | Rules · Months · Adjustments              | `scoring-rules` · `score-months` · `adjustments`                                                     |
+| Settings         | Lists · Look & home pages · Announcements | `lists` · `look` · `announcements`                                                                   |
+| System           | Data · Check · Logs · Feedback            | `data` (export only) · `syscheck` (view) · `logs` (view) · `feedback`                                |
+
+Super admin only: Roles & access (permissions, team rules, giving Admin roles and templates), import / restore, undo,
+fixing in System Check, the minimum app version and folder paths.
+
+Member fields: `admin`, `adminV: 2`, `adminAreas`, `adminLevels` (`{ area: 'view' }`; missing = edit), `adminReach`
+(`team` / `teams` + `adminTeams` / `all`). Entries without `adminV` use the older areas and are read as the new ones
+(`AdminRole.MIGRATE`, all at edit level, same reach) — the people list is not rewritten.
+
+- **What they see:** only the tabs, sub-tabs, cards and search results of their areas, only their teams. At view level
+  the screens are read-only (`AdminNav.lock`: inputs disabled, buttons removed).
+- **What they may save:** `AdminRole.needs()` maps every settings record — and each part of shared ones
+  (`settings-teams`, `settings-custom`, `settings-features`, `settings-lists-*`, `settings-taskflow-*`) — to an area
+  and team; `settingOk` needs edit level for each. The trust check replays this with the people list as it was at the
+  time, so hand-edited files outside an Admin's access are ignored and listed in System Check.
+- Every Admin change is logged, shown on the super admin's Admin home, and can be undone by the super admin.

@@ -235,7 +235,7 @@ const FollowUpUI = {
   },
   /* ---------- the upgrade card (super admin / Admin with Workflows for all teams) ---------- */
   upgradeCard() {
-    if (!(App.isSuper() || AdminRole.can(App.me, 'workflows', '*'))) return '';
+    if (!(App.isSuper() || AdminRole.can(App.me, 'followups', '*'))) return '';
     const plan = FollowUp.upgradePlan();
     if (!plan.length) return '';
     const m = {};

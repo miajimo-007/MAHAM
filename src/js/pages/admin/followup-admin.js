@@ -5,11 +5,7 @@
 
 (function wire() {
   const A = TaskFlowAdmin;
-  const sc0 = A.scopes;
-  A.scopes = () => {
-    const l = sc0();
-    return A.can('') ? l.concat([['fu', 'Follow-ups (Central, vendors)']]) : l;
-  };
+  // Follow-ups have their own Admin sub-tab (Work & workflows → Follow-ups), which opens this page with TFE.scope = 'fu'
   const ri = A.recId;
   A.recId = scope => (scope === 'fu' ? 'settings-fuflow' : ri(scope));
   const tt = Work.teamTypes;
@@ -32,9 +28,6 @@
         .statuses.map(s => `<span class="tf-st" style="--c:${h(s.color || TaskFlow.CAT_COLOR[s.cat || 'todo'])}">${h(s.name)}</span>`)
         .join(' → ')}</div>`;
     const html = `<div class="page-actions"><span class="muted small">Follow-ups with parties outside the department — <b>Central HQ</b> today, <b>vendors</b> later. Each party has its own reference name, key and workflow. The escalation days (analyst / team leader / manager) and the next-chase gap are in <a class="link" href="#/admin/timerules">Time rules</a>.</span></div>
-      <div class="filters"><label>For <select id="tfscope">${A.scopes()
-        .map(([v, l]) => opt(v, l, 'fu'))
-        .join('')}</select></label></div>
       ${card(
         'Parties',
         `${TFE.parties.map((p, i) => `<div class="cf-row" data-pt="${i}" style="grid-template-columns: 1.3fr .6fr 1fr 1.3fr 30px"><input class="pt-n" value="${h(p.name)}" placeholder="Name, e.g. Vendor A"><input class="pt-p" value="${h(p.prefix || '')}" placeholder="Key, e.g. VA"><input class="pt-r" value="${h(p.ref || '')}" placeholder="Their reference, e.g. Case ID"><select class="pt-f">${flows.map(w => opt(w.id, w.name, p.flow || flows[0].id)).join('')}</select>${p.id === 'central' ? '<span></span>' : `<button class="btn xs ghost" data-ptdel="${i}">✕</button>`}</div>`).join('')}
@@ -54,11 +47,6 @@
     return {
       html,
       mount(root) {
-        root.querySelector('#tfscope').onchange = e => {
-          TFE.scope = e.target.value;
-          TFE.parties = null;
-          App.render();
-        };
         A.bindFields(root, 'fu');
         const keep = () => {
           TFE.parties = [...root.querySelectorAll('[data-pt]')].map(r => {

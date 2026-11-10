@@ -99,7 +99,7 @@ const TierEdit = {
 
 const ScorePartsUI = {
   canEdit(team) {
-    return App.realSuper() || AdminRole.can(App.me, 'scoring', team);
+    return App.realSuper() || AdminRole.can(App.me, 'scoring-rules', team);
   },
   label(k, S) {
     if (k.startsWith('c_')) {

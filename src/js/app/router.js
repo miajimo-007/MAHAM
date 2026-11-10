@@ -23,7 +23,7 @@ Object.assign(App, {
   pageAllowed(k) {
     if (['dashboard', 'performance', 'lazy', 'projperf'].includes(k) && !App.can('viewDashboards')) return false;
     if (k === 'admin') return App.isSuper() || AdminRole.any(App.me);
-    if (k === 'syscheck') return App.isSuper() || AdminRole.can(App.me, 'syscheck');
+    if (k === 'syscheck') return App.isSuper() || AdminRole.sees('syscheck');
     if (k === 'adminperson' || k === 'settings' || k === 'importdata') return App.isSuper();
     if (k === 'director') return App.isDir() || App.isSuper();
     if (k === 'project' || k === 'workdash') return Store.pageOn(App.me, 'projects', App.viewTeam);

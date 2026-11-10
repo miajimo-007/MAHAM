@@ -4,10 +4,10 @@ async def main():
     c = Check('shared folder path')
     async with app_session() as s:
         pg = s.page
-        await s.sign_in_as('adam'); await s.go('#/admin/teams', 500)
+        await s.sign_in_as('adam'); await s.go('#/admin/system/data', 500)
         await pg.fill('#spf [name=sharedPath]', r'S:\MAHAM'); await pg.click('#savesp'); await pg.wait_for_timeout(300)
         c('saved', await s.js("Store.sharedPath()") == 'S:\\MAHAM')
-        t = await s.go('#/admin/data', 500); c('Admin shows the path', 'S:\\MAHAM' in t)
+        await s.go('#/home', 200); t = await s.go('#/admin/data', 500); c('Admin shows the path', 'S:\\MAHAM' in t)
         t = await s.go('#/syscheck', 500); c('System Check shows the path', 'Data folder' in t and 'S:\\MAHAM\\MAHAM Data\\Backups' in t)
         c('data folder path shown', 'S:\\MAHAM\\MAHAM Data\\users' in t and 'Backups' in t, t[:800])
         c('remembered on this PC', await s.js("LS.get('bct.sharedPath', '')") == 'S:\\MAHAM')

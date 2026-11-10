@@ -7,7 +7,7 @@ async def main():
         c('analyst cannot approve quick wins by default', not await s.js("Store.can('layla', 'approveQW')"))
         c('manager cannot post announcements or add help desk rows by default', not await s.js("Store.can('apps-mgr', 'postAnnouncements')") and not await s.js("Store.can('apps-mgr', 'editHelpdeskByHand')"))
         await s.sign_in_as('adam', 'admin'); t = await s.go('#/admin/teamrules')
-        tt = (await pg.inner_text('.adm-tabs')).lower(); c('grouped admin tabs', all(x.lower() in tt for x in ['People & access', 'Team rules', 'Help desk months', 'System']))
+        tt = (await pg.inner_text('.adm-top')).lower() + (await pg.inner_text('.adm-sub')).lower(); c('grouped admin tabs: People → Roles & access (team rules), Scoring, System', all(x.lower() in tt for x in ['People', 'Roles & access', 'Scoring', 'System']) and 'What each role can do' in t)
         await pg.select_option('#trteam', 'apps'); await pg.wait_for_timeout(300)
         await pg.check('[data-tr="analyst|approveQW"]'); await pg.check('[data-tr="manager|postAnnouncements"]'); await pg.click('#trsave'); await pg.wait_for_timeout(300)
         c('APPS analysts now approve quick wins', await s.js("Store.can('layla', 'approveQW')"))

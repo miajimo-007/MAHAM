@@ -9,7 +9,7 @@ async def main():
     async with app_session() as s:
         pg = s.page
         t = await s.go('#/admin/timerules', 600)
-        c('Admin → Time rules & holidays opens', 'Time rules' in await pg.inner_text('.adm-tabs') and 'Escalation' in t and 'Public holidays and Ramadan' in t)
+        c('Admin → Work & workflows → Time rules opens', 'Time rules' in await pg.inner_text('.adm-sub') and 'Escalation' in t and 'Public holidays and Ramadan' in t)
         await pg.select_option('#trscope', 'apps'); await pg.wait_for_timeout(300)
         await pg.fill('#trf [name=p_Normal]', '3'); await pg.fill('#trf [name=p_High]', '1'); await pg.fill('#trf [name=e_mgr]', '2'); await pg.fill('#trf [name=e_dir]', '4')
         await pg.click('#trprev'); await pg.wait_for_timeout(300)

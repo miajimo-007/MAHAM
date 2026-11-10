@@ -8,7 +8,9 @@ async def main():
         pg = s.page
         y = await s.js("new Date().getFullYear()"); mo = await s.js("new Date().getMonth() + 1")
         t = await s.go('#/admin/scoring', 800)
-        c('Scoring & months has: weights and parts, scoring rules, tiers as tables, what-if, bonus / penalty', all(x in t for x in ('Weights and parts', 'Scoring rules', 'Tiers', 'Scoring what-if', 'Bonus / penalty points')) and await pg.locator('.tier-ed').count() >= 6, t[:200])
+        c('Scoring → Rules has: weights and parts, scoring rules, tiers as tables, what-if', all(x in t for x in ('Weights and parts', 'Scoring rules', 'Tiers', 'Scoring what-if')) and await pg.locator('.tier-ed').count() >= 6, t[:200])
+        t = await s.go('#/admin/scoring/adjust', 600)
+        c('Scoring → Adjustments has bonus / penalty points', 'Bonus / penalty points' in t)
         t = await s.go('#/admin/lists', 600)
         c('Lists no longer holds the scoring rules', 'Scoring rules' not in t and 'Dropdown lists' in t)
         # tier editor writes the JSON the save uses
@@ -31,7 +33,7 @@ async def main():
         await pg.click(f'[data-rmo="{y}-{mo}"]'); await pg.wait_for_timeout(400)
         await pg.select_option('[data-rid="yousef"] [data-rv]', '4'); await pg.fill('[data-rid="yousef"] [data-rc]', 'Great follow-through'); await pg.click('#rsave'); await s.js("Store.flush()"); await pg.wait_for_timeout(300)
         c('rating saved', (await s.js(f"Store.get('mrating-{y}-' + U.pad({mo}) + '-yousef')"))['rating'] == 4)
-        await s.sign_in_as('adam'); await s.go('#/admin/scoring', 700)
+        await s.sign_in_as('adam'); await s.go('#/admin/scoring/adjust', 700)
         await pg.click('#adjnew'); await pg.wait_for_selector('#adjf'); await pg.select_option('#adjf [name=mid]', 'yousef'); await pg.fill('#adjf [name=points]', '3'); await pg.fill('#adjf [name=reason]', 'Covered the night go-live'); await pg.click('.modal [data-ok]'); await s.js("Store.flush()"); await pg.wait_for_timeout(300)
         sc = await s.js(f"Calc.monthScore({y}, 'yousef', {mo})")
         keys = {p['key']: p for p in sc['parts']}
