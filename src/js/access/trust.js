@@ -250,6 +250,12 @@ Object.assign(Store, {
               (typeof AdminRole !== 'undefined' && AdminRole.of(by, null, day(r._ts || 0))) ||
               (bad(x, 'admin change log written by someone who is not the administrator'), false)
             );
+          if (r.c === 'importlog')
+            return (
+              Store.isSuper(by) ||
+              (!r.undone && r.by === by && Store.privileged(by, 'importOld', r._ts)) ||
+              (bad(x, 'import log written by someone who may not import (or undone by someone who is not the administrator)'), false)
+            );
           if (r.c === 'usage') return r.id === 'usage-' + by || (bad(x, 'usage written for someone else'), false);
           if (r.c === 'actlog')
             return (

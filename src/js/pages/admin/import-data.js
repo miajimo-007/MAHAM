@@ -17,13 +17,69 @@ P.importdata = () => {
     <p class="muted small">Sheets used: To Do List (and 2025), Shadow Works, MEDataSource, Attendance, Quick Wins, Riyad FU, Manager Tasks, On-Call Sheet, Courses, IT Directory, EMR Directory, Info &amp; SRS &amp; ECTS, Dashboard (monthly scores), Drops — and a team's <b>Routine Tasks</b> (→ Shadow Works) and <b>Project Tasks</b> (→ projects with their tasks; each Stage becomes a board column). Calculated sheets (Performance, Details, LazyDays…) are not needed. Importing the same file again does not create duplicates.</p>
     <div class="row-btns"><button class="btn primary" id="impfolder">📁 Read files from the Import folder</button><label class="btn">📄 Pick files…<input type="file" id="impfiles" multiple accept=".xlsx,.csv" hidden></label></div>
     ${teamNote}<div id="impstatus"></div>`
-  )}`;
+  )}
+  ${App.isSuper() ? '<div id="implogs"></div>' : ''}`;
+  /* past imports, each can be undone by the super admin (removes what that import added) */
+  const NAMES = {
+    shadow: 'shadow work',
+    todo: 'To Dos',
+    project: 'projects',
+    ptask: 'project tasks',
+    helpdesk: 'help desk',
+    attendance: 'attendance',
+  };
+  const logsCard = () => {
+    const L = Importer.logs();
+    return card(
+      `Past imports <span class="count">${L.length}</span>`,
+      L.length
+        ? `<p class="muted small">Undo removes everything that import added (and puts back records it overwrote) — also any changes people made to those records since. Imports made before version 2026.11.10.2 are not listed.</p>
+      <div class="tbl-scroll"><table class="tbl"><thead><tr><th>When</th><th>By</th><th>Team</th><th>File(s)</th><th>What came in</th><th></th></tr></thead><tbody>
+      ${L.map(
+        g => `<tr class="${g.undone ? 'muted' : ''}"><td>${U.fmtTs(g.at)}</td><td>${h(Store.memberShort(g.by))}</td><td>${h(Store.teamName(g.team))}</td><td>${h((g.files || []).join(', '))}</td>
+        <td>${Object.entries(g.counts || {})
+          .map(([c, n]) => `${n.toLocaleString()} ${h(NAMES[c] || c)}`)
+          .join(' · ')}</td>
+        <td>${g.undone ? `Undone ${U.fmtTs(g.undone.at)}` : `<button class="btn xs danger" data-impundo="${h(g.id)}">Undo</button>`}</td></tr>`
+      ).join('')}
+      </tbody></table></div>`
+        : '<p class="muted">No imports yet (imports are listed from version 2026.11.10.2).</p>'
+    );
+  };
   return {
     title: 'Import Old Data',
     html,
     mount(root) {
       if (!mgr) return;
-      const st = root.querySelector('#impstatus');
+      const st = root.querySelector('#impstatus'),
+        lg = root.querySelector('#implogs');
+      const drawLogs = () => {
+        if (!lg) return;
+        lg.innerHTML = logsCard();
+        lg.querySelectorAll('[data-impundo]').forEach(
+          b =>
+            (b.onclick = () => {
+              const g = Store.get(b.dataset.impundo);
+              if (!g) return;
+              const n = (g.ids || []).filter(id => Store.get(id)).length,
+                ch = Importer.changedSince(g),
+                back = Object.keys(g.prev || {}).length;
+              UI.confirm(
+                `Undo the import of ${U.fmtTs(g.at)} (${Store.teamName(g.team)})? This removes ${n.toLocaleString()} record(s)${back ? ` and puts back ${back} it overwrote` : ''}.${ch ? ` ${ch} of them were changed since the import — those changes go too.` : ''}`,
+                () => {
+                  const r = Importer.undo(g);
+                  if (!r) return UI.toast('This import can no longer be undone', 'bad');
+                  UI.toast(
+                    `Import undone — ${r.removed.toLocaleString()} record(s) removed${r.restored ? `, ${r.restored} put back` : ''}`,
+                    'good'
+                  );
+                  drawLogs();
+                }
+              );
+            })
+        );
+      };
+      drawLogs();
       const show = analysis => {
         const rows = analysis.results;
         const total = rows.reduce((a, R) => a + R.recs.filter(r => r.c !== 'settings').length, 0);
@@ -50,6 +106,7 @@ P.importdata = () => {
         go.onclick = () => {
           const r = Importer.commit(analysis, ov.checked);
           UI.toast(`Imported ${r.added.toLocaleString()} records`, 'good');
+          drawLogs();
           st.innerHTML = `<p class="t-good" style="margin-top:12px">✓ Imported ${r.added.toLocaleString()} records${r.skipped ? ` (${r.skipped.toLocaleString()} already in the app were kept as they are)` : ''}. Press <b>Save</b> at the top if it doesn't say Saved yet.</p>`;
         };
       };

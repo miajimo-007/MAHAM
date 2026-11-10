@@ -39,7 +39,10 @@ async def main():
         # notes on other task types (own quick win, the department's good catch)
         await open_form(s, 'quickwin', 'rn-qw'); await add_note(s, 'Saved 3 clicks per order'); await J("UI.closeModal()")
         await open_form(s, 'gcatch', 'rn-gc'); await add_note(s, 'Check the unit table every release'); await J("UI.closeModal()")
-        c('notes on quick win and good catch', await J("RefNotes.count('rn-qw') === 1 && RefNotes.count('rn-gc') === 1"))
+        ok = True
+        try: await pg.wait_for_function("RefNotes.count('rn-qw') === 1 && RefNotes.count('rn-gc') === 1", timeout=3000)
+        except Exception: ok = False
+        c('notes on quick win and good catch', ok)
         # kept after the To Do is done
         await J("Store.save(Object.assign({}, Store.get('rn-td'), { finish: U.todayStr() }))")
         c('notes stay after done', await J("RefNotes.count('rn-td')") == 2)

@@ -2,7 +2,7 @@
  * Change behaviour here rather than in the code that uses it. */
 'use strict';
 
-const APP_VERSION = '2026.11.10.1';
+const APP_VERSION = '2026.11.10.2';
 const APP_MARK = '🧭'; // the app's mark when no logo picture is set
 
 /* folder & polling */

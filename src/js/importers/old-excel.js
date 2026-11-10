@@ -966,10 +966,119 @@ const Importer = {
           helpdeskUpdated: analysis.meta.helpdeskUpdated || U.todayStr(),
         })
       );
-    if (list.length) Store.saveMany(list);
+    const log = Importer.logOf(analysis, list);
+    if (list.length) Store.saveMany(log ? list.concat(log) : list);
     return {
       added: list.filter(r => r.c !== 'settings').length,
       skipped: all.length - list.filter(r => r.c !== 'settings').length - all.filter(r => r.c === 'settings').length,
     };
+  },
+
+  /* ---------- import log + undo ----------
+   * importlog { at, by, team, files[], counts{c:n}, ids[] (records this import created), prev{id: record before} (records it
+   * overwrote), added{ types[], flows[], picks[] } (task types / workflows / project workflow picks it added), undone{at, by} } */
+  logOf(analysis, list) {
+    const data = list.filter(r => r.c !== 'settings');
+    if (!data.length) return null;
+    const team = App.viewTeam && App.viewTeam !== '*' ? App.viewTeam : 'apps';
+    const ids = [],
+      prev = {},
+      counts = {};
+    for (const r of data) {
+      const cur = Store.get(r.id);
+      if (cur) prev[r.id] = Object.assign({}, cur);
+      else ids.push(r.id);
+      counts[r.c] = (counts[r.c] || 0) + 1;
+    }
+    const added = { types: [], flows: [], picks: [] };
+    for (const r of list.filter(x => x.c === 'settings')) {
+      const before = Store.get(r.id) || {};
+      if (r.id === 'settings-lists-' + team && r.lists && r.lists.taskTypes) {
+        const had = new Set(Store.lists(team).taskTypes || []);
+        added.types.push(...r.lists.taskTypes.filter(t => !had.has(t)));
+      }
+      if (r.id === 'settings-taskflow-' + team) {
+        const hadF = new Set((before.flows || []).map(w => w.id)),
+          hadP = before.projects || {};
+        added.flows.push(...(r.flows || []).map(w => w.id).filter(id => !hadF.has(id)));
+        added.picks.push(...Object.keys(r.projects || {}).filter(k => !(k in hadP)));
+      }
+    }
+    return {
+      id: U.uid('importlog'),
+      c: 'importlog',
+      at: Date.now(),
+      by: App.me,
+      team,
+      files: [...new Set(analysis.results.filter(R => R.recs.length).map(R => R.file))],
+      counts,
+      ids,
+      prev,
+      added,
+    };
+  },
+  logs() {
+    return Store.all('importlog')
+      .slice()
+      .sort((a, b) => (b.at || 0) - (a.at || 0));
+  },
+  /* records of this import changed by someone (or later) since — they go too when it is undone */
+  changedSince(log) {
+    return (log.ids || []).filter(id => {
+      const r = Store.get(id);
+      return r && (r._by !== log.by || (r._ts || 0) > (log.at || 0) + 120000);
+    }).length;
+  },
+  undo(log) {
+    if (!log || log.undone || !App.isSuper()) return null;
+    const out = [],
+      gone = new Set();
+    for (const id of log.ids || []) {
+      const r = Store.get(id);
+      if (r) {
+        out.push(Object.assign({}, r, { _del: true }));
+        gone.add(id);
+      }
+    }
+    for (const [id, p] of Object.entries(log.prev || {})) {
+      const r = Object.assign({}, p);
+      delete r._del;
+      r.id = id;
+      out.push(r);
+    }
+    const team = log.team || 'apps',
+      A = log.added || {};
+    /* workflow picks for the removed projects, and the workflows nothing uses any more */
+    const tf = Store.get('settings-taskflow-' + team);
+    if (tf && ((A.picks || []).length || (A.flows || []).length)) {
+      const projects = Object.assign({}, tf.projects || {});
+      for (const k of A.picks || []) if (gone.has(k) || !Store.get(k)) delete projects[k];
+      const used = new Set([tf.use, ...Object.values(tf.types || {})]);
+      for (const x of Object.values(projects)) {
+        if (typeof x === 'string') used.add(x);
+        else if (x) {
+          used.add(x.all);
+          for (const v of Object.values(x.types || {})) used.add(v);
+        }
+      }
+      out.push(Object.assign({}, tf, { projects, flows: (tf.flows || []).filter(w => !(A.flows || []).includes(w.id) || used.has(w.id)) }));
+    }
+    /* task types this import added that no remaining shadow entry uses */
+    const ls = Store.get('settings-lists-' + team);
+    if (ls && ls.lists && (A.types || []).length) {
+      const used = new Set(
+        Store.all('shadow', team)
+          .filter(r => !gone.has(r.id))
+          .map(r => r.taskType)
+      );
+      out.push(
+        Object.assign({}, ls, {
+          lists: Object.assign({}, ls.lists, { taskTypes: (ls.lists.taskTypes || []).filter(t => !A.types.includes(t) || used.has(t)) }),
+        })
+      );
+    }
+    out.push(Object.assign({}, log, { undone: { at: Date.now(), by: App.me } }));
+    Store.saveMany(out);
+    return { removed: gone.size, restored: Object.keys(log.prev || {}).length };
   },
 };
