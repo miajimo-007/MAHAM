@@ -5,7 +5,7 @@ each calls the one before it. Order = the script order in `src/index.html`.
 
 | Function | Wrapped by (in load order) |
 |---|---|
-| `App.launch` | `js/app/whatsnew.js` → `js/data/storage/storage.js` → `js/app/always-admin.js` → `js/maham/20-notify.js` → `js/maham/30-chat.js` |
+| `App.launch` | `js/app/whatsnew.js` → `js/data/storage/storage.js` → `js/app/always-admin.js` → `js/maham/20-notify.js` → `js/maham/30-chat.js` → `js/maham/70-ai.js` |
 | `App.modeUi` | `js/app/always-admin.js` |
 | `App.switchMode` | `js/app/always-admin.js` |
 | `App.teamFor` | `js/app/always-admin.js` |

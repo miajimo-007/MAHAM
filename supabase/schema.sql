@@ -656,6 +656,60 @@ begin
 end $$;
 grant execute on function public.form_info(uuid, text), public.form_submit(uuid, text, text, text, text, text) to anon, authenticated;
 
+-- ---------------------------------------------------------------- ✨ AI connections (MAHAM)
+-- A company's AI and each person's own AI. The key is written here and NEVER read back by the app: there is no
+-- select for anyone; only the function ai-proxy (supabase/functions/ai-proxy, service key) reads it to call the AI.
+create table if not exists public.ai_keys (
+  id          uuid primary key default gen_random_uuid(),
+  company_id  uuid not null references public.companies (id) on delete cascade,
+  scope       text not null check (scope in ('company', 'person')),
+  member_id   text,                          -- whose (scope 'person')
+  provider    text not null,
+  model       text not null default '',
+  base_url    text not null default '',
+  name        text not null default '',
+  secret      text not null,
+  created_at  timestamptz not null default now(),
+  created_by  uuid default auth.uid()
+);
+alter table public.ai_keys enable row level security;
+revoke all on public.ai_keys from anon, authenticated;
+create or replace function public.ai_set_key(c uuid, p_scope text, p_provider text, p_model text, p_base text, p_name text, p_key text) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare me text := public.my_member_id(c); r uuid; pol jsonb := coalesce((select data from records where company_id = c and id = 'settings-ai' and data is not null order by ts desc limit 1), '{}'::jsonb);
+begin
+  if not public.is_member(c) then raise exception 'Not allowed' using errcode = '42501'; end if;
+  if p_scope not in ('company', 'person') then raise exception 'Scope must be company or person'; end if;
+  if p_scope = 'company' and not public.is_admin(c) then raise exception 'Only the company admin can connect the company AI' using errcode = '42501'; end if;
+  if p_scope = 'person' and coalesce((pol ->> 'personal')::boolean, true) = false then raise exception 'Your admin has not allowed personal AI connections' using errcode = '42501'; end if;
+  if jsonb_typeof(pol -> 'providers') = 'array' and not ((pol -> 'providers') ? p_provider) then raise exception 'Your admin has not allowed this AI service' using errcode = '42501'; end if;
+  if coalesce(p_key, '') = '' then raise exception 'The key is empty'; end if;
+  insert into ai_keys (company_id, scope, member_id, provider, model, base_url, name, secret)
+    values (c, p_scope, case when p_scope = 'person' then me end, p_provider, coalesce(p_model, ''), coalesce(p_base, ''), left(coalesce(p_name, ''), 80), p_key) returning id into r;
+  perform public.log(c, 'AI connected', jsonb_build_object('scope', p_scope, 'provider', p_provider, 'model', p_model, 'member', me));
+  return r;
+end $$;
+-- the connections this person may use — never the key
+create or replace function public.ai_list(c uuid) returns table (id uuid, scope text, provider text, model text, base_url text, name text)
+language sql stable security definer set search_path = public as $$
+  select k.id, k.scope, k.provider, k.model, k.base_url, k.name from ai_keys k
+   where k.company_id = c and public.is_member(c) and (k.scope = 'company' or k.member_id = public.my_member_id(c)) order by k.scope, k.created_at;
+$$;
+create or replace function public.ai_delete(c uuid, p_id uuid) returns void language plpgsql security definer set search_path = public as $$
+begin
+  delete from ai_keys where id = p_id and company_id = c and ((scope = 'company' and public.is_admin(c)) or (scope = 'person' and member_id = public.my_member_id(c)));
+  if not found then raise exception 'Not found, or not yours' using errcode = '42501'; end if;
+  perform public.log(c, 'AI removed', jsonb_build_object('id', p_id));
+end $$;
+-- for ai-proxy only (service key): the connection a signed-in person may use, with its key
+create or replace function public.ai_key_for(c uuid, p_id uuid, p_user uuid) returns jsonb language sql stable security definer set search_path = public as $$
+  select to_jsonb(x) from (select k.provider, k.model, k.base_url, k.secret, k.scope from ai_keys k join company_members m on m.company_id = k.company_id and m.user_id = p_user and m.active
+    join companies co on co.id = k.company_id and co.status = 'active'
+    where k.id = p_id and k.company_id = c and (k.scope = 'company' or k.member_id = m.member_id)) x;
+$$;
+revoke execute on function public.ai_key_for(uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.ai_set_key(uuid, text, text, text, text, text, text), public.ai_list(uuid), public.ai_delete(uuid, uuid) to authenticated;
+
 grant usage on schema public to anon, authenticated;
 grant select on public.platform_owners, public.companies, public.company_members, public.invites, public.audit to authenticated;
 grant select, insert, update, delete on public.files to authenticated;

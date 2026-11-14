@@ -1,4 +1,4 @@
-/* DARRIK — Online storage, record by record.
+/* MAHAM — Online storage, record by record.
  * The online database keeps the team's data as one row per record (table "records", supabase/schema.sql), each with a
  * change number. So in the online mode:
  *   - refreshing asks only for the rows changed since the last number this PC saw (a few rows, or none);
@@ -21,7 +21,7 @@ const CloudRecords = {
   root() {
     return Config.DATA_FOLDER + '/';
   },
-  /* "DARRIK Data/users/adam.json" → "users/adam.json"; null when it is not one of the record files */
+  /* "MAHAM Data/users/adam.json" → "users/adam.json"; null when it is not one of the record files */
   appFile(path) {
     const r = CloudRecords.root();
     if (!path.startsWith(r)) return null;

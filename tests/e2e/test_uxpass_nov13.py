@@ -70,7 +70,7 @@ async def main():
         # 21 text boxes grow; hints show while in the box
         await J("UI.editRecord('todo', Store.get('ux4-a'))"); await pg.wait_for_selector('#recform')
         hid = await J("(() => { const f = document.querySelector('#recform [name=ref]').closest('.fld').querySelector('small'); return f ? getComputedStyle(f).display : 'none'; })()")
-        await pg.focus('#recform [name=ref]')
+        await pg.wait_for_timeout(400); await pg.focus('#recform [name=ref]')
         shown = await J("(() => { const f = document.querySelector('#recform [name=ref]').closest('.fld').querySelector('small'); return f ? getComputedStyle(f).display : 'x'; })()")
         c('21 the Reference hint shows only while you are in the box', hid == 'none' and shown == 'block', (hid, shown))
         h0 = await J("document.querySelector('#recform [name=task]').offsetHeight")

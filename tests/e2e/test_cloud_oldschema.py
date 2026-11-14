@@ -5,7 +5,7 @@ from playwright.async_api import async_playwright
 from harness import APP, Check, free_port, run
 from supa_local import LocalSupabase, Api
 
-HTML = next(f for f in os.listdir(APP) if f.endswith('.html') and f[:-5] in ('MAHAM', 'DARRIK'))
+HTML = next(f for f in os.listdir(APP) if f.endswith('.html') and f[:-5] in ('MAHAM', 'MAHAM'))
 CFGJS = HTML[:-5].lower() + '.config.js'
 D = HTML[:-5] + ' Data'
 

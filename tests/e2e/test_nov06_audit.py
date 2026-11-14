@@ -90,7 +90,7 @@ async def main():
         await J("ps('todo').pri = ''; App.tableState.todo.q = ''; App.render()")
         # ---------- foldable menu ----------
         secs = await J("[...document.querySelectorAll('nav a.sec')].map(e => e.dataset.sec)")
-        c('menu: one link per section, in order', [x for x in secs if x not in ('Admin', 'Connect', 'Service', 'Sales')] == ['Home', 'Work', 'Projects', 'Tracking', 'Team', 'Performance', 'Reference'], secs)
+        c('menu: one link per section, in order', [x for x in secs if x not in ('Admin', 'Connect', 'Service', 'Sales', 'AI', 'Operations', 'Workplace')] == ['Home', 'Work', 'Projects', 'Tracking', 'Team', 'Performance', 'Reference'], secs)
         c('the open page\'s section is highlighted and its pages are tabs on top', await J("document.querySelector('nav a.sec.on').dataset.sec") == 'Work' and await pg.locator('#main .sec-tabs .sec-tab').count() == 4 and await pg.locator('#main .sec-tab.on[data-tab=todo]').count() == 1)
         await s.go('#/shadow', 300); await s.go('#/quickwins', 300)
         c('a section link opens the page last used in it', await J("document.querySelector('nav a.sec[data-sec=Work]').getAttribute('href')") == '#/shadow')

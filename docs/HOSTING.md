@@ -105,3 +105,17 @@ Each person can switch emails off in 🔔 → _Emails: on/off_. Without step 1�
   `supabase secrets set INBOUND_SECRET=…`) and point your mail service's inbound webhook at
   `https://<project>.supabase.co/functions/v1/inbound-email?company=<company id>&secret=<INBOUND_SECRET>`.
   Each email becomes a ticket in the queue for it, like a portal ticket.
+
+## ✨ AI (optional)
+
+People connect the AI they use in **✨ AI → AI connections** — Claude (Anthropic), OpenAI, Google Gemini, Azure OpenAI,
+any OpenAI-compatible address, or a model on their own PC (Ollama, LM Studio). The company admin can connect one for
+everyone, allow or forbid personal ones, choose the services allowed, keep areas out of the AI and set a monthly limit.
+
+- **Online:** deploy the proxy once — `supabase functions deploy ai-proxy`. Keys are stored in the database where
+  nobody can read them back (not even the admin); the proxy adds the key on the server.
+- **Shared folder / this device:** a personal key is kept in that browser only and the AI is called from there.
+- **Claude:** an API key from platform.claude.com → Settings → API keys. Claude Max, Ultra and Team plans include
+  monthly API credits: the plan owner links them on claude.ai → Settings → Billing. MAHAM uses Claude Opus 5.5 by default
+  and asks the API to re-run a declined request on another model (server-side fallback).
+- **A model on this PC (Ollama):** start it with `OLLAMA_ORIGINS=https://you.github.io` so the page may call it.
