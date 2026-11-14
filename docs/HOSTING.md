@@ -119,3 +119,23 @@ everyone, allow or forbid personal ones, choose the services allowed, keep areas
   monthly API credits: the plan owner links them on claude.ai → Settings → Billing. MAHAM uses Claude Opus 5.5 by default
   and asks the API to re-run a declined request on another model (server-side fallback).
 - **A model on this PC (Ollama):** start it with `OLLAMA_ORIGINS=https://you.github.io` so the page may call it.
+
+## Sign in with Microsoft 365 / Google (optional)
+
+1. Supabase → **Authentication → Providers**: switch on **Azure** (Microsoft Entra ID) and/or **Google** and paste the
+   client id and secret from your Microsoft Entra / Google Cloud app registration (redirect URL: shown on that page).
+2. In `maham.config.js` add `sso: ['azure', 'google']` inside `cloud: { … }` — the sign-in page then shows
+   **Sign in with Microsoft / Google**. People still join only by invitation (the invited email must match).
+
+## Keeping the data in Saudi Arabia (data residency)
+
+Supabase's own cloud has no region in Saudi Arabia. For customers whose data must stay in the kingdom (government,
+health — PDPL, NCA), run **self-hosted Supabase** (docker compose from supabase.com/docs/guides/self-hosting) on a server
+in a Saudi cloud region or the customer's data centre, then put that address and key in `maham.config.js`.
+Everything in this guide (schema.sql, the functions) works the same on a self-hosted Supabase.
+
+## Billing
+
+Companies, seats and pausing are in the **Owner Console** (seats are enforced by the database). Charging is not built
+in: invoice from your own system (for Saudi customers a ZATCA-compliant e-invoicing provider), and pause a company in the
+Owner Console when it is not paid.

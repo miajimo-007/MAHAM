@@ -522,3 +522,38 @@
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* ---------- 🎯 goals, sign-in buttons, Arabic ---------- */
+.okr-bar {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--line);
+  overflow: hidden;
+  margin: 6px 0;
+}
+.okr-bar.sm {
+  height: 6px;
+  margin: 4px 0 0;
+}
+.okr-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.sso {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+html.lang-ar body {
+  font-family: 'Segoe UI', Tahoma, 'Noto Sans Arabic', system-ui, sans-serif;
+}
+html[dir='rtl'] .nt-panel {
+  right: auto;
+  left: 12px;
+}
+html[dir='rtl'] .ai-panel {
+  right: auto;
+  left: 12px;
+}
