@@ -13,9 +13,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SCHEMA = os.path.join(ROOT, 'supabase', 'schema.sql')
 
 def pg_bin():
-    for d in sorted(glob.glob('/usr/lib/postgresql/*/bin'), reverse=True) + ['/usr/local/bin', '/usr/bin', '/opt/homebrew/bin']:
-        if os.path.isfile(os.path.join(d, 'initdb')) and os.path.isfile(os.path.join(d, 'pg_ctl')): return d
+    win = sorted(glob.glob(os.path.join(os.environ.get('ProgramFiles', 'C:/Program Files'), 'PostgreSQL', '*', 'bin')), reverse=True) if os.name == 'nt' else []
+    for d in win + sorted(glob.glob('/usr/lib/postgresql/*/bin'), reverse=True) + ['/usr/local/bin', '/usr/bin', '/opt/homebrew/bin']:
+        if os.path.isfile(os.path.join(d, EXE('initdb'))) and os.path.isfile(os.path.join(d, EXE('pg_ctl'))): return d
     return None
+
+WIN = os.name == 'nt'
+def EXE(n): return n + '.exe' if WIN else n
+def ROOT_USER(): return not WIN and os.geteuid() == 0   # as root (Linux CI) the server runs as a separate user
 
 def free_port():
     with socket.socket() as s: s.bind(('127.0.0.1', 0)); return s.getsockname()[1]
@@ -36,22 +41,25 @@ alter default privileges in schema public grant all on sequences to anon, authen
 
 class LocalSupabase:
     def __init__(self):
-        self.bin = pg_bin(); self.ok = bool(self.bin) and shutil.which('psql') is not None
+        self.bin = pg_bin(); self.ok = bool(self.bin) and (os.path.isfile(os.path.join(self.bin, EXE('psql'))) or shutil.which('psql') is not None)
         self.tokens = {}; self.lock = threading.Lock(); self.calls = []
 
     # ---------- PostgreSQL ----------
     def _as_pg_user(self, cmd):
-        if os.geteuid() != 0: return cmd
+        if not ROOT_USER(): return cmd
         return ['su', 'pgtest', '-s', '/bin/sh', '-c', ' '.join("'" + c.replace("'", "'\\''") + "'" for c in cmd)]
     def start(self):
         if not self.ok: return False
-        if os.geteuid() == 0 and subprocess.run(['id', 'pgtest'], capture_output=True).returncode != 0:
+        if ROOT_USER() and subprocess.run(['id', 'pgtest'], capture_output=True).returncode != 0:
             subprocess.run(['useradd', '-m', 'pgtest'], check=True)
         self.dir = tempfile.mkdtemp(prefix='supa-'); os.chmod(self.dir, 0o777)
         data = os.path.join(self.dir, 'data'); self.sock = self.dir; self.pgport = free_port()
-        subprocess.run(self._as_pg_user([os.path.join(self.bin, 'initdb'), '-D', data, '-U', 'postgres', '--auth=trust', '-E', 'UTF8']), check=True, capture_output=True)
-        subprocess.run(self._as_pg_user([os.path.join(self.bin, 'pg_ctl'), '-D', data, '-o', f'-p {self.pgport} -k {self.sock} -c listen_addresses=', '-l', os.path.join(self.dir, 'log'), '-w', 'start']), check=True, capture_output=True)
-        self.psql = shutil.which('psql')
+        subprocess.run(self._as_pg_user([os.path.join(self.bin, EXE('initdb')), '-D', data, '-U', 'postgres', '--auth=trust', '-E', 'UTF8'] + (['--no-locale'] if WIN else [])), check=True, capture_output=True)
+        # Linux: a Unix socket in the temp folder; Windows: local TCP only
+        opts = f'-p {self.pgport} -c listen_addresses=127.0.0.1' if WIN else f'-p {self.pgport} -k {self.sock} -c listen_addresses='
+        if WIN: self.sock = '127.0.0.1'
+        subprocess.run(self._as_pg_user([os.path.join(self.bin, EXE('pg_ctl')), '-D', data, '-o', opts, '-l', os.path.join(self.dir, 'log'), '-w', 'start']), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)   # no pipes: on Windows the server would keep them open and this would wait forever
+        self.psql = os.path.join(self.bin, EXE('psql')) if os.path.isfile(os.path.join(self.bin, EXE('psql'))) else shutil.which('psql')
         self.sql('create database app;', db='postgres')
         self.sql(AUTH_SQL)
         out = self.sql(open(SCHEMA, encoding='utf-8').read())
@@ -62,7 +70,7 @@ class LocalSupabase:
     def stop(self):
         try: self.httpd.shutdown()
         except Exception: pass
-        try: subprocess.run(self._as_pg_user([os.path.join(self.bin, 'pg_ctl'), '-D', os.path.join(self.dir, 'data'), '-m', 'immediate', 'stop']), capture_output=True)
+        try: subprocess.run(self._as_pg_user([os.path.join(self.bin, EXE('pg_ctl')), '-D', os.path.join(self.dir, 'data'), '-m', 'immediate', 'stop']), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
         except Exception: pass
         shutil.rmtree(self.dir, ignore_errors=True)
 
@@ -72,7 +80,7 @@ class LocalSupabase:
         head = '\\set ON_ERROR_STOP on\n\\set VERBOSITY verbose\n'
         if role:
             params['_claims'] = json.dumps(claims or {})
-            script = f"begin;\nset local role {role};\nselect set_config('request.jwt.claims', :'_claims', true) \\g /dev/null\n{script}\ncommit;\n"
+            script = f"begin;\nset local role {role};\nselect set_config('request.jwt.claims', :'_claims', true) \\g {os.devnull}\n{script}\ncommit;\n"
         cmd = [self.psql, '-h', self.sock, '-p', str(self.pgport), '-U', 'postgres', '-d', db, '-X', '-q', '-A', '-t']
         pre = ''; tmp = []
         for k, v in params.items():
@@ -80,7 +88,7 @@ class LocalSupabase:
                 f = os.path.join(self.dir, f'v-{secrets.token_hex(6)}'); open(f, 'w', encoding='utf-8').write(v); os.chmod(f, 0o644); tmp.append(f)
                 cmd += ['-v', f'_f_{k}={f}']; pre += f"select pg_read_file(:'_f_{k}') as {k} \\gset\n"
             else: cmd += ['-v', f'{k}={v}']
-        r = subprocess.run(cmd, input=head + pre + script, capture_output=True, text=True)
+        r = subprocess.run(cmd, input=head + pre + script, capture_output=True, text=True, encoding='utf-8')
         for f in tmp: os.remove(f)
         if r.returncode != 0:
             m = re.search(r'ERROR:\s+(?:([0-9A-Z]{5}):\s+)?(.*)', r.stderr); code = m.group(1) if m else ''; msg = m.group(2).strip() if m else r.stderr.strip()
@@ -127,6 +135,7 @@ class LocalSupabase:
             p = f'p{i}'
             col = f'{table}.{k}'
             if op == 'eq': params[p] = val; where.append(f"{col} = :'{p}'")
+            elif op in ('gt', 'gte', 'lt'): params[p] = val; where.append(f"{col} {'>' if op == 'gt' else '>=' if op == 'gte' else '<'} :'{p}'")
             elif op == 'like': params[p] = val.replace('*', '%'); where.append(f"{col} like :'{p}'")
             elif op == 'in':
                 items = [x.strip().strip('"') for x in val.strip('()').split(',') if x.strip()]

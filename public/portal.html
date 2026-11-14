@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Help centre</title>
+<script src="maham.config.js"></script>
+<style>
+  :root { --bg: #f5f7fa; --card: #fff; --ink: #1d2433; --muted: #667085; --line: #e3e8ef; --accent: #0e7c86; --bad: #c0392b; --good: #1e8e5a; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0f141b; --card: #171e28; --ink: #e6ebf2; --muted: #98a2b3; --line: #2a3442; --accent: #2bb3bd; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 26px; margin: 8px 0 4px; } h2 { font-size: 18px; margin: 0 0 10px; }
+  .muted { color: var(--muted); } .small { font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 16px; }
+  label { display: block; margin: 10px 0 4px; font-weight: 600; font-size: 14px; }
+  input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; }
+  textarea { min-height: 110px; resize: vertical; }
+  button { margin-top: 14px; padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  button[disabled] { opacity: .6; cursor: default; }
+  .msg { padding: 10px 12px; border-radius: 8px; margin-top: 12px; } .msg.bad { background: #fdecea; color: var(--bad); } .msg.good { background: #e8f6ef; color: var(--good); }
+  .r { border-top: 1px solid var(--line); padding: 10px 0; } .r b { margin-right: 6px; } .r.mine b { color: var(--accent); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 99px; background: #eef2f6; color: #344054; font-size: 13px; font-weight: 600; }
+  details { border-top: 1px solid var(--line); padding: 8px 0; } summary { cursor: pointer; font-weight: 600; }
+  .link { color: var(--accent); word-break: break-all; }
+</style>
+</head>
+<body>
+<main id="app"><p class="muted">Loading…</p></main>
+<script>
+/* MAHAM — the customer portal. No account: a customer raises a ticket here and gets a private link to follow it and
+ * reply. It talks only to the database's portal functions (supabase/schema.sql: portal_info, portal_submit,
+ * portal_status, portal_reply, portal_articles). Address: portal.html?c=<company id>  ·  a ticket: portal.html?t=<link> */
+(() => {
+  const cfg = (window.MAHAM_CONFIG || {}).cloud || {};
+  const app = document.getElementById('app');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const qs = new URLSearchParams(location.search);
+  const rpc = async (fn, args) => {
+    const r = await fetch(cfg.url.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: cfg.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((j && (j.message || j.msg)) || 'Something went wrong (' + r.status + ')');
+    return j;
+  };
+  const when = t => (t ? new Date(+t).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+  if (!cfg.url || !cfg.anonKey) { app.innerHTML = '<h1>Help centre</h1><p class="muted">This help centre is not set up yet.</p>'; return; }
+
+  /* ---------- following one ticket ---------- */
+  async function ticket(token, note) {
+    let t;
+    try { t = await rpc('portal_status', { p_token: token }); } catch (e) { app.innerHTML = `<h1>Your request</h1><div class="msg bad">${esc(e.message)}</div>`; return; }
+    if (!t) { app.innerHTML = '<h1>Your request</h1><div class="msg bad">This link is not valid.</div>'; return; }
+    app.innerHTML = `<h1>${esc(t.subject)}</h1><p><span class="badge">${esc(t.status)}</span> <span class="muted small">Request TK-${esc(t.no)} · opened ${esc(when(t.created))}</span></p>
+      ${note ? `<div class="msg good">${note}</div>` : ''}
+      <div class="card"><h2>Messages</h2>${(t.replies || []).length ? t.replies.map(r => `<div class="r${r.mine ? ' mine' : ''}"><b>${esc(r.by)}</b><span class="muted small">${esc(when(r.at))}</span><div>${esc(r.text).replace(/\n/g, '<br>')}</div></div>`).join('') : '<p class="muted">No replies yet — we will answer here.</p>'}</div>
+      <div class="card"><h2>Reply</h2><textarea id="rt" maxlength="8000"></textarea><button id="rs">Send</button><div id="rm"></div></div>
+      <p class="muted small">Keep this page's address: it is your private link to this request.</p>`;
+    document.getElementById('rs').onclick = async e => {
+      const text = document.getElementById('rt').value.trim(); if (!text) return;
+      e.target.disabled = true;
+      try { await rpc('portal_reply', { p_token: token, p_text: text }); ticket(token, 'Thank you — your reply was sent.'); }
+      catch (er) { e.target.disabled = false; document.getElementById('rm').innerHTML = `<div class="msg bad">${esc(er.message)}</div>`; }
+    };
+  }
+
+  /* ---------- the help centre: articles + a new request ---------- */
+  async function home(c) {
+    let info, arts;
+    try { [info, arts] = await Promise.all([rpc('portal_info', { c }), rpc('portal_articles', { c })]); } catch (e) { info = null; }
+    if (!info) { app.innerHTML = '<h1>Help centre</h1><p class="muted">This help centre is not open.</p>'; return; }
+    document.title = info.title + ' — ' + info.name;
+    app.innerHTML = `<p class="muted small">${esc(info.name)}</p><h1>${esc(info.title)}</h1><p>${esc(info.intro)}</p>
+      ${arts && arts.length ? `<div class="card"><h2>Answers to common questions</h2><input id="aq" placeholder="Search…">${arts.map((a, i) => `<details data-a="${i}"><summary>${esc(a.title)}</summary>${a.problem ? `<p class="muted">${esc(a.problem)}</p>` : ''}<p>${esc(a.solution || '').replace(/\n/g, '<br>')}</p></details>`).join('')}</div>` : ''}
+      <div class="card"><h2>Ask for help</h2>
+        <label for="pn">Your name</label><input id="pn" maxlength="100" autocomplete="name">
+        <label for="pe">Your email</label><input id="pe" type="email" maxlength="200" autocomplete="email">
+        ${(info.categories || []).length ? `<label for="pc">About</label><select id="pc">${info.categories.map(x => `<option>${esc(x)}</option>`).join('')}</select>` : ''}
+        <label for="ps">Subject</label><input id="ps" maxlength="200">
+        <label for="pd">Details</label><textarea id="pd" maxlength="8000"></textarea>
+        <p class="muted small">Please do not write personal data that is not needed (for example ID numbers or medical details).</p>
+        <button id="pgo">Send</button><div id="pm"></div></div>`;
+    const aq = document.getElementById('aq');
+    if (aq) aq.oninput = () => { const q = aq.value.toLowerCase(); arts.forEach((a, i) => { app.querySelector(`[data-a="${i}"]`).hidden = q && !(a.title + ' ' + a.problem + ' ' + a.solution).toLowerCase().includes(q); }); };
+    document.getElementById('pgo').onclick = async e => {
+      const v = id => (document.getElementById(id) || {}).value || '';
+      if (!v('ps').trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('pe').trim())) { document.getElementById('pm').innerHTML = '<div class="msg bad">Please write a subject and a valid email.</div>'; return; }
+      e.target.disabled = true;
+      try {
+        const tok = await rpc('portal_submit', { c, p_name: v('pn'), p_email: v('pe'), p_subject: v('ps'), p_desc: v('pd'), p_category: v('pc') });
+        history.replaceState(null, '', '?t=' + encodeURIComponent(tok));
+        ticket(tok, `Thank you — we have your request. <b>Keep this page's address</b> to follow it: <span class="link">${esc(location.href)}</span>`);
+      } catch (er) { e.target.disabled = false; document.getElementById('pm').innerHTML = `<div class="msg bad">${esc(er.message)}</div>`; }
+    };
+  }
+
+  if (qs.get('t')) ticket(qs.get('t'));
+  else if (qs.get('c') || cfg.company) home(qs.get('c') || cfg.company);
+  else app.innerHTML = '<h1>Help centre</h1><p class="muted">Open the link your support team gave you.</p>';
+})();
+</script>
+</body>
+</html>

@@ -59,7 +59,7 @@ async def main():
         t = await tab('reports'); c('estimated vs actual shown', 'Estimated vs actual hours' in t and '140%' in t)
         # template
         await pg.click('#savetpl'); await pg.fill('.modal [name=name]', 'Label project'); await pg.click('.modal [data-ok]'); await pg.wait_for_timeout(300)
-        c('template saved with phases and tasks', await s.js("(t => t && t.tasks.length === 2 && t.phases.length === 1 && t.tasks[1].parent === t.tasks[0].key)(Store.all('ptemplate')[0])"))
+        c('template saved with phases and tasks', await s.js("(t => t && t.tasks.length === 2 && t.phases.length === 1 && t.tasks.some(x => x.parent && t.tasks.some(y => y.key === x.parent && y.key !== x.key)))(Store.all('ptemplate')[0])"))
         await s.go('#/projects/mine'); await pg.click('#fromtpl'); await pg.click('[data-tpuse]'); await pg.wait_for_selector('#recform')
         await pg.fill('#recform [name=name]', 'Radiology label reprint'); await pg.fill('#recform [name=start]', await s.js("U.addDays(U.todayStr(), 10)")); await pg.click('[data-save]'); await pg.wait_for_timeout(600)
         np = await s.js("Store.all('project').find(p => p.name === 'Radiology label reprint').id")

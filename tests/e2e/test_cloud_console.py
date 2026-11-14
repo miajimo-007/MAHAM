@@ -25,7 +25,7 @@ async def main():
         async with async_playwright() as p:
             b = await p.chromium.launch()
             async def page():
-                ctx = await b.new_context(viewport={'width': 1366, 'height': 900}, service_workers='block')
+                ctx = await b.new_context(viewport={'width': 1366, 'height': 900}, service_workers='block'); await ctx.add_init_script("try { localStorage.setItem('bct.test.nowhatsnew', '1'); } catch (e) {}")
                 await ctx.route('**/' + CFGJS, lambda r: r.fulfill(status=200, content_type='application/javascript', body=cfg))
                 pg = await ctx.new_page(); pg.errors = []; pg.on('pageerror', lambda e: pg.errors.append(str(e)))
                 return ctx, pg
@@ -84,7 +84,7 @@ async def main():
             await pg.click(f'[data-co-cancel="{omar}"]'); await pg.wait_for_timeout(1500)
             c('cancel an invitation frees the seat', '1 used + 1 invited of 3' in await pg.inner_text('#coadm'))
             c('no "support access" card any more', 'Support access' not in await pg.inner_text('#coadm'))
-            await pg.evaluate("location.hash = '#/admin/people'"); await pg.wait_for_selector('[data-k=superAdmin]', timeout=15000)
+            await pg.evaluate("location.hash = '#/admin/people/people'"); await pg.wait_for_selector('[data-k=superAdmin]', timeout=15000)
             c("People: the admin tick follows the database (can't be ticked here)", await pg.evaluate("[...document.querySelectorAll('[data-k=superAdmin]')].every(i => i.disabled)"))
             await pg.screenshot(path=f'{SHOTS}/cloud_company_admin.png')
             errors += pg.errors; await ctx.close()
@@ -125,7 +125,7 @@ async def main():
             c('Open as admin: inside Acme, in admin mode, with its data, no setup', st == {'me': 'platform-owner', 'admin': True, 'adam': True, 'setup': False}, st)
             c('…with the "Platform owner — in the audit log" note', 'Platform owner' in await pg.inner_text('.side-foot'))
             await pg.evaluate("(async () => { Store.save({ c: 'shadow', id: 'owner-try', analyst: 'adam', team: Store.teams()[0].id, date: U.todayStr(), taskType: 'TRAINING >> x', source: 'Call', subject: 'Owner was here', minutes: 5 }); await Store.flush(); })()"); await pg.wait_for_timeout(1200)
-            c('…and can save in it', 'Owner was here' in sb.sql("select string_agg(content, '') from public.files;"))
+            c('…and can save in it', 'Owner was here' in sb.sql("select string_agg(data::text, '') from public.records;"))
             acts = sb.sql("select string_agg(action, ',') from public.audit;")
             c("…all of it in Acme's audit log", 'owner opened' in acts and 'owner saved' in acts, acts)
             await pg.evaluate("location.hash = '#/admin/company'"); await pg.wait_for_selector('#coadm table', timeout=20000); await pg.wait_for_timeout(500)

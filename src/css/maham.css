@@ -1,0 +1,438 @@
+/* MAHAM — styles of the MAHAM-only modules (attachments, chat, service desk, CRM …). Colours come from the theme
+ * tokens (css/theme.css), so Light and Dark both work. */
+
+/* ---------- 📎 attachments (in record forms, after the notes) ---------- */
+.attach {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.attach .at-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.attach .at-drop {
+  border: 1px dashed var(--line2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.attach .at-drop.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.attach .at-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+.attach .at-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.attach .at-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.attach .at-ic {
+  width: 1.4em;
+  text-align: center;
+}
+.at-count {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- 🔔 For you (top bar) ---------- */
+.nt-bell {
+  position: relative;
+}
+.nt-bell .nt-n {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+.nt-panel {
+  position: absolute;
+  top: 48px;
+  right: 12px;
+  width: min(380px, calc(100vw - 24px));
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  z-index: 60;
+  background: var(--card-solid);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.nt-panel .nt-head,
+.nt-panel .nt-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+.nt-panel .nt-head {
+  border-bottom: 1px solid var(--line);
+}
+.nt-panel .nt-foot {
+  border-top: 1px solid var(--line);
+}
+.nt-panel .nt-list {
+  overflow: auto;
+}
+.nt-item {
+  display: block;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+  line-height: 1.35;
+}
+.nt-item:hover {
+  background: var(--accent-soft);
+}
+.nt-item.new {
+  border-left: 3px solid var(--accent);
+  padding-left: 11px;
+}
+.nt-item .nt-who {
+  font-weight: 700;
+}
+.nt-item .nt-text {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.nt-item .nt-at {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+.nt-empty {
+  padding: 14px;
+}
+
+/* ---------- 💬 Chat ---------- */
+.chat {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 12px;
+  height: calc(100vh - 150px);
+  min-height: 420px;
+}
+.chat.with-thread {
+  grid-template-columns: 220px 1fr 340px;
+}
+.chat .ch-side,
+.chat .ch-main,
+.chat .ch-thread {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.chat .ch-side {
+  padding: 8px;
+  overflow: auto;
+}
+.chat .ch-sh {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 10px 6px 4px;
+}
+.ch-it {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: var(--ink);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.ch-it:hover {
+  background: var(--accent-soft);
+}
+.ch-it.on {
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+.ch-it .count {
+  margin-left: auto;
+}
+.ch-none {
+  padding: 4px 8px;
+}
+.chat .ch-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.chat .ch-list {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ch-empty {
+  margin: auto;
+}
+.ch-msg .ch-meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.ch-msg .ch-acts {
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ch-msg:hover .ch-acts,
+.ch-msg:focus-within .ch-acts {
+  opacity: 1;
+}
+.ch-msg .ch-text {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.ch-msg .ch-on {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ch-msg .ch-thr {
+  display: inline-block;
+  margin-top: 2px;
+}
+.mention {
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-weight: 600;
+}
+.mention.me {
+  background: var(--warn-soft);
+}
+.chat .ch-comp {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 4px;
+  border-top: 1px solid var(--line);
+  position: relative;
+}
+.chat .ch-comp textarea {
+  flex: 1;
+  resize: vertical;
+  min-height: 44px;
+}
+.chat .ch-hint {
+  padding: 0 14px 8px;
+}
+.ch-sug {
+  position: absolute;
+  bottom: 100%;
+  left: 14px;
+  z-index: 30;
+  background: var(--card-solid);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  min-width: 220px;
+}
+.ch-sug a {
+  display: block;
+  padding: 6px 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.ch-sug a.on,
+.ch-sug a:hover {
+  background: var(--accent-soft);
+}
+.ch-pick {
+  max-height: 300px;
+  overflow: auto;
+  margin-top: 8px;
+}
+@media (max-width: 900px) {
+  .chat,
+  .chat.with-thread {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .chat .ch-list {
+    max-height: 60vh;
+  }
+}
+
+/* ---------- 🎫 Service desk ---------- */
+.tk-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.tk-ctl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.tk-ctl label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+.tk-desc {
+  margin: 8px 0 12px;
+  overflow-wrap: anywhere;
+}
+.tk-conv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+.tk-r {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  overflow-wrap: anywhere;
+}
+.tk-r.internal {
+  background: var(--warn-soft);
+}
+.tk-r.cust {
+  border-left: 3px solid var(--accent);
+}
+.tk-reply {
+  margin-top: 10px;
+}
+.tk-reply textarea {
+  width: 100%;
+}
+.tk-csat {
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.sv-q {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cols3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+/* ---------- 💼 Sales ---------- */
+.crm-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.crm-col {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  min-height: 200px;
+}
+.crm-col.over {
+  outline: 2px dashed var(--accent);
+}
+.crm-ch {
+  padding: 4px 6px 8px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.crm-card {
+  background: var(--card-solid);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  cursor: grab;
+  overflow-wrap: anywhere;
+}
+.crm-card.drag {
+  opacity: 0.5;
+}
+.crm-card .crm-cm {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 4px;
+}
+.crm-empty {
+  padding: 8px;
+  text-align: center;
+}
+.crm-act {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.crm-st {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.crm-top {
+  margin-bottom: 8px;
+}

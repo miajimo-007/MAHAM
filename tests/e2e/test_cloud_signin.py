@@ -1,6 +1,6 @@
 """Online storage with many companies, in the browser, against a real PostgreSQL running supabase/schema.sql:
 sign in / wrong password; an account without an invitation sees "no company yet"; an invited admin creates an account
-and the app opens as that person with the database's admin; saving goes to their own file in the database; a reload
+and the app opens as that person with the database's admin; saving goes to their own records in the database (only the changed ones); a reload
 keeps the session; someone in two companies chooses one; forgot password; a reset link sets a new password; sign out."""
 import json, os, subprocess, sys, time
 from playwright.async_api import async_playwright
@@ -25,7 +25,7 @@ async def main():
         async with async_playwright() as p:
             b = await p.chromium.launch()
             async def page():
-                ctx = await b.new_context(viewport={'width': 1280, 'height': 860}, service_workers='block')
+                ctx = await b.new_context(viewport={'width': 1280, 'height': 860}, service_workers='block'); await ctx.add_init_script("try { localStorage.setItem('bct.test.nowhatsnew', '1'); } catch (e) {}")
                 await ctx.route('**/' + CFGJS, lambda r: r.fulfill(status=200, content_type='application/javascript', body=cfg))
                 pg = await ctx.new_page(); pg.errors = []; pg.on('pageerror', lambda e: pg.errors.append(str(e)))
                 return ctx, pg
@@ -57,8 +57,10 @@ async def main():
             c('the company name shows under your name', 'Acme' in await pg.inner_text('.side-foot'))
             await pg.evaluate("(async () => { Store.save({ c: 'shadow', id: 'cloud-td', analyst: 'adam', team: 'apps', date: U.todayStr(), taskType: 'TRAINING >> x', source: 'Call', subject: 'Saved online', minutes: 45 }); await Store.flush(); })()")
             await pg.wait_for_timeout(1500)
-            row = sb.sql(f"select content from public.files where company_id = :'c'::uuid and path = :'p';", params={'c': acme, 'p': f'{D}/users/adam.json'})
-            c("saved into adam's own file, in Acme", 'Saved online' in row, row[:120])
+            row = sb.sql("select data::text from public.records where company_id = :'c'::uuid and f = 'users/adam.json' and id = 'cloud-td';", params={'c': acme})
+            c("saved as one record in adam's own file, in Acme (records table)", 'Saved online' in row, row[:120])
+            old = sb.sql("select count(*) from public.files where company_id = :'c'::uuid and path like :'p';", params={'c': acme, 'p': f'{D}/users/%'}).strip()
+            c('…nothing written as a whole file any more', old == '0', old)
             await pg.reload(); await pg.wait_for_selector('#main', timeout=20000); await pg.wait_for_timeout(800)
             c('reload: still signed in, data read back from the database', await pg.evaluate("App.me === 'adam' && !!Store.get('cloud-td')"))
             await pg.screenshot(path=f'{SHOTS}/cloud_signin.png')

@@ -273,7 +273,7 @@ ${
             location.hash = '#/perf/dashboard';
           })
       );
-      root.querySelectorAll('[data-desk]').forEach(
+      root.querySelectorAll('button[data-desk]').forEach(
         b =>
           (b.onclick = () => {
             App.setViewTeam(b.dataset.desk);

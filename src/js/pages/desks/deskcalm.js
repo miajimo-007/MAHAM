@@ -171,10 +171,58 @@ const DeskCalm = {
       rows
         .map(
           r =>
-            `<div class="li click" data-deskteam="${h(r.t.id)}"><div class="grow"><b>${h(r.m ? Store.memberShort(r.m.id) : Store.teamName(r.t.id))}</b> <span class="muted small">· ${h(Store.teamName(r.t.id))}</span><div class="muted small">${[r.qw ? `${r.qw} quick win${r.qw === 1 ? '' : 's'} to approve${r.old ? ` (oldest ${U.diffDays(r.old, U.todayStr())} d)` : ''}` : '', r.rv ? `${r.rv} To Do${r.rv === 1 ? '' : 's'} to confirm` : ''].filter(Boolean).join(' · ')}</div></div></div>`
+            `<div class="li click" data-waitmgr="${h(r.t.id)}" title="See what is waiting"><div class="grow"><b>${h(r.m ? Store.memberShort(r.m.id) : Store.teamName(r.t.id))}</b> <span class="muted small">· ${h(Store.teamName(r.t.id))}</span><div class="muted small">${[r.qw ? `${r.qw} quick win${r.qw === 1 ? '' : 's'} to approve${r.old ? ` (oldest ${U.diffDays(r.old, U.todayStr())} d)` : ''}` : '', r.rv ? `${r.rv} To Do${r.rv === 1 ? '' : 's'} to confirm` : ''].filter(Boolean).join(' · ')}</div></div></div>`
         )
         .join('')
     );
+  },
+
+  /* the list behind a Waiting on managers row — shown on the Director Desk (it never leaves the page) */
+  waitingList(teamId) {
+    const qw = Store.all('quickwin', '*')
+      .filter(q => (q.team || 'apps') === teamId && !q.approval && !q.deleted)
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    const rv = Store.all('todo', '*')
+      .filter(x => (x.team || 'apps') === teamId && x.status === 'Ready for review')
+      .sort((a, b) => String(a.finish || '').localeCompare(String(b.finish || '')));
+    const m = Store.teamManager(teamId);
+    const today = U.todayStr();
+    const days = d => (d ? `${U.diffDays(d, today)} d` : '');
+    const row = (who, what, since) =>
+      `<tr><td class="nw">${h(Store.memberShort(who) || '—')}</td><td>${h(what || '')}</td><td class="num nw">${h(days(since))}</td></tr>`;
+    const tbl = (title, list) =>
+      list.length
+        ? `<h4>${h(title)} <span class="count">${list.length}</span></h4><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th>What</th><th class="num">Waiting</th></tr></thead><tbody>${list.join('')}</tbody></table></div>`
+        : '';
+    const body =
+      tbl(
+        'Quick wins to approve',
+        qw.map(q => row(q.analyst, q.subject, q.date))
+      ) +
+      tbl(
+        'To Dos to confirm',
+        rv.map(x => row(x.analyst, x.task, x.finish))
+      );
+    UI.modal({
+      title: `Waiting on ${m ? Store.memberShort(m.id) : 'the manager'} · ${Store.teamName(teamId)}`,
+      body: body || '<p class="muted">Nothing is waiting any more.</p>',
+      actions: `${m && (qw.length || rv.length) ? '<button class="btn" data-wmask>🔔 Ask for an update</button>' : ''}<span class="grow"></span><button class="btn primary" data-wmok>Close</button>`,
+      onMount: w => {
+        w.querySelector('[data-wmok]').onclick = UI.closeModal;
+        const ask = w.querySelector('[data-wmask]');
+        if (ask)
+          ask.onclick = () => {
+            Dir.nudge(
+              m.id,
+              'approvals',
+              teamId,
+              `Please look at what is waiting for your approval: ${[qw.length ? qw.length + ' quick win' + (qw.length === 1 ? '' : 's') : '', rv.length ? rv.length + ' To Do' + (rv.length === 1 ? '' : 's') + ' to confirm' : ''].filter(Boolean).join(' and ')}.`
+            );
+            UI.toast(`Asked ${Store.memberShort(m.id)}`, 'good');
+            UI.closeModal();
+          };
+      },
+    });
   },
 
   /* ---------- the page ---------- */
@@ -188,7 +236,7 @@ const DeskCalm = {
     } catch (e) {
       strip = '';
     }
-    return html.replace(a, `${strip}<div class="dc-main" data-desk="${level}">${a}`).replace(b, `</div>${b}`);
+    return html.replace(a, `${strip}<div class="dc-main" data-dclevel="${level}">${a}`).replace(b, `</div>${b}`);
   },
   titleOf(cardEl) {
     const h3 = cardEl.querySelector(':scope > .card-head h3');
@@ -231,6 +279,12 @@ const DeskCalm = {
   mount(root, level) {
     const main = root.querySelector('.dc-main');
     if (!main) return;
+    main.querySelectorAll('[data-waitmgr]').forEach(r =>
+      r.addEventListener('click', e => {
+        e.stopPropagation();
+        DeskCalm.waitingList(r.dataset.waitmgr);
+      })
+    );
     const need = main.querySelector('.desk-grp[data-dg="need"]'),
       watch = main.querySelector('.desk-grp[data-dg="watch"]');
     if (!need || !watch) return;

@@ -26,7 +26,7 @@ async def main():
         c('a Lanes task follows its own lane', w[3] == 'Waiting/Passed', w[3])
         c('a follow-up follows its party\'s steps', w[4].startswith('Under Review'), w[4])
         c('the engine has the add-on registries (follow-ups, Lanes)', await J("!!TaskFlow.KINDS.central && !!TaskFlow.MODES.lanes && typeof TaskFlow.scheme === 'function'"))
-        c('the task form add-ons are a visible list, in order', await J("Schemas.extensions('ptask').join(',')") == 'workflow,work items,waiting on a follow-up,workflow box,approval box,lanes,definition of done', await J("Schemas.extensions('ptask').join(',')"))
+        c('the task form add-ons are a visible list, in order', await J("Schemas.extensions('ptask').filter(x => !['attach', 'chat'].includes(x)).join(',')") == 'workflow,work items,waiting on a follow-up,workflow box,approval box,lanes,definition of done', await J("Schemas.extensions('ptask').join(',')"))
         # ---------- boards ----------
         for pid, want in [('ps-kb', cols), ('ps-st', 'Initial/Gather/Build/Validation/Done')]:
             got = await J(f"Scrum.columns(Store.get('{pid}')).join('/')")

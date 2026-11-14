@@ -57,6 +57,10 @@ const App = {
   },
   viewTeam: 'apps',
   setViewTeam(t) {
+    if (t !== '*' && !Store.teams().some(x => x.id === t) && !App.myTeams().some(x => x.id === t)) {
+      console.warn('Not a team, view not changed:', t);
+      return;
+    }
     App.viewTeam = t;
     LS.set('bct.viewTeam', t);
     Calc.invalidate();

@@ -78,3 +78,30 @@ An account nobody invited sees nothing. Someone invited by two companies chooses
 
 Supabase makes daily database backups on paid plans. The app's own backups (Admin → Data) are also saved in the
 database under `MAHAM Data/Backups/`.
+
+## Emails for 🔔 notifications (optional)
+
+When someone gives a person work, asks for their approval or @mentions them, MAHAM shows it under 🔔 — and, online,
+can also email it. The database queues the emails (table `notify_queue`); a small function sends them:
+
+1. Create a free account at an email service with an API (the function uses **Resend**; change one `fetch` in
+   `supabase/functions/send-notifications/index.ts` for another one) and verify your sending domain.
+2. Deploy the function and give it its settings:
+   ```
+   supabase functions deploy send-notifications --no-verify-jwt
+   supabase secrets set RESEND_API_KEY=re_xxx MAIL_FROM="MAHAM <no-reply@your-domain>" APP_URL=https://you.github.io/MAHAM/
+   ```
+3. Run it every minute: Supabase → **Integrations → Cron** → new job → _Supabase Edge Function_ → `send-notifications`,
+   schedule `* * * * *`.
+
+Each person can switch emails off in 🔔 → _Emails: on/off_. Without step 1–3 nothing is sent; 🔔 in the app works anyway.
+
+## Service desk: customer portal and email in (optional)
+
+- **Portal:** switch it on in **Service → Tickets → Settings → Customer portal**, then give customers the address
+  `https://you.github.io/MAHAM/portal.html?c=<your company id>` (Owner Console shows the company id). They raise tickets
+  without an account and follow them with a private link. Knowledge base articles marked **Public** are its help centre.
+- **Email in:** deploy `supabase/functions/inbound-email` (`supabase functions deploy inbound-email --no-verify-jwt`,
+  `supabase secrets set INBOUND_SECRET=…`) and point your mail service's inbound webhook at
+  `https://<project>.supabase.co/functions/v1/inbound-email?company=<company id>&secret=<INBOUND_SECRET>`.
+  Each email becomes a ticket in the queue for it, like a portal ticket.

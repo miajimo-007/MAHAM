@@ -129,6 +129,13 @@ create or replace function public.is_own_file(c uuid, p text) returns boolean la
      and left(p, length('MAHAM Data/users/' || public.my_member_id(c))) = 'MAHAM Data/users/' || public.my_member_id(c)
      and substr(p, length('MAHAM Data/users/' || public.my_member_id(c)) + 1) ~ '^(\.[A-Za-z0-9-]+)?\.json$';
 $$;
+-- a person's own attachments: Attachments/<id>/<file> (MAHAM — 📎 on any piece of work)
+create or replace function public.is_own_attachment(c uuid, p text) returns boolean language sql stable security definer set search_path = public as $$
+  select public.my_member_id(c) is not null
+     and left(p, length('MAHAM Data/Attachments/' || public.my_member_id(c) || '/')) = 'MAHAM Data/Attachments/' || public.my_member_id(c) || '/'
+     and position('/' in substr(p, length('MAHAM Data/Attachments/' || public.my_member_id(c) || '/') + 1)) = 0
+     and position('..' in p) = 0;
+$$;
 create or replace function public.log(c uuid, a text, d jsonb default '{}') returns void language sql security definer set search_path = public as $$
   insert into audit (company_id, action, detail) values (c, a, coalesce(d, '{}'));
 $$;
@@ -169,13 +176,13 @@ drop policy if exists files_read on public.files;
 create policy files_read on public.files for select using (public.is_member(company_id));
 drop policy if exists files_write on public.files;
 create policy files_write on public.files for insert with check (
-  public.is_member(company_id) and (public.is_admin(company_id) or public.is_own_file(company_id, path) or path like 'MAHAM Data/Backups/%'));
+  public.is_member(company_id) and (public.is_admin(company_id) or public.is_own_file(company_id, path) or path like 'MAHAM Data/Backups/%' or public.is_own_attachment(company_id, path)));
 drop policy if exists files_update on public.files;
 create policy files_update on public.files for update using (
-  public.is_member(company_id) and (public.is_admin(company_id) or public.is_own_file(company_id, path) or path like 'MAHAM Data/Backups/%'));
+  public.is_member(company_id) and (public.is_admin(company_id) or public.is_own_file(company_id, path) or path like 'MAHAM Data/Backups/%' or public.is_own_attachment(company_id, path)));
 drop policy if exists files_delete on public.files;
 create policy files_delete on public.files for delete using (
-  public.is_member(company_id) and (public.is_admin(company_id) or path like 'MAHAM Data/Backups/%'));
+  public.is_member(company_id) and (public.is_admin(company_id) or path like 'MAHAM Data/Backups/%' or public.is_own_attachment(company_id, path)));
 
 -- audit: the company's admins read their company's log; the platform owner reads all
 drop policy if exists audit_read on public.audit;
@@ -382,17 +389,288 @@ begin
   return query select * from audit where company_id = c order by at desc limit greatest(least(n, 1000), 1);
 end $$;
 
+-- ---------------------------------------------------------------- records: the team's data, one row per record
+-- Every record belongs to one of the app's files ("users/adam.json", "users/adam.hd-2026-05.json", "seed.json") — the
+-- same files the shared folder had — and gets a change number ("seq", always larger than the one before). The app asks
+-- only for what changed since the last number it saw, and saves only the records that changed (save_records).
+-- A record that leaves a file keeps its row with data = null, so every PC learns it is gone.
+create sequence if not exists public.records_seq;
+create table if not exists public.records (
+  company_id  uuid not null references public.companies (id) on delete cascade,
+  f           text not null,
+  id          text not null,
+  data        jsonb,
+  ts          bigint not null default 0,          -- the record's own _ts (newest wins)
+  seq         bigint not null default nextval('public.records_seq'),
+  updated_at  timestamptz not null default now(),
+  updated_by  uuid default auth.uid(),
+  primary key (company_id, f, id)
+);
+create index if not exists records_company_seq on public.records (company_id, seq);
+create index if not exists records_company_rid on public.records (company_id, id);
+alter table public.records enable row level security;
+drop policy if exists records_read on public.records;
+-- a record with an audience ("aud": direct messages, private channels) goes only to the people in it — not even the
+-- company admin or the platform owner reads those
+create or replace function public.in_audience(c uuid, d jsonb) returns boolean language sql stable security definer set search_path = public as $$
+  select d is null or jsonb_typeof(d -> 'aud') is distinct from 'array' or (d -> 'aud') ? coalesce(public.my_member_id(c), '');
+$$;
+create policy records_read on public.records for select using (public.is_member(company_id) and public.in_audience(company_id, data));
+-- the app file f may be written by: its owner (users/<me>….json), the company admin (any)
+create or replace function public.may_write_file(c uuid, p_f text) returns boolean language sql stable security definer set search_path = public as $$
+  select public.is_member(c) and (public.is_admin(c) or public.is_own_file(c, 'MAHAM Data/' || p_f));
+$$;
+create or replace function public.records_owner_log(c uuid, p_f text) returns void language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_platform_owner() and not exists (select 1 from company_members where company_id = c and user_id = auth.uid() and active) then
+    if exists (select 1 from audit where company_id = c and user_id = auth.uid() and action = 'owner saved' and at > now() - interval '10 minutes') then
+      update audit set detail = jsonb_set(detail, '{files}', to_jsonb(least(coalesce((detail ->> 'files')::int, 1) + 1, 100000)))
+       where id = (select max(id) from audit where company_id = c and user_id = auth.uid() and action = 'owner saved');
+    else
+      insert into audit (company_id, action, detail) values (c, 'owner saved', jsonb_build_object('files', 1, 'first', p_f));
+    end if;
+  end if;
+end $$;
+revoke execute on function public.records_owner_log(uuid, text) from public, anon, authenticated;
+
+-- save the changed records: items = [{ f, r } | { f, id, d: true, ts }]. A copy older (_ts) than the one kept is not
+-- taken (the app gets the newer one with its next read). Returns { seq, taken, skipped }.
+create or replace function public.save_records(c uuid, items jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare it jsonb; p_f text; p_id text; p_ts bigint; cur bigint; taken integer := 0; skipped integer := 0; files text[] := '{}';
+begin
+  if jsonb_typeof(items) <> 'array' then raise exception 'items must be a list'; end if;
+  for it in select * from jsonb_array_elements(items) loop
+    p_f := it ->> 'f';
+    if p_f is null or not (p_f = 'seed.json' or p_f ~ '^users/[A-Za-z0-9 ._@()+-]+\.json$') then raise exception 'Bad file name: %', p_f; end if;
+    if not public.may_write_file(c, p_f) then raise exception 'You can only save your own files' using errcode = '42501'; end if;
+    if not (p_f = any(files)) then files := files || p_f; end if;
+    if coalesce((it ->> 'd')::boolean, false) then
+      p_id := it ->> 'id'; p_ts := coalesce((it ->> 'ts')::numeric, 0)::bigint;
+      select ts into cur from records where company_id = c and f = p_f and id = p_id and data is not null;
+      if not found or cur > p_ts then skipped := skipped + 1; continue; end if;
+      update records set data = null, seq = nextval('public.records_seq'), updated_at = now(), updated_by = auth.uid() where company_id = c and f = p_f and id = p_id;
+    else
+      p_id := it -> 'r' ->> 'id'; p_ts := coalesce((it -> 'r' ->> '_ts')::numeric, 0)::bigint;
+      if coalesce(p_id, '') = '' then raise exception 'A record without an id'; end if;
+      select ts into cur from records where company_id = c and f = p_f and id = p_id and data is not null;
+      if found and (cur > p_ts or (select data from records where company_id = c and f = p_f and id = p_id) = it -> 'r') then skipped := skipped + 1; continue; end if;
+      insert into records (company_id, f, id, data, ts) values (c, p_f, p_id, it -> 'r', p_ts)
+        on conflict (company_id, f, id) do update set data = excluded.data, ts = excluded.ts, seq = nextval('public.records_seq'), updated_at = now(), updated_by = auth.uid();
+    end if;
+    taken := taken + 1;
+  end loop;
+  foreach p_f in array files loop perform public.records_owner_log(c, p_f); end loop;
+  return jsonb_build_object('seq', (select coalesce(max(seq), 0) from records where company_id = c), 'taken', taken, 'skipped', skipped);
+end $$;
+
+-- a whole file (admin tools, import, restore): its records become exactly these. Returns { added, changed, removed }.
+create or replace function public.replace_file(c uuid, p_f text, recs jsonb) returns jsonb language plpgsql security definer set search_path = public as $$
+declare r jsonb; a integer := 0; ch integer := 0; rm integer := 0; ids text[] := '{}'; old jsonb;
+begin
+  if p_f is null or not (p_f = 'seed.json' or p_f ~ '^users/[A-Za-z0-9 ._@()+-]+\.json$') then raise exception 'Bad file name: %', p_f; end if;
+  if not public.may_write_file(c, p_f) then raise exception 'You can only save your own files' using errcode = '42501'; end if;
+  for r in select * from jsonb_array_elements(coalesce(recs, '[]'::jsonb)) loop
+    if jsonb_typeof(r) <> 'object' or coalesce(r ->> 'id', '') = '' then continue; end if;
+    ids := ids || (r ->> 'id');
+    select data into old from records where company_id = c and f = p_f and id = r ->> 'id';
+    if old is null then a := a + 1; elsif old = r then continue; else ch := ch + 1; end if;
+    insert into records (company_id, f, id, data, ts) values (c, p_f, r ->> 'id', r, coalesce((r ->> '_ts')::numeric, 0)::bigint)
+      on conflict (company_id, f, id) do update set data = excluded.data, ts = excluded.ts, seq = nextval('public.records_seq'), updated_at = now(), updated_by = auth.uid();
+  end loop;
+  with gone as (
+    update records set data = null, seq = nextval('public.records_seq'), updated_at = now(), updated_by = auth.uid()
+     where company_id = c and f = p_f and data is not null and not (id = any(ids))
+       and public.in_audience(c, data) returning 1)   -- what the caller cannot read (someone's direct messages) is never removed this way
+  select count(*) into rm from gone;
+  perform public.records_owner_log(c, p_f);
+  return jsonb_build_object('added', a, 'changed', ch, 'removed', rm, 'seq', (select coalesce(max(seq), 0) from records where company_id = c));
+end $$;
+
+-- ONE-TIME (safe to run again): person files kept in "files" by an older MAHAM become records; the file row then goes.
+do $$
+declare x record; j jsonb; r jsonb;
+begin
+  for x in select company_id, path, content from public.files where path ~ '^MAHAM Data/(users/[^/]+\.json|seed\.json)$' loop
+    begin j := x.content::jsonb; exception when others then continue; end;   -- unreadable: left as it is
+    for r in select * from jsonb_array_elements(case when jsonb_typeof(j -> 'records') = 'array' then j -> 'records' else '[]'::jsonb end) loop
+      if jsonb_typeof(r) <> 'object' or coalesce(r ->> 'id', '') = '' then continue; end if;
+      insert into public.records (company_id, f, id, data, ts, updated_by) values (x.company_id, substr(x.path, length('MAHAM Data/') + 1), r ->> 'id', r, coalesce((r ->> '_ts')::numeric, 0)::bigint, null)
+        on conflict (company_id, f, id) do nothing;
+    end loop;
+    delete from public.files where company_id = x.company_id and path = x.path;
+  end loop;
+end $$;
+
+-- ---------------------------------------------------------------- emails for 🔔 notifications (MAHAM)
+-- A notification record ({ c: 'notify', to }) queues one email to that person's account address, unless they switched
+-- emails off in 🔔 (their notifprefs record). The function supabase/functions/send-notifications sends the queue
+-- (every minute, with the service key); nobody else can read or change it.
+create table if not exists public.notify_queue (
+  id          bigserial primary key,
+  company_id  uuid not null references public.companies (id) on delete cascade,
+  to_member   text not null,
+  to_email    text not null,
+  title       text not null default '',
+  body        text not null default '',
+  link        text not null default '',
+  created_at  timestamptz not null default now(),
+  sent_at     timestamptz,
+  tries       integer not null default 0,
+  error       text
+);
+create index if not exists notify_queue_open on public.notify_queue (created_at) where sent_at is null;
+alter table public.notify_queue enable row level security;
+revoke all on public.notify_queue from anon, authenticated;
+create or replace function public.records_notify_mail() returns trigger language plpgsql security definer set search_path = public as $$
+declare who text; em text; off boolean; byname text;
+begin
+  if new.data is null or new.data ->> 'c' is distinct from 'notify' or (tg_op = 'UPDATE' and old.data is not null) then return new; end if;
+  who := new.data ->> 'to';
+  select email into em from company_members where company_id = new.company_id and member_id = who and active and coalesce(email, '') <> '';
+  if em is null then return new; end if;
+  select coalesce((data ->> 'email')::boolean, true) = false into off from records where company_id = new.company_id and id = 'notifprefs-' || who and data is not null order by ts desc limit 1;
+  if coalesce(off, false) then return new; end if;
+  byname := coalesce(new.data ->> 'by', '');
+  insert into notify_queue (company_id, to_member, to_email, title, body, link)
+    values (new.company_id, who, em, left(byname || ' ' || coalesce(new.data ->> 'title', ''), 200), left(coalesce(new.data ->> 'text', ''), 1000), left(coalesce(new.data ->> 'link', ''), 200));
+  return new;
+end $$;
+drop trigger if exists records_notify_mail on public.records;
+create trigger records_notify_mail after insert or update on public.records for each row execute function public.records_notify_mail();
+
+-- ---------------------------------------------------------------- 🎫 customer portal (MAHAM service desk)
+-- Customers have no account: they raise a ticket on portal.html?c=<company id>, get a private link (token) to follow it
+-- and reply. These functions are the only way in; what they save goes into the file users/_portal.json as "_portal".
+-- The portal is OFF until the company admin switches it on (Service desk → Settings).
+create or replace function public.svc_settings(c uuid) returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce((select data from records where company_id = c and id = 'settings-service' and data is not null order by ts desc limit 1), '{}'::jsonb);
+$$;
+create or replace function public.ticket_now(c uuid, p_id text) returns jsonb language sql stable security definer set search_path = public as $$
+  select data from records where company_id = c and id = p_id and data is not null order by ts desc limit 1;
+$$;
+revoke execute on function public.svc_settings(uuid), public.ticket_now(uuid, text) from public, anon, authenticated;
+-- a 🔔 notification from the portal to a person (and so an email, see records_notify_mail)
+create or replace function public.portal_notify(c uuid, p_to text, p_title text, p_text text, p_link text) returns void language plpgsql security definer set search_path = public as $$
+declare now_ms bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint; nid text := 'notify-_portal-' || to_hex(now_ms) || substr(md5(random()::text), 1, 4);
+begin
+  insert into records (company_id, f, id, data, ts, updated_by) values (c, 'users/_portal.json', nid, jsonb_build_object('c', 'notify', 'id', nid, 'to', p_to, 'by', '_portal',
+    'at', now_ms, 'kind', 'ticket', 'title', p_title, 'text', coalesce(p_text, ''), 'link', p_link, '_ts', now_ms, '_by', '_portal'), now_ms, null);
+end $$;
+revoke execute on function public.portal_notify(uuid, text, text, text, text) from public, anon, authenticated;
+create or replace function public.portal_info(c uuid) returns jsonb language sql stable security definer set search_path = public as $$
+  select case when public.company_active(c) and coalesce((public.svc_settings(c) -> 'portal' ->> 'on')::boolean, false)
+    then jsonb_build_object('name', (select name from companies where id = c), 'title', coalesce(public.svc_settings(c) -> 'portal' ->> 'title', 'Help centre'),
+      'intro', coalesce(public.svc_settings(c) -> 'portal' ->> 'intro', ''), 'categories', coalesce(public.svc_settings(c) -> 'categories', '[]'::jsonb))
+    else null end;
+$$;
+create or replace function public.portal_submit(c uuid, p_name text, p_email text, p_subject text, p_desc text, p_category text default '') returns text
+language plpgsql security definer set search_path = public as $$
+declare st jsonb := public.svc_settings(c); n int; tid text; tok text; now_ms bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+        q jsonb; qid text := ''; who text := ''; recent int;
+begin
+  if public.portal_info(c) is null then raise exception 'This help centre is not open' using errcode = '42501'; end if;
+  if coalesce(trim(p_subject), '') = '' or coalesce(trim(p_email), '') !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'A subject and a valid email are needed'; end if;
+  select count(*) into recent from records where company_id = c and f = 'users/_portal.json' and data ->> 'c' = 'ticket' and updated_at > now() - interval '1 hour';
+  if recent >= 30 then raise exception 'Too many requests just now — please try again in a while'; end if;
+  -- the queue for the category (else the first), and its member with the fewest open tickets
+  select x into q from jsonb_array_elements(coalesce(st -> 'queues', '[]'::jsonb)) x where coalesce(x -> 'categories', '[]'::jsonb) ? coalesce(p_category, '') limit 1;
+  if q is null then q := coalesce(st -> 'queues', '[]'::jsonb) -> 0; end if;
+  if q is not null then
+    qid := coalesce(q ->> 'id', '');
+    select m into who from jsonb_array_elements_text(coalesce(q -> 'members', '[]'::jsonb)) m
+      order by (select count(*) from records r where r.company_id = c and r.data ->> 'c' = 'ticket' and r.data ->> 'assignee' = m
+                and r.data ->> 'status' in ('New', 'Open', 'Waiting on customer', 'Waiting on third party')), m limit 1;
+  end if;
+  select coalesce(max((data ->> 'no')::int), 0) + 1 into n from records where company_id = c and data ->> 'c' = 'ticket';
+  tid := 'ticket-_portal-' || to_hex(now_ms) || substr(md5(random()::text), 1, 4);
+  tok := md5(random()::text || clock_timestamp()::text) || md5(random()::text || tid);
+  insert into records (company_id, f, id, data, ts, updated_by) values (c, 'users/_portal.json', tid, jsonb_strip_nulls(jsonb_build_object(
+    'c', 'ticket', 'id', tid, 'no', n, 'subject', left(trim(p_subject), 200), 'desc', left(coalesce(p_desc, ''), 8000), 'category', nullif(p_category, ''),
+    'priority', 'Normal', 'status', 'New', 'channel', 'portal', 'created', now_ms, 'token', tok, 'queue', nullif(qid, ''), 'assignee', nullif(who, ''),
+    'cust', jsonb_build_object('name', left(coalesce(trim(p_name), ''), 100), 'email', lower(trim(p_email))), '_ts', now_ms, '_by', '_portal')), now_ms, null);
+  if coalesce(who, '') <> '' then perform public.portal_notify(c, who, 'sent a new ticket TK-' || n, left(trim(p_subject), 160), '#/tickets/mine'); end if;
+  return tok;
+end $$;
+create or replace function public.portal_status(p_token text) returns jsonb language sql stable security definer set search_path = public as $$
+  with t as (select company_id, id from records where data ->> 'c' = 'ticket' and data ->> 'token' = p_token and length(p_token) >= 24 limit 1),
+       cur as (select public.ticket_now(t.company_id, t.id) d, t.company_id, t.id from t)
+  select jsonb_build_object('no', d ->> 'no', 'subject', d ->> 'subject', 'status', d ->> 'status', 'created', d -> 'created',
+    'replies', coalesce((select jsonb_agg(jsonb_build_object('at', r.data -> 'at', 'text', r.data ->> 'text', 'mine', r.data ? 'cust',
+              'by', case when r.data ? 'cust' then coalesce(r.data -> 'cust' ->> 'name', 'You') else 'Support' end) order by (r.data ->> 'at')::bigint)
+       from records r where r.company_id = cur.company_id and r.data ->> 'c' = 'tkreply' and r.data ->> 'on' = cur.id
+         and coalesce((r.data ->> 'internal')::boolean, false) = false), '[]'::jsonb)) from cur;
+$$;
+create or replace function public.portal_reply(p_token text, p_text text) returns boolean language plpgsql security definer set search_path = public as $$
+declare c uuid; tid text; d jsonb; now_ms bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint; rid text;
+begin
+  select company_id, id into c, tid from records where data ->> 'c' = 'ticket' and data ->> 'token' = p_token and length(p_token) >= 24 limit 1;
+  if c is null then raise exception 'This link is not valid' using errcode = '42501'; end if;
+  if coalesce(trim(p_text), '') = '' then raise exception 'Write a reply'; end if;
+  d := public.ticket_now(c, tid);
+  rid := 'tkreply-_portal-' || to_hex(now_ms) || substr(md5(random()::text), 1, 4);
+  insert into records (company_id, f, id, data, ts, updated_by) values (c, 'users/_portal.json', rid, jsonb_build_object('c', 'tkreply', 'id', rid, 'on', tid,
+    'cust', d -> 'cust', 'at', now_ms, 'text', left(trim(p_text), 8000), '_ts', now_ms, '_by', '_portal'), now_ms, null);
+  if coalesce(d ->> 'assignee', '') <> '' then perform public.portal_notify(c, d ->> 'assignee', 'replied on TK-' || (d ->> 'no'), left(trim(p_text), 160), '#/tickets/mine'); end if;
+  -- the customer answered: a ticket waiting on them (or resolved) opens again, and its SLA clock runs again
+  if d ->> 'status' in ('Waiting on customer', 'Resolved') then
+    d := d || jsonb_build_object('status', 'Open', 'pausedMs', coalesce((d ->> 'pausedMs')::bigint, 0) + case when d ->> 'status' = 'Waiting on customer' and d ? 'pausedAt' and jsonb_typeof(d -> 'pausedAt') = 'number' then now_ms - (d ->> 'pausedAt')::bigint else 0 end,
+      'pausedAt', null, 'resolvedAt', null, '_ts', now_ms, '_by', '_portal');
+    insert into records (company_id, f, id, data, ts, updated_by) values (c, 'users/_portal.json', tid, jsonb_strip_nulls(d), now_ms, null)
+      on conflict (company_id, f, id) do update set data = excluded.data, ts = excluded.ts, seq = nextval('public.records_seq'), updated_at = now();
+  end if;
+  return true;
+end $$;
+create or replace function public.portal_articles(c uuid) returns jsonb language sql stable security definer set search_path = public as $$
+  select case when public.portal_info(c) is null then '[]'::jsonb else coalesce((select jsonb_agg(jsonb_build_object('title', d ->> 'title', 'problem', d ->> 'problem', 'solution', d ->> 'solution', 'tags', d -> 'tags'))
+    from (select distinct on (id) data d from records where company_id = c and data ->> 'c' = 'kbarticle' and data ->> 'vis' = 'public' order by id, ts desc) x where coalesce((d ->> '_del')::boolean, false) = false), '[]'::jsonb) end;
+$$;
+grant execute on function public.portal_info(uuid), public.portal_submit(uuid, text, text, text, text, text), public.portal_status(text), public.portal_reply(text, text), public.portal_articles(uuid) to anon, authenticated;
+
+-- ---------------------------------------------------------------- 📣 lead forms (MAHAM marketing)
+-- form.html?c=<company>&f=<campaign id>: a public sign-up form for a campaign whose form is switched on. Each sign-up
+-- becomes a contact (source = the campaign) and a follow-up for the campaign's owner, who gets a 🔔 notification.
+create or replace function public.form_info(c uuid, p_form text) returns jsonb language sql stable security definer set search_path = public as $$
+  select case when public.company_active(c) and coalesce((d -> 'form' ->> 'on')::boolean, false) and d ->> 'c' = 'campaign' and coalesce(d ->> 'status', '') <> 'Done'
+    then jsonb_build_object('company', (select name from companies where id = c), 'title', coalesce(nullif(d -> 'form' ->> 'title', ''), d ->> 'name'), 'intro', coalesce(d -> 'form' ->> 'intro', ''))
+    else null end
+  from (select public.ticket_now(c, p_form) d) x;
+$$;
+create or replace function public.form_submit(c uuid, p_form text, p_name text, p_email text, p_phone text default '', p_note text default '') returns boolean
+language plpgsql security definer set search_path = public as $$
+declare d jsonb := public.ticket_now(c, p_form); now_ms bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint; cid text; aid text; owner text; recent int;
+begin
+  if public.form_info(c, p_form) is null then raise exception 'This form is closed' using errcode = '42501'; end if;
+  if coalesce(trim(p_name), '') = '' or (coalesce(trim(p_email), '') !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' and coalesce(trim(p_phone), '') = '') then raise exception 'A name and an email or phone are needed'; end if;
+  select count(*) into recent from records where company_id = c and f = 'users/_portal.json' and data ->> 'c' = 'contact' and updated_at > now() - interval '1 hour';
+  if recent >= 60 then raise exception 'Too many sign-ups just now — please try again in a while'; end if;
+  owner := coalesce(d ->> 'owner', '');
+  cid := 'contact-_portal-' || to_hex(now_ms) || substr(md5(random()::text), 1, 4);
+  aid := 'crmact-_portal-' || to_hex(now_ms) || substr(md5(random()::text), 1, 4);
+  insert into records (company_id, f, id, data, ts, updated_by) values (c, 'users/_portal.json', cid, jsonb_strip_nulls(jsonb_build_object('c', 'contact', 'id', cid, 'name', left(trim(p_name), 100),
+    'email', nullif(lower(trim(coalesce(p_email, ''))), ''), 'phone', nullif(left(trim(coalesce(p_phone, '')), 40), ''), 'notes', nullif(left(coalesce(p_note, ''), 2000), ''), 'tags', jsonb_build_array('lead'),
+    'source', p_form, 'owner', nullif(owner, ''), '_ts', now_ms, '_by', '_portal')), now_ms, null);
+  insert into records (company_id, f, id, data, ts, updated_by) values (c, 'users/_portal.json', aid, jsonb_build_object('c', 'crmact', 'id', aid, 'on', cid, 'kind', 'followup',
+    'text', 'New sign-up from ' || coalesce(d ->> 'name', 'a campaign') || ': contact them', 'due', to_char(now(), 'YYYY-MM-DD'), 'done', false, 'by', '_portal', 'at', now_ms, '_ts', now_ms, '_by', '_portal'), now_ms, null);
+  if owner <> '' then perform public.portal_notify(c, owner, 'signed up for ' || coalesce(d ->> 'name', 'your campaign'), left(trim(p_name), 100), '#/crm/activities'); end if;
+  return true;
+end $$;
+grant execute on function public.form_info(uuid, text), public.form_submit(uuid, text, text, text, text, text) to anon, authenticated;
+
 grant usage on schema public to anon, authenticated;
 grant select on public.platform_owners, public.companies, public.company_members, public.invites, public.audit to authenticated;
 grant select, insert, update, delete on public.files to authenticated;
 revoke all on public.companies, public.company_members, public.invites, public.audit, public.platform_owners from anon;
 revoke all on public.files from anon;
+grant select on public.records to authenticated;
+revoke all on public.records from anon;
+revoke insert, update, delete on public.records from authenticated;
+revoke all on sequence public.records_seq from anon, authenticated;
 revoke insert, update, delete on public.companies, public.company_members, public.invites, public.audit, public.platform_owners from authenticated;
 grant execute on function public.my_companies(), public.accept_invites(), public.invite_member(uuid, text, text, text), public.cancel_invite(uuid, text),
   public.set_member(uuid, text, text, boolean), public.rename_company(uuid, text), public.grant_support(uuid, integer), public.delete_my_company(uuid, text),
   public.owner_companies(), public.owner_create_company(text, text, text, integer), public.owner_set_company(uuid, text, integer),
   public.owner_invite_admin(uuid, text, text), public.owner_delete_company(uuid, text), public.owner_open(uuid), public.owner_accounts(uuid), public.company_audit(uuid, integer),
-  public.is_platform_owner(), public.is_member(uuid), public.is_admin(uuid) to authenticated;
+  public.is_platform_owner(), public.is_member(uuid), public.is_admin(uuid), public.save_records(uuid, jsonb), public.replace_file(uuid, text, jsonb), public.may_write_file(uuid, text), public.is_own_attachment(uuid, text), public.in_audience(uuid, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- ONE-TIME: make yourself the platform owner (after creating your account in Authentication → Users, or by signing

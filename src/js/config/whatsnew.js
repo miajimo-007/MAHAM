@@ -9,6 +9,26 @@
 const WHATS_NEW_FROM = '2026.11.07.3';
 const WHATS_NEW = [
   {
+    ver: '2026.11.13.9',
+    date: '14 Nov 2026',
+    items: [
+      {
+        who: 'lead',
+        text: '<b>Director Desk → Watch → Waiting on managers:</b> click a manager to see, right there, the quick wins and To Dos waiting for their approval — who, what and how long. <b>🔔 Ask for an update</b> reminds the manager. The Director Desk no longer jumps to the Manager Desk.',
+      },
+    ],
+  },
+  {
+    ver: '2026.11.13.8',
+    date: '14 Nov 2026',
+    items: [
+      {
+        who: 'lead',
+        text: '<b>Fixed — the Director Desk could empty the screen:</b> a click on the desk (for example on <b>Watch → Waiting on managers</b>) opened the Manager Desk for a team that does not exist, so every list looked empty and the app said it had no data. Nothing was lost — the data was always there. Now <b>Waiting on managers</b> opens that team’s Manager Desk, and the app never switches to a team that does not exist.',
+      },
+    ],
+  },
+  {
     ver: '2026.11.13.7',
     date: '13 Nov 2026',
     items: [

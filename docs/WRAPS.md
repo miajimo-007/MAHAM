@@ -5,7 +5,7 @@ each calls the one before it. Order = the script order in `src/index.html`.
 
 | Function | Wrapped by (in load order) |
 |---|---|
-| `App.launch` | `js/app/whatsnew.js` → `js/data/storage/storage.js` → `js/app/always-admin.js` |
+| `App.launch` | `js/app/whatsnew.js` → `js/data/storage/storage.js` → `js/app/always-admin.js` → `js/maham/20-notify.js` → `js/maham/30-chat.js` |
 | `App.modeUi` | `js/app/always-admin.js` |
 | `App.switchMode` | `js/app/always-admin.js` |
 | `App.teamFor` | `js/app/always-admin.js` |
@@ -26,8 +26,8 @@ each calls the one before it. Order = the script order in `src/index.html`.
 | `Store.all` | `js/domain/private.js` |
 | `Store.extraBlock` | `js/domain/flowtrust.js` |
 | `Store.normalize` | `js/domain/todoid.js` |
-| `Store.save` | `js/pages/admin/admin-role.js` |
-| `Store.saveMany` | `js/domain/todoid.js` |
+| `Store.save` | `js/pages/admin/admin-role.js` → `js/maham/45-kbpublic.js` |
+| `Store.saveMany` | `js/domain/todoid.js` → `js/maham/20-notify.js` |
 | `Store.team` | `js/app/always-admin.js` |
 | `Store.verify` | `js/app/mode.js` |
 | `UI.memberOptions` | `js/app/always-admin.js` |
