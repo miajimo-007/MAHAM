@@ -1,4 +1,4 @@
-/* MAHAM — Online storage, record by record.
+/* DARRIK — Online storage, record by record.
  * The online database keeps the team's data as one row per record (table "records", supabase/schema.sql), each with a
  * change number. So in the online mode:
  *   - refreshing asks only for the rows changed since the last number this PC saw (a few rows, or none);
@@ -12,11 +12,16 @@
 const CloudRecords = {
   ALL: new Map(), // app file ("users/adam.json", "seed.json") → { ver, recs: Map(id → record) }
   SEQ: 0,
+  /* the database has not been updated yet (no "records" table / save_records): keep working the old way, whole files */
+  off: false,
+  missing(status, j) {
+    return status === 404 || (j && /PGRST20[25]|42P01|42883|does not exist|Could not find/i.test(JSON.stringify(j)));
+  },
   PAGE: 1000, // rows per request (Supabase's usual maximum)
   root() {
     return Config.DATA_FOLDER + '/';
   },
-  /* "MAHAM Data/users/adam.json" → "users/adam.json"; null when it is not one of the record files */
+  /* "DARRIK Data/users/adam.json" → "users/adam.json"; null when it is not one of the record files */
   appFile(path) {
     const r = CloudRecords.root();
     if (!path.startsWith(r)) return null;
@@ -49,7 +54,15 @@ const CloudRecords = {
         const r = await CloudBackend.req(
           `/rest/v1/records?select=f,id,data,seq&company_id=eq.${c}&seq=gt.${since}&order=seq.asc&limit=${CloudRecords.PAGE}`
         );
-        if (!r.ok) throw new Error('Could not read the data (' + r.status + ')');
+        if (!r.ok) {
+          const j = await r.json().catch(() => null);
+          if (CloudRecords.missing(r.status, j)) {
+            CloudRecords.off = true;
+            console.warn('MAHAM: the database has no records table yet — run supabase/schema.sql; saving whole files meanwhile');
+            return false;
+          }
+          throw new Error('Could not read the data (' + r.status + ')');
+        }
         const rows = await r.json();
         for (const x of rows) {
           CloudRecords.put(x.f, x.id, x.data, x.seq);
@@ -100,6 +113,7 @@ const CloudRecords = {
   const orig = { list: B.list, read: B.read, write: B.write, remove: B.remove, hasDir: B.hasDir };
   const usersDir = () => CloudRecords.root() + Config.USERS_FOLDER;
   B.list = async function (dir) {
+    if (CloudRecords.off) return orig.list.call(B, dir);
     if (dir === usersDir()) {
       await CloudRecords.pull();
       return [...CloudRecords.ALL.entries()]
@@ -109,6 +123,7 @@ const CloudRecords = {
     const out = await orig.list.call(B, dir);
     if (dir + '/' === CloudRecords.root()) {
       await CloudRecords.pull();
+      if (CloudRecords.off) return out;
       if (!out.some(x => x.name === Config.USERS_FOLDER)) out.push({ name: Config.USERS_FOLDER, kind: 'directory' });
       const s = CloudRecords.ALL.get('seed.json');
       if (s && !out.some(x => x.name === 'seed.json')) out.push({ name: 'seed.json', kind: 'file', size: s.recs.size, mtime: s.ver });
@@ -117,8 +132,9 @@ const CloudRecords = {
   };
   B.read = async function (path, opt = {}) {
     const f = CloudRecords.appFile(path);
-    if (!f) return orig.read.call(B, path, opt);
+    if (!f || CloudRecords.off) return orig.read.call(B, path, opt);
     await CloudRecords.pull();
+    if (CloudRecords.off) return orig.read.call(B, path, opt);
     const e = CloudRecords.ALL.get(f);
     if (!e) return null;
     if (opt.head) return { size: e.recs.size, mtime: e.ver };
@@ -127,7 +143,7 @@ const CloudRecords = {
   };
   B.write = async function (path, data) {
     const f = CloudRecords.appFile(path);
-    if (!f) return orig.write.call(B, path, data);
+    if (!f || CloudRecords.off) return orig.write.call(B, path, data);
     if ((typeof data === 'string' ? data : 'x') === '' && !CloudRecords.ALL.has(f)) return { size: 0, mtime: Date.now() }; // "create" of a new file: nothing to save yet
     const r = await CloudRecords.replaceFile(f, data);
     const e = CloudRecords.ALL.get(f);
@@ -135,11 +151,11 @@ const CloudRecords = {
   };
   B.remove = async function (path) {
     const f = CloudRecords.appFile(path);
-    if (!f) return orig.remove.call(B, path);
+    if (!f || CloudRecords.off) return orig.remove.call(B, path);
     await CloudRecords.replaceFile(f, '');
   };
   B.hasDir = async function (dir) {
-    return dir === usersDir() || orig.hasDir.call(B, dir);
+    return (!CloudRecords.off && dir === usersDir()) || orig.hasDir.call(B, dir);
   };
 })();
 
@@ -153,11 +169,12 @@ const CloudRecords = {
   const cloud = () => Store.storageMode === 'cloud';
   Object.assign(Store, {
     async sync(force) {
-      if (!cloud()) return sync0.apply(Store, arguments);
+      if (!cloud() || CloudRecords.off) return sync0.apply(Store, arguments);
       if (!Store.dataDir) return false;
       const t0 = performance.now();
       try {
         await CloudRecords.pull(force);
+        if (CloudRecords.off) return sync0.apply(Store, arguments);
       } catch (e) {
         console.warn('Could not refresh', e);
         Store.lastError = e.message || String(e);
@@ -215,7 +232,7 @@ const CloudRecords = {
       return changed;
     },
     async writeUser(me, own, files) {
-      if (!cloud()) return write0.apply(Store, arguments);
+      if (!cloud() || CloudRecords.off) return write0.apply(Store, arguments);
       try {
         const fileOf = r => 'users/' + Store.fileFor(r, me);
         const want = new Set([...(files || [me + '.json', ...Object.values(own).map(r => Store.fileFor(r, me))])].map(n => 'users/' + n));
@@ -254,7 +271,16 @@ const CloudRecords = {
         }
         const tw = performance.now();
         if (items.length) {
-          const j = await CloudBackend.rpc('save_records', { c: CloudBackend.company, items });
+          let j;
+          try {
+            j = await CloudBackend.rpc('save_records', { c: CloudBackend.company, items });
+          } catch (e) {
+            if (CloudRecords.missing(e.status, { message: e.message })) {
+              CloudRecords.off = true;
+              return write0.call(Store, me, own, files);
+            }
+            throw e;
+          }
           for (const it of items) CloudRecords.put(it.f, it.id || it.r.id, it.d ? null : it.r, j.seq);
           if (j.skipped) await CloudRecords.pull(true); // the database had newer copies of some: read them
         }
