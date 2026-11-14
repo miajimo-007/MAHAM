@@ -16,6 +16,7 @@ P.todo = sub => {
   if (s.ms) rows = rows.filter(t => t.r.milestone);
   rows = [...rows].sort((a, b) => (b.r.assigned || '').localeCompare(a.r.assigned || ''));
   const pend = rows.filter(t => t.status === 'In Progress');
+  const nw = newInLists();
   const html = `<div class="page-actions">${filterBar('todo', [
     { key: 'analyst', type: 'member', label: 'Assigned to' },
     { key: 'month', type: 'month' },
@@ -24,8 +25,8 @@ P.todo = sub => {
     { key: 'fu', type: 'toggle', label: 'Follow-up only (TDFU)' },
     { key: 'ms', type: 'toggle', label: '⭐ Milestones only' },
     { key: 'chk', type: 'toggle', label: '🔀 Handed on only' },
-  ])}${App.can('assignTodo') || TodoRules.all(App.viewTeam).some(r => r.analyst === App.me) ? `<a class="btn ghost" href="#/todo/scheduled">↻ Scheduled <span class="count">${TodoRules.all(App.viewTeam).filter(r => !r.stopped && (App.can('assignTodo') || r.analyst === App.me)).length}</span></a>` : ''}${addBtn('todo', 'New task')}</div>
-  <div class="chips-row">${UI.badge(`${pend.length} in progress`, 'warn')} ${UI.badge(`${pend.filter(t => t.timing === 'Delayed').length} overdue`, 'bad')} ${UI.badge(`${rows.filter(t => t.timing === 'On Time' && t.status === 'Resolved').length} done on time`, 'good')} ${UI.badge(`${rows.filter(t => t.timing === 'Delayed' && t.status === 'Resolved').length} done late`)}</div>
+  ])}<span class="grow"></span>${App.can('assignTodo') || TodoRules.all(App.viewTeam).some(r => r.analyst === App.me) ? `<a class="btn ghost" href="#/todo/scheduled">↻ Scheduled <span class="count">${TodoRules.all(App.viewTeam).filter(r => !r.stopped && (App.can('assignTodo') || r.analyst === App.me)).length}</span></a>` : ''}${addBtn('todo', 'New To Do')}</div>
+  ${listSum([`<b>${rows.length}</b> To Do${rows.length === 1 ? '' : 's'}`, { t: `<b class="t-warn">${pend.length}</b> in progress`, f: ['todo', 'st', 'In Progress'] }, { t: `<b class="t-bad">${pend.filter(t => t.timing === 'Delayed').length}</b> overdue`, f: ['todo', 'st', 'Delayed'] }, `<b class="t-good">${rows.filter(t => t.timing === 'On Time' && t.status === 'Resolved').length}</b> done on time`, `<b>${rows.filter(t => t.timing === 'Delayed' && t.status === 'Resolved').length}</b> done late`])}
   ${UI.table({
     id: 'todo',
     rows,
@@ -45,7 +46,7 @@ P.todo = sub => {
         label: 'Status',
         html: t => {
           const l = TodoFlow.label(t.r);
-          return UI.sbadge(t.status) + (l ? `<div class="tf-lab">${h(l)}</div>` : '');
+          return UI.schip(t.status) + (l ? `<div class="tf-lab">${h(l)}</div>` : '');
         },
         get: t => t.status + ' ' + TodoFlow.label(t.r),
       },
@@ -53,7 +54,7 @@ P.todo = sub => {
         key: 'task',
         label: 'To Do',
         html: t =>
-          `${t.r.prevStep ? '<span class="muted small" title="Handed on from ' + h(Store.memberShort((Store.get(t.r.prevStep) || {}).analyst)) + '">➜ </span>' : ''}<b>${h(t.r.task)}</b>${UI.flagTags(t.r, { noPri: true })}${Conv.tag(t.r)}${t.r.instruction ? `<div class="muted small">📝 ${h(t.r.instruction)}</div>` : ''}${t.r.comment ? `<div class="muted small">💬 ${h(t.r.comment)}</div>` : ''}${t.r.fromRule ? ' <span class="muted small" title="Repeating To Do">↻</span>' : ''}`,
+          `${nw.has(t.r.id) ? '<span class="new-dot" title="New or changed by someone else since you last looked"></span>' : ''}${t.r.prevStep ? '<span class="muted small" title="Handed on from ' + h(Store.memberShort((Store.get(t.r.prevStep) || {}).analyst)) + '">➜ </span>' : ''}<b>${h(t.r.task)}</b>${UI.flagTags(t.r, { noPri: true })}${Conv.tag(t.r)}${WorkLinks.tag(t.r)}${t.r.instruction ? `<div class="muted small">📝 ${h(t.r.instruction)}</div>` : ''}${t.r.comment ? `<div class="muted small">💬 ${h(t.r.comment)}</div>` : ''}${t.r.fromRule ? ' <span class="muted small" title="Repeating To Do">↻</span>' : ''}`,
         get: t => t.r.task + ' ' + (t.r.instruction || '') + ' ' + (t.r.comment || ''),
       },
       {
@@ -74,13 +75,27 @@ P.todo = sub => {
       { key: 'assigned', label: 'Assigned', get: t => U.fmtDate(t.r.assigned), sortVal: t => t.r.assigned || '' },
       { key: 'due', label: 'Due', get: t => U.fmtDate(t.due), sortVal: t => t.due },
       { key: 'finish', label: 'Finished', get: t => U.fmtDate(t.r.finish), sortVal: t => t.r.finish || '' },
-      { key: 'days', label: 'Days', cls: 'num', get: t => (t.days == null ? '' : t.days), sortVal: t => t.days || 0 },
+      // days left as one number (2026.11.13.5): 5 = five days left · 0 = due today · −6 = six days late (red); the sentence on hover. Done: empty (see Timing)
+      {
+        key: 'days',
+        label: 'Days left',
+        cls: 'num',
+        html: t => {
+          const w = Calc.todoWhen(t);
+          if (!w.text || /^Done/.test(w.text)) return w.text ? `<span class="muted" title="${h(w.text)}">✓</span>` : '';
+          const n = -(t.days || 0);
+          return `<span class="nw strong ${w.cls}" title="${h(w.text)} · due ${h(U.fmtDate(t.due))}">${n < 0 ? '−' + Math.abs(n) : n}</span>`;
+        },
+        get: t => Calc.todoWhen(t).text,
+        sortVal: t => t.days || 0,
+      },
       { key: 'timing', label: 'Timing', html: t => UI.sbadge(t.timing), get: t => t.timing },
       ...(Admin.canSee()
         ? [
             {
               key: 'seen',
               label: '👁',
+              cls: 'nw small',
               html: t => (t.r.analyst === App.me ? '' : Admin.seenLabel(t.r)),
               get: t => {
                 const x = Admin.todoSeen(t.r);
@@ -97,9 +112,10 @@ P.todo = sub => {
           if (tf) return tf; // ✓ Fixed (sent back to me) · ➜ Choose who (workflow)
           const back = TodoFlow.buttons(t.r, { backOnly: true }); // on a handed-on To Do: something wrong with the step before
           if (t.status !== 'Ready for review' && Store.canFinishTodo(t.r, App.me) && App.canEdit('todo'))
-            return `<span class="nw"><button class="btn sm" data-done="${h(t.r.id)}">✓ Done</button>${back ? ' ' + back : ''}</span>`;
+            return `<span class="nw"><button class="btn xs" data-done="${h(t.r.id)}">✓ Done</button>${back ? ' ' + back : ''}</span>`;
+          // three small buttons, one line (2026.11.13.5): ✓ Confirm · ➜ Send on · ↩ Send back — the name on hover
           if (Store.canConfirmTodo(t.r, App.me) && App.canEdit('todo'))
-            return `<span class="nw"><button class="btn sm primary" data-tdok="${h(t.r.id)}">✓ Confirm</button> <button class="btn sm ghost" data-tf="send|${h(t.r.id)}" title="A new To Do for the next person (testing, go-live …)">➜ Send on</button> <button class="btn sm ghost" data-tdback="${h(t.r.id)}">↩ Send back</button></span>`;
+            return `<span class="nw row-btns tight"><button class="btn xs primary" data-tdok="${h(t.r.id)}" title="Confirm — it is done">✓</button><button class="btn xs ghost" data-tf="send|${h(t.r.id)}" title="Send on — a new To Do for the next person (testing, go-live …)">➜</button><button class="btn xs ghost" data-tdback="${h(t.r.id)}" title="Send back — something is still missing">↩</button></span>`;
           return back;
         },
         get: () => '',

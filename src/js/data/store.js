@@ -30,6 +30,43 @@ const Store = {
 };
 
 Object.assign(Store, {
+  /* No lost changes when two people change the same item at about the same time.
+   * Each saved version of these kinds lists the fields it changed (_chg, worked out against what the saver saw). When the
+   * files are merged, versions are applied oldest → newest and a version with _chg only overwrites those fields — so
+   * "✓ Done" by the analyst and "Priority: High" by the manager both survive, even from a copy that was a few seconds old.
+   * A version without _chg (new items, older app versions) replaces the whole record, as before. */
+  MERGE_COLLS: new Set([
+    'todo',
+    'shadow',
+    'quickwin',
+    'central',
+    'oncall',
+    'gcatch',
+    'ptask',
+    'mgrtask',
+    'action',
+    'mytask',
+    'project',
+    'attendance',
+  ]),
+  /* the fields that differ between what I saw (cur) and what I am saving (rec); '_' fields are bookkeeping, except _del */
+  diffKeys(cur, rec) {
+    const eq = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    return [...new Set([...Object.keys(cur), ...Object.keys(rec)])].filter(
+      k => (!k.startsWith('_') || k === '_del') && !eq(cur[k], rec[k])
+    );
+  },
+  /* apply version r on top of the merged record so far (prev) */
+  fold(prev, r) {
+    if (!prev || !r || !Array.isArray(r._chg) || !Store.MERGE_COLLS.has(r.c) || prev.c !== r.c) return r;
+    const out = Object.assign({}, prev);
+    for (const k of r._chg) {
+      if (k in r) out[k] = r[k];
+      else delete out[k];
+    }
+    for (const k of ['_ts', '_by', '_v', '_chg']) if (k in r) out[k] = r[k];
+    return out;
+  },
   newer(a, b) {
     // is a newer than b?
     if (!b) return true;
@@ -91,39 +128,10 @@ Object.assign(Store, {
       return;
     }
     let fairMsg = '';
-    // a To Do's status always follows its finish date and the manager's confirmation — whoever saves it
-    // a quick win gets its QW ID automatically the moment it is accepted (however it was approved)
-    nextQwId.taken = [];
-    list = list.map(r => {
-      if (
-        r &&
-        r.c === 'quickwin' &&
-        !r._del &&
-        U.lc(r.approval) === 'accepted' &&
-        !String(r.qwId || '').trim() &&
-        Store.can(App.me, 'approveQW')
-      ) {
-        const id = nextQwId();
-        nextQwId.taken.push({ qwId: id });
-        return Object.assign({}, r, { qwId: id });
-      }
-      return r;
-    });
-    nextQwId.taken = [];
-    list = list.map(r =>
-      r && r.c === 'todo' && !r._del && r.status !== 'Canceled' && App.me
-        ? Object.assign({}, r, {
-            status: (() => {
-              const p = r.id && Store.db.get(r.id);
-              return p && !p._del && p.status === 'Resolved' && p.finish && p.finish === r.finish
-                ? 'Resolved'
-                : Store.finishStatus(r, App.me);
-            })(),
-          })
-        : r
-    ); // already-done To Dos stay done when someone adds a comment
+    // small rules every record follows, whoever saves it (domain/rules.js): QW IDs, To Do status
+    if (typeof nextQwId === 'function') nextQwId.taken = []; // QW IDs given out in this one save, so two never get the same number
+    if (Store.normalize) list = list.map(r => (r ? Store.normalize(r) : r));
     if (typeof nextQwId === 'function') nextQwId.taken = [];
-    if (Store.normalize) list = list.map(r => (r ? Store.normalize(r) : r)); // e.g. a quick win gets its QW ID when accepted (domain/rules.js)
     const blocked = list.filter(r => {
       if (!r || !r.c) return false;
       if (
@@ -155,7 +163,21 @@ Object.assign(Store, {
               : 'You have view-only access to this function'),
           'bad'
         );
-      list = list.filter(r => !blocked.includes(r));
+      // a conversion is all or nothing: when the new record is refused, the original is not removed (and its notes are not copied)
+      const cv = new Set([
+        ...blocked.filter(r => r.convertedFrom && r.convertedFrom.id).map(r => r.convertedFrom.id),
+        ...blocked.filter(r => r.keptFrom).map(r => r.keptFrom),
+      ]); // keptFrom: the time kept as shadow work when converting
+      const cvNew = new Set(blocked.filter(r => r.convertedFrom).map(r => r.id));
+      const gone = new Set(blocked.filter(r => r._del && r.convertedTo).map(r => r.id));
+      list = list.filter(
+        r =>
+          !blocked.includes(r) &&
+          !cv.has(r.id) &&
+          !(r.c === 'refnote' && r.carried && cvNew.has(r.on)) &&
+          !(r.convertedFrom && (gone.has(r.convertedFrom.id) || cv.has(r.convertedFrom.id))) &&
+          !(r.keptFrom && (gone.has(r.keptFrom) || cv.has(r.keptFrom)))
+      );
       if (!list.length) return;
     }
     if (typeof Admin !== 'undefined' && Admin.trackSave)
@@ -192,9 +214,15 @@ Object.assign(Store, {
         rec.updAt = now;
         rec.updBy = App.me;
       } // answers the director's "ask for update"
+      // only these fields win when merged. My file keeps only my latest version, so it lists every field I have changed
+      // in it so far (my earlier "take it" must survive my later "resolve")
+      if (cur && Store.MERGE_COLLS.has(rec.c)) {
+        const mine = Store.own[rec.id];
+        rec._chg = [...new Set([...(mine && Array.isArray(mine._chg) ? mine._chg : []), ...Store.diffKeys(cur, rec)])];
+      } else delete rec._chg;
       rec._by = App.me;
       rec._v = APP_VERSION; // which app version saved it (Admin → minimum version)
-      if (Store.TEAM_SCOPED.has(rec.c) && !rec.team && App.viewTeam && App.viewTeam !== '*') rec.team = App.viewTeam;
+      if (Store.TEAM_SCOPED.has(rec.c) && !rec.team) rec.team = Store.saveTeam(rec); // data/people.js
       Store.own[rec.id] = rec;
     }
     for (const x of logs) x.log.afterTs = x.rec._ts;
@@ -222,10 +250,10 @@ Object.assign(Store, {
       Store.rebuild();
       return;
     }
-    for (const rec of list) {
+    for (let rec of list) {
       const cur = Store.db.get(rec.id);
       if (cur && !Store.newer(rec, cur)) continue;
-      Store.db.set(rec.id, rec);
+      Store.db.set(rec.id, (rec = Store.fold(cur, rec)));
       const arr = (Store.byC[rec.c] = Store.byC[rec.c] || []);
       const i = arr.findIndex(x => x.id === rec.id);
       if (rec._del) {

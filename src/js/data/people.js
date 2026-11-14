@@ -181,6 +181,22 @@ Object.assign(Store, {
     const tm = t || App.viewTeam;
     return Store.visible().filter(m => !Store.topRole(m.role) && (!tm || tm === '*' || (m.team || 'apps') === tm));
   },
+  /* a person's work (To Do / shadow / quick win / follow-up / on-call / attendance) belongs to that person's own team,
+   * whichever team the one saving it is looking at; anything else new goes to the team being viewed */
+  OWN_WORK: new Set(['todo', 'shadow', 'quickwin', 'central', 'oncall', 'attendance']),
+  personTeam(rec) {
+    if (!rec || !Store.OWN_WORK.has(rec.c) || !rec.analyst) return '';
+    const m = Store.members().find(x => x.id === rec.analyst);
+    return m && !Store.topRole(m.role) ? m.team || 'apps' : '';
+  },
+  saveTeam(rec) {
+    return Store.personTeam(rec) || (App.viewTeam && App.viewTeam !== '*' ? App.viewTeam : '');
+  },
+  /* the super admin is listed at the bottom of other teams' name boxes ("Adam (APPS)"), never chosen for them */
+  realSuper(id) {
+    const m = Store.members().find(x => x.id === (id || App.me));
+    return !!(m && m.superAdmin);
+  },
   teamManager(t) {
     return Store.members().find(m => m.role === 'manager' && (m.team || 'apps') === t && m.active !== false);
   },

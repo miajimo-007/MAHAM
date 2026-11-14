@@ -49,7 +49,7 @@ Object.assign(Schemas, {
         options: () =>
           Store.members()
             .filter(m => m.active !== false)
-            .map(m => [m.id, Store.memberName(m.id)]),
+            .map(m => [m.id, UI.personName(m.id)]),
         blank: false,
       },
       { key: 'due', label: 'Due date', type: 'date' },

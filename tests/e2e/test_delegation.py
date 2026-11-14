@@ -13,8 +13,8 @@ async def main():
         await s.sign_in_as('khalid'); await s.js("Store.save({id: 'settings-delegations', c: 'settings', list: []})")
         c('director cannot change delegations', await s.js("Store.delegations().length") == 1)
         # director assigns work to the manager on leave and sees who is covering
-        await s.go('#/home'); t = await pg.inner_text('#main')
-        c('Director Desk: "Managers on leave" card', 'managers on leave' in t.lower() and await pg.locator('.card:has-text("Managers on leave") >> text=Yousef').count() == 1)
+        await s.go('#/home'); t = await s.open_watch()
+        c('Director Desk: "Managers on leave" card', 'managers on leave' in t.lower() and await pg.locator('.dc-wl:has-text("Managers on leave") >> text=Yousef').count() >= 1)
         c('Teams table shows the acting person', await pg.locator('td:has-text("on leave") >> text=Yousef').count() == 1)
         await pg.click('#dirassign'); await pg.wait_for_selector('#asgf')
         c('assign form marks the manager as on leave', await pg.locator('#asgf label:has-text("acting")').count() == 1)

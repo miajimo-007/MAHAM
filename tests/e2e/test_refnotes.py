@@ -7,7 +7,10 @@ async def open_form(s, c, rid):
     await s.page.wait_for_function("(() => { const b = document.querySelector('#modal #rnaddbtn'); return !b || !!b.onclick; })()", timeout=5000)
 
 async def add_note(s, text):
-    await s.page.fill('#modal #rnnew', text); await s.page.click('#modal #rnaddbtn'); await s.page.wait_for_timeout(250)
+    await s.page.fill('#modal #rnnew', text); await s.page.click('#modal #rnaddbtn')
+    try: await s.page.wait_for_function(f"(() => (document.querySelector('#modal #refnotes') || {{}}).innerText && document.querySelector('#modal #refnotes').innerText.includes({text[:30]!r}))()", timeout=5000)   # a busy PC (4 tests at once) can take longer than a fixed wait
+    except Exception: pass
+    await s.page.wait_for_timeout(150)
 
 async def main():
     c = Check('reference notes')

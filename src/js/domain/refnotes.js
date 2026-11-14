@@ -20,8 +20,13 @@ const RefNotes = {
       return m;
     });
   },
+  /* notes on this item — also those written before it was converted (Conv.family: every id the item has had) */
   of(id) {
-    return (id && RefNotes.index().get(id)) || [];
+    if (!id) return [];
+    const ix = RefNotes.index();
+    const ids = typeof Conv !== 'undefined' ? Conv.family(id) : [id];
+    if (ids.length === 1) return ix.get(id) || [];
+    return ids.flatMap(i => ix.get(i) || []).sort((a, b) => (b.at || 0) - (a.at || 0));
   },
   count(id) {
     return RefNotes.of(id).length;

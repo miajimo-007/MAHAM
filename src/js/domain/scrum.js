@@ -81,12 +81,12 @@ const Scrum = {
       m => m.active !== false && ((!Store.topRole(m.role) && ts.has(m.team || 'apps')) || (m.id === App.me && Store.topRole(m.role)))
     );
     if (!(App.isSuper() || App.isDir() || App.isMgr() || App.isActing()))
-      return list.filter(m => m.id === App.me).map(m => [m.id, Store.memberName(m.id)]); // a team leader / analyst creates projects they run themselves
+      return list.filter(m => m.id === App.me).map(m => [m.id, UI.personName(m.id)]); // a team leader / analyst creates projects they run themselves
     return list
       .sort((a, b) => String(a.team || '').localeCompare(String(b.team || '')) || a.name.localeCompare(b.name))
       .map(m => [
         m.id,
-        `${Store.memberName(m.id)} (${Store.topRole(m.role) ? Store.titleOf(m) : Store.teamName(m.team) + ' · ' + Store.titleOf(m)})${Store.delegationOf(m.id) ? ' — on leave, acting: ' + Store.memberShort(Store.delegationOf(m.id).to) : ''}`,
+        `${UI.personName(m.id)} (${Store.topRole(m.role) ? Store.titleOf(m) : Store.teamName(m.team) + ' · ' + Store.titleOf(m)})${Store.delegationOf(m.id) ? ' — on leave, acting: ' + Store.memberShort(Store.delegationOf(m.id).to) : ''}`,
       ]);
   },
   member(p) {

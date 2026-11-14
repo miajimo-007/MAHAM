@@ -65,3 +65,10 @@
 | `settings-meta-<team>`                          | `helpdeskUpdated` (last ManageEngine import date)                                                                                                                                                                                                                                                                         | anyone with importME                                    |
 
 Patient privacy: only MRNs appear in imported data — no names or national IDs. Do not store passwords.
+
+## Links between items (`worklink`)
+
+`{ c: 'worklink', id: 'worklink-<by>-<time>', a: <item id>, b: <item id>, team, by, at }` — a link made by hand between
+two Shadow work / To Do / Quick win items, saved in the writer's own file (domain/worklinks.js). Items with the same
+Reference that looks like an ID (3+ characters with a number, e.g. `12345`, `SRS-7`; a quick win's QW ID counts) are
+linked without a record. Notes and links follow an item through conversions (`Conv.family`).

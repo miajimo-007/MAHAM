@@ -58,6 +58,7 @@ const TaskFlowUI = {
     );
   },
   start(t, tr) {
+    if (typeof ScrumUI !== 'undefined' && ScrumUI.dodGate(t, tr, fresh => TaskFlowUI.start(fresh, tr))) return; // finishing: the project's Definition of Done first
     if (TaskFlowUI.needsScreen(t, tr)) return TaskFlowUI.screen(t, tr);
     const err = TaskFlow.run(t, tr.id, {});
     if (err === 'pending') UI.toast(`Sent for approval — ${tr.name || tr.to}`, 'good');
@@ -91,7 +92,7 @@ const TaskFlowUI = {
         key: 'assignee',
         label: 'Assigned to',
         type: 'select',
-        options: p ? Scrum.people(p).map(id => [id, Store.memberName(id)]) : [],
+        options: p ? Scrum.people(p).map(id => [id, UI.personName(id)]) : [],
         blank: 'Unassigned',
       },
       due: { key: 'due', label: 'Due date', type: 'date' },
@@ -207,16 +208,11 @@ const TaskFlowUI = {
 };
 
 /* the board: ◀ ▶ and drag follow the workflow */
-moveItem = function (id, to) {
-  TaskFlowUI.go(id, to);
-};  
+PT_CARD.move = (id, to) => TaskFlowUI.go(id, to);
 
 /* cards: with a real workflow, the ◀ ▶ buttons become the allowed moves */
 (function wireCards() {
-  const old = ptCard;
-  ptCard = function (t, p, opts) {
-     
-    let html = old(t, p, opts);
+  PT_CARD.decorate.push((html, t, p) => {
     const w = TaskFlow.forTask(t);
     const b = TaskFlow.board(p);
     if (b.byCat)
@@ -228,28 +224,24 @@ moveItem = function (id, to) {
     return html
       .replace(/<button class="btn xs[^"]*" data-mv="[^"]*"[^>]*>.*?<\/button>/g, '')
       .replace(/<\/div><\/div>$/, `${TaskFlowUI.buttons(t, 2)}</div></div>`);
-  };
-  const ob = bindScrum;
-  bindScrum = function (root) {
-    ob(root);
-    TaskFlowUI.bind(root);
-  };  
+  });
+  PT_CARD.bind.push(root => TaskFlowUI.bind(root));
 })();
 
 /* the task form: workflow box under the checklist / comments */
 (function wireForm() {
-  const S = Schemas.ptask;
-  const om = S.onFormMount;
-  S.onFormMount = (form, base) => {
-    if (om) om(form, base);
-    if (!base || !base.id) return;
-    const box = document.createElement('div');
-    box.className = 'tfx';
-    box.innerHTML = TaskFlowUI.panel(base);
-    const after = form.parentNode.querySelector('.ptx') || form;
-    after.parentNode.insertBefore(box, after.nextSibling);
-    TaskFlowUI.bind(box);
-  };
+  Schemas.extend('ptask', {
+    name: 'workflow box',
+    mount(form, base) {
+      if (!base || !base.id) return;
+      const box = document.createElement('div');
+      box.className = 'tfx';
+      box.innerHTML = TaskFlowUI.panel(base);
+      const after = form.parentNode.querySelector('.ptx') || form;
+      after.parentNode.insertBefore(box, after.nextSibling);
+      TaskFlowUI.bind(box);
+    },
+  });
 })();
 
 /* notices on Home and on the project page */

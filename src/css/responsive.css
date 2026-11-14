@@ -36,7 +36,7 @@
     padding: 10px 16px;
   }
   .quick .q-row,
-  .quick .q-row:nth-child(2) {
+  .quick .q-row.q-subj {
     grid-template-columns: 1fr;
   }
 }

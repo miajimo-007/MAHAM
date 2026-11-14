@@ -92,8 +92,7 @@ function goodCatchTab() {
       free: all.filter(g => GC.isOpen(g) && !g.taker).length,
       all: all.length,
     })[v];
-  const html = `<div class="kpis k4">${UI.kpi('Open', all.filter(g => (g.status || 'New') === GC.ST.N).length, `${cnt('free')} with nobody on it`, cnt('free') ? 'sc-c' : '')}${UI.kpi('In progress', all.filter(g => g.status === GC.ST.P).length, '')}${UI.kpi('Resolved this month', res.filter(g => g.resolvedOn.startsWith(mo)).length, `${all.filter(g => (g.found || '').startsWith(mo)).length} found this month`, 'sc-a')}${UI.kpi('Average days to resolve', avg == null ? '–' : U.num(avg, 1), res.length + ' resolved in all')}</div>
-  <div class="page-actions"><div class="pm-seg">${[
+  const html = `<div class="page-actions"><div class="pm-seg">${[
     ['all', 'All'],
     ['mine', 'My catches'],
     ['taken', 'Taken by me'],
@@ -112,7 +111,8 @@ function goodCatchTab() {
     { key: 'tk', label: 'Taken by', options: people },
     { key: 'sys', label: 'Where', options: () => [...new Set(all.flatMap(g => [g.system, g.where]).filter(Boolean))].sort() },
   ])}</div>
-  <p class="muted small">Saw something wrong, or something that could work better? Report it — anyone in the department can take it and resolve it. Good catches are not scored; they show on Performance as recognition.</p>
+  ${listSum([`<b>${rows.length}</b> listed`, `<b class="t-warn">${all.filter(g => (g.status || 'New') === GC.ST.N).length}</b> open (${cnt('free')} with nobody on it)`, `<b>${all.filter(g => g.status === GC.ST.P).length}</b> in progress`, `<b class="t-good">${res.filter(g => g.resolvedOn.startsWith(mo)).length}</b> resolved this month`, `average <b>${avg == null ? '–' : U.num(avg, 1)}</b> days to resolve`], { noLink: true })}
+  ${UI.howto('Saw something wrong, or something that could work better? Report it — anyone in the department can take it and resolve it. Good catches are not scored; they show on Performance as recognition.')}
   ${UI.table({
     id: 'gc',
     rows,

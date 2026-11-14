@@ -77,7 +77,9 @@ async def main():
         await pg.wait_for_timeout(300); await s.js("Store.flush()")
         c('all items of the epic done → the epic rule ran (epic Done)', await s.js("Store.get('e1').status") == 'Done', await s.js("Store.get('e1')"))
         # refuse path
-        await s.js("Store.save(Object.assign({}, Store.get('s1'), { status: 'In Review', pending: { tr: '%s', trName: 'Done', to: 'Done', by: 'layla', at: Date.now(), form: {} } }))" % tr)
+        await s.sign_in_as('adam')   # set-up: put it back to In Review waiting for approval (a jump only the super admin may make)
+        await s.js("Store.save(Object.assign({}, Store.get('s1'), { status: 'In Review', pending: { tr: '%s', trName: 'Done', to: 'Done', by: 'layla', at: Date.now(), form: {} } }))" % tr); await s.js("Store.flush()")
+        await s.sign_in_as('apps-mgr')
         await s.go('#/projects', 300); await s.go('#/home', 500); await pg.click('[data-apno="s1"]'); await pg.wait_for_timeout(200)
         c('refusing needs a note', await s.js("!!Store.get('s1').pending"))
         await pg.fill('#apnote-s1', 'Report totals wrong'); await pg.click('[data-apno="s1"]'); await s.js("Store.flush()"); await pg.wait_for_timeout(300)

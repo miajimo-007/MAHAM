@@ -34,8 +34,8 @@ async def main():
         await J("document.querySelector('.rep-opts').open = true"); await pg.fill('[data-note="high"]', 'CH menus delivered'); await pg.wait_for_timeout(200)
         c('notes appear in the report', 'CH menus delivered' in await J("document.querySelector('.rep-doc').innerText"))
         # help desk → To Do
-        t = await s.go('#/home', 200); t = await s.go('#/manager', 500)
-        c('old requests card on Manager Desk (only > 3 days)', 'Open requests older than 3 days' in t and '770001' in t and '770002' in t and '770003' not in t)
+        t = await s.go('#/home', 200); t = await s.go('#/manager', 500); t = await s.open_watch()
+        c('old requests card on Manager Desk (only > 3 days)', 'Open help desk > 3 days' in t and '770001' in t and '770002' in t and '770003' not in t)
         await pg.click('[data-h2one="hd-old1"]'); await pg.wait_for_timeout(400)
         c('one sent to To Do', await J("Store.all('todo').some(t => t.hdReq === 770001 && t.analyst === 'yousef' && t.priority === 'High')"))
         await s.go('#/home', 200); await s.go('#/helpdesk', 500)

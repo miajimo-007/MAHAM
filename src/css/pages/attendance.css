@@ -6,7 +6,7 @@
 .tbl.att th {
   position: sticky;
   top: 0;
-  background: #fafcfd;
+  background: color-mix(in srgb, #fafcfd var(--lt), var(--card));
   z-index: 1;
   text-align: center;
 }
@@ -23,7 +23,7 @@
   font-weight: 600;
 }
 .tbl.att tr.we td {
-  background: #f7f7f7;
+  background: color-mix(in srgb, #f7f7f7 var(--lt), var(--card));
 }
 .acell {
   cursor: pointer;
@@ -41,24 +41,24 @@
   font-weight: 700;
 }
 td.a-on {
-  background: #f1faf4;
+  background: color-mix(in srgb, #f1faf4 var(--lt), var(--card));
 }
 td.a-off {
-  background: #fdeee0;
-  color: #8a4b00;
+  background: color-mix(in srgb, #fdeee0 var(--lt), var(--card));
+  color: color-mix(in srgb, #8a4b00 var(--ltt), var(--ink));
   font-weight: 600;
 }
 td.a-sick {
-  background: #fde3e1;
+  background: color-mix(in srgb, #fde3e1 var(--lt), var(--card));
   color: var(--bad);
 }
 td.a-annual {
-  background: #e6eefc;
-  color: #2c4f9e;
+  background: color-mix(in srgb, #e6eefc var(--lt), var(--card));
+  color: color-mix(in srgb, #2c4f9e var(--ltt), var(--ink));
 }
 td.a-mid-year {
-  background: #efe6fb;
-  color: #5b3a99;
+  background: color-mix(in srgb, #efe6fb var(--lt), var(--card));
+  color: color-mix(in srgb, #5b3a99 var(--ltt), var(--ink));
 }
 .pr {
   display: inline-block;
@@ -76,8 +76,8 @@ td.a-mid-year {
   align-items: center;
 }
 .legend span.a-off {
-  background: #fdeee0;
+  background: color-mix(in srgb, #fdeee0 var(--lt), var(--card));
   padding: 1px 6px;
   border-radius: 4px;
-  color: #8a4b00;
+  color: color-mix(in srgb, #8a4b00 var(--ltt), var(--ink));
 }

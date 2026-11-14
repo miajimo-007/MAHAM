@@ -80,7 +80,7 @@ const Handover = {
     UI.modal({
       title: '🤝 Hand over my work',
       wide: true,
-      body: `<form class="grid-form" id="hof">${UI.field({ key: 'to', label: 'Who covers for you', type: 'select', options: ppl.map(m => [m.id, m.name]), blank: false }, old.to || ppl[0].id)}<div></div>
+      body: `<form class="grid-form" id="hof">${UI.field({ key: 'to', label: 'Who covers for you', type: 'select', options: ppl.map(m => [m.id, UI.personName(m.id)]), blank: false }, old.to || ppl[0].id)}<div></div>
         ${UI.field({ key: 'from', label: 'From', type: 'date' }, old.from || (lv && lv.from) || U.todayStr())}${UI.field({ key: 'until', label: 'Until (you are back)', type: 'date' }, old.until || (lv && (lv.to || lv.from)) || U.addDays(U.todayStr(), 7))}
         ${UI.field({ key: 'note', label: 'General note for them', type: 'textarea', span: 2, rows: 2, placeholder: 'Passwords are in the usual place · call me only if …' }, old.note || '')}</form>
         <p class="small"><b>${work.length}</b> open item(s). Write a note where it helps. Tick <b>Hand on</b> for To Dos and project tasks they should take over — your manager moves them in one click and gives them back when you return.</p>
@@ -247,11 +247,7 @@ const Handover = {
       const out = base.apply(this, arguments);
       if (!out || !out.html) return out;
       const c0 = Handover.mgrCard();
-      if (c0) {
-        const at = out.html.indexOf('<div class="needs-you');
-        const end = at >= 0 ? out.html.indexOf('</div>', at) + 6 : -1;
-        out.html = end > 5 ? out.html.slice(0, end) + c0 + out.html.slice(end) : out.html + c0;
-      }
+      if (c0) out.html = deskPut(out.html, 'need', c0); // Manager Desk → Needs you (2026.11.13.3)
       const m0 = out.mount;
       out.mount = root => {
         if (m0) m0(root);

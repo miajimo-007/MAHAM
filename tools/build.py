@@ -53,8 +53,26 @@ def check():
         print('note: Node.js not found — skipped JavaScript syntax check')
     m = re.search(r"APP_VERSION = '([^']+)'", read('js/config/app-config.js'))
     if not m: fail('APP_VERSION not found in js/config/app-config.js')
-    print(f'checks ok — {len(css)} stylesheets, {len(js)} scripts, version {m.group(1)}')
+    print(f'checks ok — {len(css)} stylesheets, {len(js)} scripts, version {m.group(1)} · {write_wraps(js)} wraps listed in docs/WRAPS.md')
     return html, css, js, m.group(1)
+
+def write_wraps(js):
+    """docs/WRAPS.md — which files replace a function an earlier file made (`const o = P.home; P.home = ...`), in load order,
+    so it is always clear what actually runs. Written on every build."""
+    out, n = {}, 0
+    for r in js:
+        if r.startswith('vendor/'): continue
+        src = read(r)
+        for m in re.finditer(r'(?:const|let) \w+ = ((?:P|Store|App|UI|Calc|Scrum)\.\w+)\s*;', src):
+            name = m.group(1)
+            if re.search(re.escape(name) + r'\s*=\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|\w+\s*=>)', src[m.end():]):   # replaced by a function (not a value saved and put back)
+                out.setdefault(name, []).append(r); n += 1
+    lines = ['# What wraps what (written by tools/build.py — do not edit)', '',
+             'Some files replace a function made by an earlier file and call the old one inside. The **last file listed runs first**;',
+             'each calls the one before it. Order = the script order in `src/index.html`.', '', '| Function | Wrapped by (in load order) |', '|---|---|']
+    for name in sorted(out): lines.append(f'| `{name}` | ' + ' → '.join(f'`{f}`' for f in out[name]) + ' |')
+    with open(os.path.join(ROOT, 'docs', 'WRAPS.md'), 'w', encoding='utf-8') as f: f.write('\n'.join(lines) + '\n')
+    return n
 
 def bundle(html, css, js):
     """inline every stylesheet and script into one self-contained HTML file"""

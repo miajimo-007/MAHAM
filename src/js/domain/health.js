@@ -11,7 +11,7 @@ const Health = {
     todo: 'To Do',
     shadow: 'Shadow work',
     quickwin: 'Quick win',
-    central: 'Central FU',
+    central: 'External FU',
     mgrtask: 'Director task',
     project: 'Project',
     ptask: 'Project task',
@@ -181,7 +181,7 @@ const Health = {
 };
 
 const ActLog = {
-  SKIP: new Set(['actlog', 'usage', 'ping', 'annread', 'adminlog', 'scoresnap', 'userpin']),
+  SKIP: new Set(['actlog', 'usage', 'ping', 'annread', 'adminlog', 'scoresnap', 'userpin', 'listview']),
   MAX: 2500, // entries kept per person per month (its own small file: users/<id>.log-YYYY-MM.json)
   id(me, ym) {
     return `actlog-${me}-${ym}`;

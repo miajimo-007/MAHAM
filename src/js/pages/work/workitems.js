@@ -175,33 +175,26 @@ const WorkUI = {
 /* ---------- wiring ---------- */
 (function wire() {
   // cards: epic + approval badges
-  const pc = ptCard;
-  ptCard = function (t, p, opts) {
-     
-    const html = pc(t, p, opts);
+  PT_CARD.decorate.push((html, t) => {
     const e = t.epic && Store.get(t.epic);
     const b = `${Work.isEpic(t) ? '<span class="pc-b ep">◈ Epic</span>' : ''}${e ? `<span class="pc-b ep" title="${h(e.title)}">◈ ${h(e.title.length > 18 ? e.title.slice(0, 18) + '…' : e.title)}</span>` : ''}${t.pending ? '<span class="pc-b warn" title="Waiting approval">⏳ approval</span>' : ''}${t.intake ? `<span class="pc-b" title="Request${t.requester ? ' from ' + h(t.requester) : ''}">📨</span>` : ''}`;
     return b ? html.replace('<div class="pc-foot">', `<div class="pc-badges">${b}</div><div class="pc-foot">`) : html;
-  };
-  const bs = bindScrum;
-  bindScrum = function (root) {
-    bs(root);
-    WorkUI.bindApprovals(root);
-  };  
+  });
+  PT_CARD.bind.push(root => WorkUI.bindApprovals(root));
   // the task form: approval box + custom field values are already fields
-  const S = Schemas.ptask;
-  const om = S.onFormMount;
-  S.onFormMount = (form, base) => {
-    if (om) om(form, base);
-    if (!base || !base.id) return;
-    const x = WorkUI.pendingBox(Store.get(base.id) || base);
-    if (!x) return;
-    const box = document.createElement('div');
-    box.innerHTML = x;
-    const tf = form.parentNode.querySelector('.tfx') || form;
-    tf.parentNode.insertBefore(box, tf);
-    WorkUI.bindApprovals(box);
-  };
+  Schemas.extend('ptask', {
+    name: 'approval box',
+    mount(form, base) {
+      if (!base || !base.id) return;
+      const x = WorkUI.pendingBox(Store.get(base.id) || base);
+      if (!x) return;
+      const box = document.createElement('div');
+      box.innerHTML = x;
+      const tf = form.parentNode.querySelector('.tfx') || form;
+      tf.parentNode.insertBefore(box, tf);
+      WorkUI.bindApprovals(box);
+    },
+  });
   // the project page: Epics tab buttons; overdue automation when the owner looks
   const pp = P.project;
   P.project = function (pid) {

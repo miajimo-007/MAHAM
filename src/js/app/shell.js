@@ -3,6 +3,7 @@
 
 Object.assign(App, {
   launch() {
+    if (typeof Theme !== 'undefined') Theme.apply(); // this person's Light / Dark (2026.11.13.7)
     try {
       if (typeof TodoRules !== 'undefined' && App.me && !App.preview) TodoRules.run();
     } catch (e) {
@@ -43,7 +44,7 @@ Object.assign(App, {
             : `<span class="badge">${U.h(Store.teamName(App.viewTeam))}</span>`
         }
         <label class="yearsel">Year <select id="yearsel">${years.map(y => `<option ${y === App.year ? 'selected' : ''}>${y}</option>`).join('')}</select></label>
-        <span id="syncst" class="sync"></span><button class="btn sm" id="savebtn" title="Save your changes to the shared folder now">💾 Save</button><button class="btn sm" id="refresh" title="Get everyone's latest changes">⟳ Refresh</button></header>
+        ${typeof Find !== 'undefined' ? Find.buttons() : ''}${typeof Theme !== 'undefined' ? Theme.buttons() : ''}<span id="syncst" class="sync"></span><button class="btn sm" id="savebtn" title="Save your changes to the shared folder now">💾 Save</button><button class="btn sm" id="refresh" title="Get everyone's latest changes">⟳ Refresh</button></header>
         <main id="main"></main></div>`;
     UI.$('#mebtn').onclick = () =>
       UI.modal({
@@ -96,6 +97,7 @@ Object.assign(App, {
     UI.$('#refresh').onclick = () => App.refresh(true);
     UI.$('#savebtn').onclick = () => App.saveNow();
     App.modeUi();
+    if (typeof Find !== 'undefined') Find.bind();
     Store.on(App.renderSync);
     Store.rescueStray()
       .then(n => {
@@ -196,8 +198,7 @@ Object.assign(App, {
         if (UI.$('#modal')) App.pendingRender = true;
         else App.render(true);
       } else App.safeRender();
-      if (manual) UI.toast(who.length ? `Updated — new changes from ${who.join(', ')}` : 'Up to date — no new changes', 'good');
-      else if (who.length) UI.toast(`New changes from ${who.join(', ')}`, '');
+      if (manual) UI.toast(who.length ? `Updated — new changes from ${who.join(', ')}` : 'Up to date — no new changes', 'good'); // only when asked (no pop-up for other people's changes)
     } catch (e) {
       UI.toast('Could not refresh: ' + e.message, 'bad');
     }
@@ -352,15 +353,9 @@ Object.assign(App, {
     }
     if (document.hidden && Date.now() - Store.lastSync < 120000) return;
     try {
-      const before = App.others();
       const changed = await Store.sync(false);
       if (changed) {
-        const after = App.others();
-        const who = Object.keys(after)
-          .filter(k => after[k] !== before[k])
-          .map(k => Store.memberShort(k) || k);
-        const shown = App.safeRender();
-        if (who.length) UI.toast(`New changes from ${who.join(', ')}${shown ? '' : ' — they will show when you finish typing'}`, '');
+        App.safeRender(); // other people's changes show quietly — no pop-up
       } else App.applyPending();
     } catch (e) {
       console.warn(e);
@@ -433,8 +428,8 @@ App.navHtml = function () {
     }
     if (g === 'Work' && (App.isSuper() || (tl && App.can('importME'))) && !App.isDir())
       items.push(a('#/helpdesk/import', 'hdimport', '⇪', 'ManageEngine Import'));
-    if (g === 'Follow-up' && App.isActing() && !App.isMgr() && !App.isSuper())
-      items.push(a('#/mgrtasks', 'mgrtasks', '✦', 'Tasks from Director (acting)', ' data-actmgr'));
+    if (g === 'Tracking' && App.isActing() && !App.isMgr() && !App.isSuper())
+      items.push(a('#/mgrtasks', 'mgrtasks', '✦', 'Tasks from the director (acting)', ' data-actmgr'));
     if (g === 'Team' && tl && App.can('editAttendanceOthers')) items.push(a('#/attendance', 'attendance-tl', '▦', 'Team Attendance'));
     return { g, items };
   }).filter(x => x.items.length);

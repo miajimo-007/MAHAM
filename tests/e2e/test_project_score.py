@@ -42,7 +42,7 @@ async def main():
         await s.sign_in_as('adam'); t = await s.go('#/admin/data', 900)
         c('Data health: project task without due date / points', 'Project tasks without a due date or story points' in t)
         await s.sign_in_as('apps-mgr'); t = await s.go('#/manager', 600)
-        c("Manager Desk: project tasks that can't be scored", 'project tasks missing a due date or points' in t)
+        c("Manager Desk: project tasks that can't be scored", 'missing a due date or story points' in t)
         await s.sign_in_as('adam')
         # printable rules
         await s.go('#/admin/timerules', 500)

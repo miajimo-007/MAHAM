@@ -26,10 +26,11 @@ P.mytasks = () => {
   const openBtns = t =>
     `${t.offer && PT.offerState(t) === 'pending' ? `<span class="badge warn">offered to ${h(Store.memberShort(t.offer.to))}</span> <button class="btn xs ghost" data-ptback="${h(t.id)}">Take back</button>` : `<button class="btn xs ghost" data-ptgive="${h(t.id)}" title="Give it to a teammate">Give to…</button>`} <button class="btn sm" data-ptdone="${h(t.id)}">✓ Done</button>`;
   const byDay = U.groupBy(planned, t => t.plan);
-  const html = `<div class="page-actions">${filterBar('mytasks', [{ key: 'month', type: 'month' }])}<span class="muted small">🔒 Only you see your personal tasks. They are not To Dos (those come from your manager) and they are not scored.</span><span class="grow"></span><button class="btn primary" data-ptnew="">＋ Personal task</button></div>
+  const html = `<div class="page-actions">${filterBar('mytasks', [{ key: 'month', type: 'month' }])}<span class="muted small" title="They are not To Dos (those come from your manager) and they are not scored.">🔒 Only you see these</span><span class="grow"></span><button class="btn primary" data-ptnew="">＋ New personal task</button></div>
+  ${listSum([`<b>${todayL.length}</b> for today`, `<b>${planned.length}</b> planned`, offers.length ? `<b class="t-warn">${offers.length}</b> offered to you` : '', `<b>${mine.filter(t => t.status === 'Done').length}</b> done`], { noLink: true })}
   ${offers.length ? card(`Offered to you <span class="count">${offers.length}</span>`, offers.map(t => `<div class="li"><div class="grow"><b>${h(t.title)}</b>${pri(t)}<div class="muted small">from <b>${h(Store.memberShort(t.owner))}</b>${t.offer.note ? ' · “' + h(t.offer.note) + '”' : ''}${PT.meta(t) ? ' · ' + PT.meta(t) : ''}</div></div><span class="nw"><button class="btn sm primary" data-ptacc="${h(t.id)}">Accept</button> <button class="btn sm ghost" data-ptdec="${h(t.id)}">Decline</button></span></div>`).join('')) : ''}
   <div class="cols2"><div>
-    ${card(`Today <span class="count">${todayL.length}</span>`, todayL.length ? todayL.map(t => row(t, openBtns(t))).join('') : empty('Nothing for today. Plan something with ＋ Personal task.'))}
+    ${card(`Today <span class="count">${todayL.length}</span>`, todayL.length ? todayL.map(t => row(t, openBtns(t))).join('') : empty('Nothing for today. Plan something with ＋ New personal task.'))}
     ${
       giving.length
         ? card(

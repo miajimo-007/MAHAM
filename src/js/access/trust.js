@@ -7,11 +7,22 @@
  *   3. requests: the requester may raise / cancel; only an approver (not the requester) may decide
  *   4. locked monthly scores only from people with the lockScores permission
  *   5. no time stamps more than a day in the future (they would block every later edit)
+ *   6. project tasks and follow-ups change step only by an allowed workflow move (domain/flowtrust.js)
  * Anything else is ignored (the previous valid version is used) and listed in Admin → System Check. */
 'use strict';
 
 Object.assign(Store, {
   rejected: [], // [{ file, id, c, by, why }] — shown in System Check
+  /* small records a person writes in their own name: { by, id: '<kind>-<by>-…' }. One rule checks them all — a new kind of
+   * signed record only needs a line here. superOk: the super admin may also change or remove other people's.
+   * (Kinds with no rule at all are accepted, but only ever in the writer's own name — rule 1 above.) */
+  SIGNED: {
+    refnote: { what: 'note', superOk: true },
+    worklink: { what: 'link', superOk: true },
+    todoask: { what: 'follow-up request' },
+    todostep: { what: 'To Do step' },
+    listview: { what: 'saved view' },
+  },
   ownerOf(sourceKey) {
     return sourceKey.startsWith('u:') ? Store.fileOwner(sourceKey.slice(2)) : null;
   }, // users/<id>.json and <id>.hd-…/.y… files belong to <id>   // 'seed' → null (shipped with the app)
@@ -179,11 +190,13 @@ Object.assign(Store, {
       .filter(x => x.r.id !== 'settings-team' || !x.owner); // replaced by the replayed version below
 
     // a temporary database with the trusted settings, so the permission helpers can be used below
+    // newest version wins; for Store.MERGE_COLLS a version only overwrites the fields it changed (Store.fold), so apply oldest first
     const pick = arr => {
       const db = new Map();
-      for (const x of arr) {
+      const ord = arr.slice().sort((a, b) => (a.r._ts || 0) - (b.r._ts || 0) || String(a.r._by || '').localeCompare(String(b.r._by || '')));
+      for (const x of ord) {
         const c0 = db.get(x.r.id);
-        if (Store.newer(x.r, c0)) db.set(x.r.id, x.r);
+        if (Store.newer(x.r, c0)) db.set(x.r.id, Store.fold(c0, x.r));
       }
       return db;
     };
@@ -317,27 +330,26 @@ Object.assign(Store, {
               (r.by === by && String(r.id).startsWith('adminask-' + by + '-') && !r.decided) ||
               (bad(x, "Admin request written in someone else's name"), false)
             );
-          if (r.c === 'todoask')
-            return (
-              (r.by === by && String(r.id).startsWith('todoask-' + by + '-')) ||
-              (bad(x, "follow-up request written in someone else's name"), false)
-            );
-          if (r.c === 'todostep')
-            return (
-              (r.by === by && String(r.id).startsWith('todostep-' + by + '-')) ||
-              (bad(x, "To Do step written in someone else's name"), false)
-            );
           if (r.c === 'todorule')
             return (
               Store.isSuper(by) ||
               Store.privileged(by, 'assignTodo', x.r._ts) ||
               (bad(x, 'repeating To Do set up without the right to give To Dos'), false)
             );
-          if (r.c === 'refnote')
+          // Knowledge base articles: the writer, or a manager of the article's team / the super admin (domain/kb.js)
+          if (r.c === 'kbarticle')
             return (
-              Store.isSuper(by) ||
-              (r.by === by && String(r.id).startsWith('refnote-' + by + '-')) ||
-              (bad(x, "note written in someone else's name"), false)
+              (r.by === by && String(r.id).startsWith('kbarticle-' + by + '-')) ||
+              (typeof KB !== 'undefined' && KB.isLead(by, r.team, r._ts || 0)) ||
+              (bad(x, 'Knowledge base article changed by someone who is not its writer or a manager of its team'), false)
+            );
+          // small records people write in their own name (one shared rule — add new kinds to Store.SIGNED, access/trust.js)
+          const sg = Store.SIGNED[r.c];
+          if (sg)
+            return (
+              (sg.superOk && Store.isSuper(by)) ||
+              (r.by === by && String(r.id).startsWith(r.c + '-' + by + '-')) ||
+              (bad(x, sg.what + " written in someone else's name"), false)
             );
           if (r.c === 'annread')
             return String(r.id).startsWith('annread-' + by + '-') || (bad(x, 'read receipt written for someone else'), false);
@@ -392,18 +404,20 @@ Object.assign(Store, {
         vs.sort((a, b) => (a.r._ts || 0) - (b.r._ts || 0) || String(a.r._by || '').localeCompare(String(b.r._by || '')));
         let curV = null;
         for (const x of vs) {
+          const m = Store.fold(curV, x.r);
+          const xm = m === x.r ? x : Object.assign({}, x, { r: m }); // only the fields this version changed
           if (!x.owner || legacy(x.owner) || (x.r._ts || 0) < Config.FAIR_SINCE) {
-            curV = x.r;
-            keep.push(x);
+            curV = m;
+            keep.push(xm);
             continue;
           } // older saves followed the old rules
-          const res = Store.fairCheck(x.r, curV, x.r._by, x.r._ts || 0, locks);
+          const res = Store.fairCheck(m, curV, x.r._by, x.r._ts || 0, locks);
           if (res.reject) {
             bad(x, res.reject);
             continue;
           }
           if (res.flag) bad(x, res.flag + ' (corrected)', res.fixed);
-          const y = res.fixed === x.r ? x : Object.assign({}, x, { r: res.fixed });
+          const y = res.fixed === m ? xm : Object.assign({}, x, { r: res.fixed });
           curV = y.r;
           keep.push(y);
         }
@@ -425,6 +439,13 @@ Object.assign(Store, {
         }
       }
       list = keep;
+      // workflow moves of project tasks and follow-ups: only allowed moves, by people allowed to make them (domain/flowtrust.js)
+      if (Store.flowReplay)
+        try {
+          list = Store.flowReplay(list, bad, legacy, pick);
+        } catch (e) {
+          console.error('workflow step check skipped (the files are merged as they are):', e);
+        } // never stop the merge
     } finally {
       Store.db = keepDb;
       Store._verifyRules = null;

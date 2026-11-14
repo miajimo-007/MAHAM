@@ -15,7 +15,7 @@ body.pre #app {
   border-radius: 18px !important;
 }
 .connect-card {
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   border-radius: 16px;
   padding: 32px 36px;
   max-width: 640px;
@@ -42,7 +42,7 @@ body.pre #app {
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   border-radius: 10px;
   cursor: pointer;
   font: inherit;
@@ -71,7 +71,7 @@ body.login-pre {
 .login-card {
   width: 100%;
   max-width: 420px;
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   border-radius: 18px;
   padding: 34px 34px 26px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
@@ -90,7 +90,7 @@ body.login-pre {
   box-shadow: 0 8px 20px rgba(14, 124, 134, 0.35);
 }
 .login-logo.img {
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   padding: 6px;
   box-sizing: border-box;
 }
@@ -102,7 +102,7 @@ body.login-pre {
 .login-card h1 {
   margin: 0 0 6px;
   font-size: 24px;
-  color: #0c2a3d;
+  color: color-mix(in srgb, #0c2a3d var(--ltt), var(--ink));
 }
 .login-sub {
   margin: 0 0 22px;
@@ -112,14 +112,14 @@ body.login-pre {
 .login-hello {
   margin: 0 0 16px;
   font-size: 14px;
-  color: #334155;
+  color: color-mix(in srgb, #334155 var(--ltt), var(--ink));
   text-align: left;
   line-height: 1.5;
 }
 .login-welcome {
-  background: #f0fdfa;
-  border: 1px solid #99f6e4;
-  color: #134e4a;
+  background: color-mix(in srgb, #f0fdfa var(--lt), var(--card));
+  border: 1px solid color-mix(in srgb, #99f6e4 var(--lt), var(--line));
+  color: color-mix(in srgb, #134e4a var(--ltt), var(--ink));
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 13px;
@@ -138,18 +138,18 @@ body.login-pre {
   gap: 5px;
   font-size: 13px;
   font-weight: 600;
-  color: #334155;
+  color: color-mix(in srgb, #334155 var(--ltt), var(--ink));
 }
 .login-form input {
   padding: 10px 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid color-mix(in srgb, #cbd5e1 var(--lt), var(--line));
   border-radius: 10px;
   font-size: 15px;
   width: 100%;
   box-sizing: border-box;
 }
 .login-form input:focus {
-  outline: 2px solid #5eead4;
+  outline: 2px solid color-mix(in srgb, #5eead4 var(--lt), var(--line));
   border-color: #0e7c86;
 }
 .login-big {
@@ -161,8 +161,8 @@ body.login-pre {
   margin-top: 4px;
 }
 .login-err {
-  background: #fee2e2;
-  color: #991b1b;
+  background: color-mix(in srgb, #fee2e2 var(--lt), var(--card));
+  color: color-mix(in srgb, #991b1b var(--ltt), var(--ink));
   border-radius: 10px;
   padding: 8px 12px;
   font-size: 13px;
@@ -198,9 +198,9 @@ input.empid {
   text-align: center;
   padding: 14px;
   margin: 12px 0 8px;
-  background: #f0fdfa;
+  background: color-mix(in srgb, #f0fdfa var(--lt), var(--card));
   border: 2px dashed #0e7c86;
   border-radius: 12px;
-  color: #0c2a3d;
+  color: color-mix(in srgb, #0c2a3d var(--ltt), var(--ink));
   user-select: all;
 }

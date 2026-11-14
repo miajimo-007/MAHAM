@@ -4,7 +4,7 @@ import os, subprocess, sys, time
 from playwright.async_api import async_playwright
 from harness import APP, SHOTS, Check, free_port, run, sign_in_page
 
-NO_FOLDER = "delete Window.prototype.showDirectoryPicker; delete window.showDirectoryPicker;"
+NO_FOLDER = "delete Window.prototype.showDirectoryPicker; delete window.showDirectoryPicker; try { localStorage.setItem('bct.test.nowhatsnew', '1'); } catch (e) {}"   # no "What's new" window over the page (as in harness.py)
 
 async def main():
     c = Check('phone / this device')

@@ -54,6 +54,16 @@ const U = {
     return m;
   },
   /* compare version strings like 2026.10.22.12 part by part (as numbers): >0 when a is newer */
+  /* permission time is stored (and scored) in hours; people see and type minutes */
+  mins(hrs) {
+    const n = Math.round((+hrs || 0) * 60),
+      hh = Math.floor(n / 60),
+      m = n % 60;
+    return !hh ? `${m} min` : `${hh} h${m ? ` ${m} min` : ''}`;
+  }, // 90 → "1 h 30 min", 45 → "45 min", 120 → "2 h"
+  minsToHrs(m) {
+    return Math.round(((+m || 0) / 60) * 10000) / 10000;
+  },
   verCmp(a, b) {
     const x = String(a || '')
         .split('.')

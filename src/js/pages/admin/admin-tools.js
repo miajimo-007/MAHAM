@@ -431,8 +431,8 @@ function adminData() {
     ${card(
       'Backups',
       `<form class="grid-form" id="bkf">${UI.field({ key: 'keep', label: 'Keep daily backups for (days)', type: 'number', min: 7, step: 1 }, Store.backupKeep())}${UI.field({ key: 'remindDays', label: 'Remind me to copy one elsewhere every (days)', type: 'number', min: 7, step: 1 }, Store.setting('settings-backup', 'remindDays', 30))}</form>
-      <p class="muted small">Last copy kept elsewhere: <b>${Store.setting('settings-backup', 'lastCopy', '') ? U.fmtDate(Store.setting('settings-backup', 'lastCopy', '')) : 'never'}</b>. Download a backup in <a class="link" href="#/syscheck">System Check</a> and put it somewhere safe (it's counted automatically).</p>
-      <div class="row-btns"><button class="btn ghost" id="bkcopied">I copied one today</button><span class="grow"></span><button class="btn primary" id="bksave">Save</button></div>`
+      <p class="muted small">Last copy kept elsewhere: <b>${Store.setting('settings-backup', 'lastCopy', '') ? U.fmtDate(Store.setting('settings-backup', 'lastCopy', '')) : 'never'}</b>. Download a full backup here (or in <a class="link" href="#/syscheck">System Check</a>, where you can also restore one from a file) and put it somewhere safe (it's counted automatically).</p>
+      <div class="row-btns"><button class="btn primary" id="bkfull2" title="Every team's work, settings, workflows, people and permissions in one zip">⬇ Download full backup</button><button class="btn ghost" id="bkcopied">I copied one today</button><span class="grow"></span><button class="btn primary" id="bksave">Save</button></div>`
     )}
   </div>`;
   return {
@@ -557,6 +557,18 @@ function adminData() {
         bkSave({ keep: Math.max(7, Math.min(365, +v.keep || 30)), remindDays: Math.max(7, +v.remindDays || 30) });
       };
       root.querySelector('#bkcopied').onclick = () => bkSave({ lastCopy: U.todayStr() });
+      root.querySelector('#bkfull2').onclick = async e => {
+        const b = e.currentTarget;
+        b.disabled = true;
+        try {
+          const n = await Store.downloadFullBackup();
+          UI.toast(n + ' downloaded — keep it somewhere safe', 'good');
+          App.render();
+        } catch (er) {
+          UI.toast('Backup failed: ' + er.message, 'bad');
+          b.disabled = false;
+        }
+      };
     },
   };
 }

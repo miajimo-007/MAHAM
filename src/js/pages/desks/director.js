@@ -72,9 +72,12 @@ function directorToday() {
   const quiet = []; // empty boxes become one small line
   let html = `${annBanner()}
   <div class="hello slim"><div><p class="muted">${U.fmtDate(today)} · ${h(Store.orgName())} · ${teams.length} team${teams.length === 1 ? '' : 's'}</p></div><div class="row-btns">${App.can('assignToManagers') || App.isSuper() ? '<button class="btn primary" id="dirassign">＋ Assign to managers</button>' : ''}</div></div>
-  ${Dir.attention().length ? Dir.attentionCard() : (quiet.push('nothing needs your attention'), '')}
+  ${deskGroup(
+    'need',
+    'Needs you',
+    'decisions and follow-ups waiting for you',
+    `<!--QUIET-->${Dir.attention().length ? Dir.attentionCard() : (quiet.push('nothing needs your attention'), '')}
   ${App.isDir() && myWork().length ? myWorkCard() : ''}
-  <!--QUIET-->
   ${(() => {
     const soon = U.addDays(today, 7);
     // everything I am waiting for: open director tasks I gave (from a meeting or not) + open actions from my meetings
@@ -137,62 +140,32 @@ function directorToday() {
       ? `<div class="cols2">${fuCard}${myCard}</div>`
       : (fuCard || myCard) + (myCard ? '' : `<div class="oneline-btns">${btns}</div>`);
   })()}
-  ${myTasks.length || myProj.length ? `<div class="cols2">${card(`From the AED <span class="count">${myTasks.length}</span>`, myTasks.length ? myTasks.map(x => `<div class="li click" data-edit="mgrtask|${h(x.r.id)}"><div class="grow"><b>${h(x.r.task)}</b><div class="muted small">${x.r.due ? 'Due ' + U.fmtDate(x.r.due) : 'No due date'}${x.r.comment ? ' · 📝 ' + h(x.r.comment) : ''}</div></div>${UI.sbadge(x.late ? 'Overdue' : x.r.status)}</div>`).join('') : empty('Nothing open.'))}${card(`My projects <span class="count">${myProj.length}</span>`, myProj.length ? myProj.map(x => `<div class="li click" data-proj="${h(x.r.id)}"><div class="grow"><b>${h(x.r.name)}</b><div style="max-width:260px">${UI.bar(x.prog)}</div></div>${UI.badge(x.health, healthKind(x.health))}</div>`).join('') : empty('None.'))}</div>` : ''}
-  ${(() => {
-    const mine = new Set(App.myTeams().map(t => t.id));
-    const ds = Store.delegations().filter(
-      d =>
-        Store.member(d.from) &&
-        (App.isSuper() || App.isAED() || mine.has(Store.member(d.from).team || 'apps')) &&
-        (!d.end || d.end >= today)
-    );
-    return ds.length
-      ? card(
-          `Managers on leave <span class="count">${ds.length}</span>`,
-          `<table class="tbl"><thead><tr><th>Manager</th><th>Team</th><th>Acting</th><th>From</th><th>Until</th><th></th></tr></thead><tbody>${ds.map(d => `<tr><td><b>${h(Store.memberShort(d.from))}</b></td><td>${h(Store.teamName(Store.member(d.from).team))}</td><td>${h(Store.memberShort(d.to))}</td><td>${U.fmtDate(d.start)}</td><td>${U.fmtDate(d.end) || '—'}</td><td>${Store.delegationActive(d) ? UI.badge('Now', 'warn') : UI.badge('Planned', '')}</td></tr>`).join('')}</tbody></table><p class="muted small">Tasks and projects you give these managers go to the acting person while they are away.</p>`
-        )
-      : '';
-  })()}
-  ${
-    directors.length
-      ? card(
-          'Directors',
-          `<table class="tbl"><thead><tr><th>Director</th><th>Teams</th><th class="num">Open tasks from you</th><th class="num">Active projects</th></tr></thead><tbody>${directors
-            .map(
-              d =>
-                `<tr><td><b>${h(Store.memberShort(d.id))}</b></td><td>${h(
-                  Store.teamsFor(d.id)
-                    .map(t => t.name)
-                    .join(', ')
-                )}</td><td class="num">${Store.all('mgrtask').filter(r => r.manager === d.id && r.status !== 'Done').length}</td><td class="num">${Store.all('project').filter(r => r.manager === d.id && !['Done', 'Canceled'].includes(r.status)).length}</td></tr>`
-            )
-            .join('')}</tbody></table>`
-        )
-      : ''
-  }
-  <div class="kpis">
-    ${UI.kpi('Teams', teams.length, `${teams.reduce((a, t) => a + t.size, 0)} analysts`)}
-    ${UI.kpi(
-      'Avg team score',
-      (() => {
-        const v = teams.map(t => t.score).filter(x => x != null);
-        return v.length ? U.num(U.avg(v), 1) : '–';
-      })(),
-      'YTD'
-    )}
-    ${UI.kpi('Tasks with managers', mtOpen.length, `<b class="${mtOpen.some(x => x.late) ? 't-bad' : ''}">${mtOpen.filter(x => x.late).length} overdue</b>`)}
-    ${UI.kpi('Active projects', pj.filter(x => x.open).length, `${pj.filter(x => ['Behind', 'Overdue'].includes(x.health)).length} need attention`, pj.some(x => x.health === 'Overdue') ? 'sc-e' : '')}
-    ${UI.kpi('Teams not imported today', teams.filter(t => t.hdUpd !== today).length, 'ManageEngine data', teams.some(t => t.hdUpd !== today) ? 'sc-c' : 'sc-a')}
-  </div>
-  ${card(
-    'Teams',
-    `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Team</th><th>Manager</th><th class="num">Analysts</th><th class="num">Team score</th><th class="num">To Do on time</th><th class="num">Avg closing</th><th class="num">Open To Do</th><th class="num">Overdue</th><th class="num">QW to approve</th><th>Help desk data</th><th></th></tr></thead><tbody>
-    ${teams.map(r => `<tr><td><b>${h(r.t.name)}</b></td><td>${r.mgr ? `<button class="btn xs ghost" data-oneone="${h(r.mgr.id)}" title="Prepare a 1:1">1:1</button> ` : ''}${r.mgr ? h(Store.memberShort(r.mgr.id)) + (Store.delegationOf(r.mgr.id) ? `<div class="small t-warn">🌴 on leave${Store.delegationOf(r.mgr.id).end ? ' until ' + U.fmtDate(Store.delegationOf(r.mgr.id).end) : ''} — acting: <b>${h(Store.memberShort(Store.delegationOf(r.mgr.id).to))}</b></div>` : '') : '<span class="t-warn">no manager</span>'}</td><td class="num">${r.size}</td><td class="num ${UI.scoreClass(r.score)}">${r.score != null ? U.num(r.score, 1) : '–'}</td><td class="num">${U.pct(r.onTime, 0)}</td><td class="num">${r.closing != null ? U.num(r.closing, 2) + ' h' : '–'}</td><td class="num">${r.open}</td><td class="num ${r.overdue ? 't-bad strong' : ''}">${r.overdue}</td><td class="num">${r.qwPending}</td><td>${r.hdUpd ? (r.hdUpd === today ? UI.badge('Today', 'good') : UI.badge(U.fmtDate(r.hdUpd), 'warn')) : UI.badge('Never', '')}</td><td><button class="btn xs" data-team="${h(r.t.id)}">Dashboard →</button> <button class="btn xs ghost" data-desk="${h(r.t.id)}">Team desk →</button></td></tr>`).join('')}</tbody></table></div>`
+  ${myTasks.length || myProj.length ? `<div class="cols2">${card(`From the AED <span class="count">${myTasks.length}</span>`, myTasks.length ? myTasks.map(x => `<div class="li click" data-edit="mgrtask|${h(x.r.id)}"><div class="grow"><b>${h(x.r.task)}</b><div class="muted small">${x.r.due ? 'Due ' + U.fmtDate(x.r.due) : 'No due date'}${x.r.comment ? ' · 📝 ' + h(x.r.comment) : ''}</div></div>${UI.sbadge(x.late ? 'Overdue' : x.r.status)}</div>`).join('') : empty('Nothing open.'))}${card(`My projects <span class="count">${myProj.length}</span>`, myProj.length ? myProj.map(x => `<div class="li click" data-proj="${h(x.r.id)}"><div class="grow"><b>${h(x.r.name)}</b><div style="max-width:260px">${UI.bar(x.prog)}</div></div>${UI.badge(x.health, healthKind(x.health))}</div>`).join('') : empty('None.'))}</div>` : ''}`,
+    '✓ Nothing needs your attention right now.'
   )}
-  ${
-    !mtOpen.length
-      ? (quiet.push('no open tasks with managers'), '')
-      : `<div>
+  ${deskGroup(
+    'watch',
+    'Watch',
+    'before it goes wrong',
+    `${(() => {
+      const mine = new Set(App.myTeams().map(t => t.id));
+      const ds = Store.delegations().filter(
+        d =>
+          Store.member(d.from) &&
+          (App.isSuper() || App.isAED() || mine.has(Store.member(d.from).team || 'apps')) &&
+          (!d.end || d.end >= today)
+      );
+      return ds.length
+        ? card(
+            `Managers on leave <span class="count">${ds.length}</span>`,
+            `<table class="tbl"><thead><tr><th>Manager</th><th>Team</th><th>Acting</th><th>From</th><th>Until</th><th></th></tr></thead><tbody>${ds.map(d => `<tr><td><b>${h(Store.memberShort(d.from))}</b></td><td>${h(Store.teamName(Store.member(d.from).team))}</td><td>${h(Store.memberShort(d.to))}</td><td>${U.fmtDate(d.start)}</td><td>${U.fmtDate(d.end) || '—'}</td><td>${Store.delegationActive(d) ? UI.badge('Now', 'warn') : UI.badge('Planned', '')}</td></tr>`).join('')}</tbody></table><p class="muted small">Tasks and projects you give these managers go to the acting person while they are away.</p>`
+          )
+        : '';
+    })()}
+${
+  !mtOpen.length
+    ? (quiet.push('no open tasks with managers'), '')
+    : `<div>
     ${card(
       `Open tasks you assigned <span class="count">${mtOpen.length}</span>`,
       mtOpen.length
@@ -222,6 +195,35 @@ function directorToday() {
       '<a href="#/director/tasks" class="link">All →</a>'
     )}
   </div>`
+}`,
+    '✓ Nothing slipping — no late tasks with managers.'
+  )}
+  <section class="desk-grp" data-dg="team"><div class="dg-head"><h3>The teams <span class="count">${teams.length}</span></h3></div>
+  <div class="dg-sum muted small">${teams.reduce((a, t) => a + t.size, 0)} analysts · avg team score <b>${(() => {
+    const v = teams.map(t => t.score).filter(x => x != null);
+    return v.length ? U.num(U.avg(v), 1) : '–';
+  })()}</b> YTD · <b>${mtOpen.length}</b> task${mtOpen.length === 1 ? '' : 's'} with managers${mtOpen.some(x => x.late) ? ` (<b class="t-bad">${mtOpen.filter(x => x.late).length} overdue</b>)` : ''} · <b>${pj.filter(x => x.open).length}</b> active project${pj.filter(x => x.open).length === 1 ? '' : 's'}${pj.some(x => ['Behind', 'Overdue'].includes(x.health)) ? ` (<b class="t-warn">${pj.filter(x => ['Behind', 'Overdue'].includes(x.health)).length} need attention</b>)` : ''}${teams.some(t => t.hdUpd !== today) ? ` · <span class="t-warn">${teams.filter(t => t.hdUpd !== today).length} team${teams.filter(t => t.hdUpd !== today).length === 1 ? '' : 's'} not imported today</span>` : ''}</div>
+  ${card(
+    'Teams',
+    `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Team</th><th>Manager</th><th class="num">Analysts</th><th class="num">Team score</th><th class="num">To Do on time</th><th class="num">Avg closing</th><th class="num">Open To Do</th><th class="num">Overdue</th><th class="num">QW to approve</th><th>Help desk data</th><th></th></tr></thead><tbody>
+    ${teams.map(r => `<tr><td><b>${h(r.t.name)}</b></td><td>${r.mgr ? `<button class="btn xs ghost" data-oneone="${h(r.mgr.id)}" title="Prepare a 1:1">1:1</button> ` : ''}${r.mgr ? h(Store.memberShort(r.mgr.id)) + (Store.delegationOf(r.mgr.id) ? `<div class="small t-warn">🌴 on leave${Store.delegationOf(r.mgr.id).end ? ' until ' + U.fmtDate(Store.delegationOf(r.mgr.id).end) : ''} — acting: <b>${h(Store.memberShort(Store.delegationOf(r.mgr.id).to))}</b></div>` : '') : '<span class="t-warn">no manager</span>'}</td><td class="num">${r.size}</td><td class="num ${UI.scoreClass(r.score)}">${r.score != null ? U.num(r.score, 1) : '–'}</td><td class="num">${U.pct(r.onTime, 0)}</td><td class="num">${r.closing != null ? U.num(r.closing, 2) + ' h' : '–'}</td><td class="num">${r.open}</td><td class="num ${r.overdue ? 't-bad strong' : ''}">${r.overdue}</td><td class="num">${r.qwPending}</td><td>${r.hdUpd ? (r.hdUpd === today ? UI.badge('Today', 'good') : UI.badge(U.fmtDate(r.hdUpd), 'warn')) : UI.badge('Never', '')}</td><td><button class="btn xs" data-team="${h(r.t.id)}">Dashboard →</button> <button class="btn xs ghost" data-desk="${h(r.t.id)}">Team desk →</button></td></tr>`).join('')}</tbody></table></div>`
+  )}
+  ${
+    directors.length
+      ? card(
+          'Directors',
+          `<table class="tbl"><thead><tr><th>Director</th><th>Teams</th><th class="num">Open tasks from you</th><th class="num">Active projects</th></tr></thead><tbody>${directors
+            .map(
+              d =>
+                `<tr><td><b>${h(Store.memberShort(d.id))}</b></td><td>${h(
+                  Store.teamsFor(d.id)
+                    .map(t => t.name)
+                    .join(', ')
+                )}</td><td class="num">${Store.all('mgrtask').filter(r => r.manager === d.id && r.status !== 'Done').length}</td><td class="num">${Store.all('project').filter(r => r.manager === d.id && !['Done', 'Canceled'].includes(r.status)).length}</td></tr>`
+            )
+            .join('')}</tbody></table>`
+        )
+      : ''
   }
   ${
     !pj.some(x => x.open)
@@ -240,7 +242,8 @@ function directorToday() {
             : empty('No active projects.'),
           '<a href="#/projects" class="link">All projects →</a>'
         )
-  }`;
+  }
+  </section>`;
   html = html.replace(
     '<!--QUIET-->',
     quiet.length ? `<div class="oneline">✓ ${quiet.join(' · ').replace(/^./, c => c.toUpperCase())}</div>` : ''
@@ -278,6 +281,7 @@ function directorToday() {
           })
       );
       Dir.bind(root);
+      deskEmpty(root);
       const da = root.querySelector('#dirassign');
       if (da) da.onclick = () => assignDialog();
     },

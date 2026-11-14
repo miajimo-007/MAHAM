@@ -2,8 +2,8 @@
 .btn {
   font: inherit;
   font-size: 13.5px;
-  border: 1px solid #cdd7dd;
-  background: #fff;
+  border: 1px solid color-mix(in srgb, #cdd7dd var(--lt), var(--line));
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   color: var(--ink);
   padding: 7px 13px;
   border-radius: 8px;
@@ -16,7 +16,7 @@
 }
 .btn:hover {
   border-color: #9fb2be;
-  background: #f8fafb;
+  background: color-mix(in srgb, #f8fafb var(--lt), var(--card));
 }
 .btn.primary {
   background: var(--accent);
@@ -76,10 +76,10 @@ select,
 textarea {
   font: inherit;
   font-size: 13.5px;
-  border: 1px solid #cdd7dd;
+  border: 1px solid color-mix(in srgb, #cdd7dd var(--lt), var(--line));
   border-radius: 7px;
   padding: 7px 9px;
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   color: var(--ink);
   width: 100%;
 }
@@ -108,4 +108,63 @@ input.ro {
   font-weight: 500;
   padding: 7px 0;
   cursor: pointer;
+}
+/* day-first date boxes (js/ui/datebox.js): a text box + 📅; the real date box sits hidden under the button */
+.dbox {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+.dbox .dtext {
+  flex: 1;
+  min-width: 0;
+  padding-right: 30px;
+}
+.dbox .dtext.dbad {
+  border-color: var(--bad, #c0392b);
+  background: color-mix(in srgb, #fff5f5 var(--lt), var(--card));
+}
+.dbox .dpick {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 5px;
+  opacity: 0.75;
+  z-index: 1;
+}
+.dbox .dpick:hover {
+  opacity: 1;
+  background: var(--line2);
+}
+.dbox .dpick:disabled {
+  display: none;
+}
+.dbox input.dnative {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  width: 26px;
+  height: 26px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.tbl .dbox {
+  width: 132px;
+}
+.tbl .dbox .dtext.inl {
+  max-width: none;
+  width: 100%;
+  padding-right: 26px;
 }

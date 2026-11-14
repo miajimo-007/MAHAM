@@ -27,8 +27,8 @@ Object.assign(Store, {
     return out.sort((a, b) => b.name.localeCompare(a.name));
   },
 
-  /* zip every users/*.json file exactly as it is on disk */
-  async makeBackup(name) {
+  /* zip every users/*.json file exactly as it is on disk (in memory) → { blob, files } */
+  async zipAll() {
     if (!Store.usersDir || typeof JSZip === 'undefined') return null;
     const zip = new JSZip();
     const files = [];
@@ -44,11 +44,22 @@ Object.assign(Store, {
       }
       files.push({ name: fname, records: n });
     }
+    const teams = Store.teams().map(t => ({
+      id: t.id,
+      name: t.name,
+      records: (Store.db ? [...Store.db.values()] : []).filter(r => r && !r._del && Store.backupTeamOf(r, r._by) === t.id).length,
+    }));
     zip.file(
       'backup.json',
-      JSON.stringify({ kind: 'ehr-backup', made: new Date().toISOString(), by: App.me || '', version: APP_VERSION, files }, null, 1)
+      JSON.stringify({ kind: 'ehr-backup', made: new Date().toISOString(), by: App.me || '', version: APP_VERSION, files, teams }, null, 1)
     );
-    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    return { blob: await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }), files };
+  },
+  /* the zip, saved in the Backups folder */
+  async makeBackup(name) {
+    const z = await Store.zipAll();
+    if (!z) return null;
+    const { blob, files } = z;
     const dir = await Store.backupsDir();
     const fh = await dir.getFileHandle(name || Store.backupName(), { create: true });
     const w = await fh.createWritable();
@@ -92,11 +103,12 @@ Object.assign(Store, {
     }
   },
 
+  /* name = a zip in the Backups folder, or a zip File / Blob the admin picked (a backup kept somewhere else) */
   async readBackup(name) {
-    const dir = await Store.backupsDir();
-    const blob = await (await dir.getFileHandle(name)).getFile();
+    const blob = typeof name === 'string' ? await (await (await Store.backupsDir()).getFileHandle(name)).getFile() : name;
     const zip = await JSZip.loadAsync(blob);
     const files = {};
+    let info = null;
     for (const p of Object.keys(zip.files))
       if (/^users\/[^/]+\.json$/.test(p)) {
         try {
@@ -105,23 +117,65 @@ Object.assign(Store, {
           /* damaged */
         }
       }
-    return { blob, files };
+    try {
+      if (zip.file('backup.json')) info = JSON.parse(await zip.file('backup.json').async('string'));
+    } catch (e) {
+      /* older backup */
+    }
+    if (!Object.keys(files).length) throw new Error('This is not a MAHAM backup (no data files inside)');
+    return { blob, files, info };
+  },
+  /* the team a record belongs to — settings by their name (settings-<thing>-<team>); '' = shared by every team */
+  backupTeamOf(r, owner) {
+    if (!r) return '';
+    if (r.c === 'settings') {
+      const ids = Store.teams().map(t => t.id);
+      const m = /-([a-z0-9_]+)$/i.exec(r.id || '');
+      return m && ids.includes(m[1]) ? m[1] : '';
+    }
+    if (r.team) return r.team === '_top' ? '' : r.team;
+    const m = Store.member(owner);
+    return m && !Store.topRole(m.role) ? m.team || 'apps' : '';
+  },
+  /* ⬇ one zip with everything: every person's file (work of all years, all settings, workflows, permissions, people, teams) */
+  async downloadFullBackup() {
+    if (Store.dirty) await Store.flush();
+    const name = `MAHAM-full-backup-${U.todayStr()}.zip`;
+    const z = await Store.zipAll();
+    if (!z) throw new Error('The shared folder is not open');
+    XL.download(z.blob, name); // straight to the download — no extra copy in the Backups folder
+    Store.noteCopied();
+    return name;
   },
 
   /* put back the records of the chosen files (default: all) from a backup */
-  async restoreBackup(name, only, kinds) {
-    if (!Store.isSuper(App.me)) throw new Error('Only the super admin can restore a backup');
+  /* a brand-new, empty data folder (everything was lost): the backup can be put back before anyone is set up */
+  async folderEmpty() {
+    if (!Store.usersDir) return false;
+    for await (const [f, hnd] of Store.usersDir.entries()) if (hnd.kind === 'file' && f.endsWith('.json')) return false;
+    return true;
+  },
+  /* teams: null = every team; else the team ids to put back, plus '' for what all teams share (people, roles, shared settings) */
+  async restoreBackup(name, only, kinds, teams) {
+    if (!Store.isSuper(App.me) && !(await Store.folderEmpty())) throw new Error('Only the super admin can restore a backup');
     if (Store.dirty) await Store.flush();
-    await Store.makeBackup(`backup-${U.todayStr()}-before-restore-${Date.now().toString(36)}.zip`); // safety copy first
+    if (!(await Store.folderEmpty())) await Store.makeBackup(`backup-${U.todayStr()}-before-restore-${Date.now().toString(36)}.zip`); // safety copy first
     const { files } = await Store.readBackup(name);
     let n = 0,
       stamp = Date.now();
+    const label = typeof name === 'string' ? name : (name && name.name) || 'a backup file';
     for (const [fname, json] of Object.entries(files)) {
       if (only && only.length && !only.includes(fname)) continue;
       const owner = Store.fileOwner(fname);
       const back = (json.records || []).filter(
-        r => r && r.id && (r._by === owner || /^_old-/.test(owner)) && (!kinds || !kinds.length || kinds.includes(r.c))
+        r =>
+          r &&
+          r.id &&
+          (r._by === owner || /^_old-/.test(owner)) &&
+          (!kinds || !kinds.length || kinds.includes(r.c)) &&
+          (!teams || teams.includes(Store.backupTeamOf(r, owner)))
       );
+      if (!back.length) continue;
       let current = [];
       try {
         current = (await Store.readJSON(Store.usersDir, fname)).json.records || [];
@@ -138,7 +192,7 @@ Object.assign(Store, {
         kind: 'user',
         user: owner,
         updated: U.nowStr(),
-        restoredFrom: name,
+        restoredFrom: label,
         records: [...map.values()],
       });
       const fh = await Store.usersDir.getFileHandle(fname, { create: true });

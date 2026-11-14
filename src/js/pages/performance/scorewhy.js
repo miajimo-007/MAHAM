@@ -31,7 +31,10 @@ const ScoreWhy = {
         `${o.hd} request(s)${o.hdHrs.length ? `, average closing ${U.num(U.avg(o.hdHrs), 1)} h` : ''}`,
         `requests vs team average: ${ScoreWhy.tierText(T.requests, true, '×')} · closing: ${ScoreWhy.tierText(T.closing, false, ' h')}`,
       ],
-      attendance: [`${U.num(o.permHrs, 1)} h permission`, ScoreWhy.tierText(T.attendance, false, ' h')],
+      attendance: [
+        `${U.mins(o.permHrs)} permission`,
+        (T.attendance || []).map(([t, p]) => (t >= 1e8 || t <= -1 ? 'otherwise' : '≤ ' + U.mins(t)) + ` → ${p}`).join(' · '),
+      ],
       shadow: [
         `${U.num(o.swHrs, 1)} h${c.presence && c.presence < 1 ? ` (counted as ${U.num(o.swHrs / Math.max(0.2, c.presence), 1)} h for the days you were there)` : ''}`,
         ScoreWhy.tierText(T.shadow, true, ' h'),

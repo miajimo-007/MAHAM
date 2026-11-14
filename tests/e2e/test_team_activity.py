@@ -6,7 +6,7 @@ async def main():
         pg = s.page; J = s.js
         await s.sign_in_as('yousef'); await s.go('#/home', 300); await s.go('#/todo', 300); await J("Admin.flushUsage(); Store.flush()")
         await s.sign_in_as('apps-mgr'); t = await s.go('#/manager', 600)
-        c('Team activity card', 'Team activity' in t)
+        c('The team: one row per person (opened time in it)', await pg.locator('.desk-grp[data-dg="team"] table.dg-team tbody tr').count() >= 2)
         seen = await J("Admin.seen('yousef')")
         c('first and last time recorded for today', seen['today'] and seen['first'] and seen['last'] and seen['first'] <= seen['last'])
         row = await J("[...document.querySelectorAll('#main table tr')].find(tr => tr.innerText.includes('Yousef') && tr.querySelector('.dot.on'))?.innerText || ''")

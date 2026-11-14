@@ -32,6 +32,24 @@ const Calc = {
     const timing = r.task ? (days > 0 ? 'Delayed' : 'On Time') : '';
     return { due, days, status, timing, month: U.month(r.assigned), year: U.year(r.assigned) };
   },
+  /* the To Do's timing in words (instead of a bare +/− number): { text, cls } — cls t-bad late, t-warn due today */
+  todoWhen(t) {
+    if (!t || t.days == null || t.status === 'Canceled') return { text: '', cls: '' };
+    const d = Math.abs(t.days),
+      n = `${d} day${d === 1 ? '' : 's'}`,
+      done = !!t.r && !!(t.r.finish || ['Resolved', 'Ready for review'].includes(t.status));
+    if (done)
+      return t.days > 0
+        ? { text: `Done ${n} late`, cls: 't-bad' }
+        : t.days < 0
+          ? { text: `Done ${n} early`, cls: 't-good' }
+          : { text: 'Done on the due day', cls: 't-good' };
+    return t.days > 0
+      ? { text: `${n} late`, cls: 't-bad' }
+      : t.days < 0
+        ? { text: `${n} left`, cls: '' }
+        : { text: 'Due today', cls: 't-warn' };
+  },
   todos(year) {
     // + the checks (validation …) each person does on To Do steps — a To Do for them too (domain/todoflow.js)
     return Calc.memo('todos' + year, () => {

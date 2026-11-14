@@ -64,23 +64,19 @@ const TaskFlowAdmin = {
       const tr = TaskFlow.teamRec(sc);
       const all = TaskFlow.listFor(sc);
       const ps = Store.all('project', '*').filter(p => Scrum.teamOf(p) === sc && !['Done', 'Canceled'].includes(p.status));
-      const wopts = sel => opt('', 'Team default', sel) + all.map(w => opt(w.id, w.name + (w.shared ? ' (shared)' : ''), sel)).join('');
-      const types = Store.lists(sc).ptaskTypes || ['Story', 'Task', 'Bug'];
       html += card(
         `Which workflow ${h(Store.teamName(sc))} uses`,
-        `<form class="grid-form" id="tfuse"><label class="fld"><span>Team default</span><select name="use">${opt('', 'Board columns (simple — any move)', tr.use || '')}${all.map(w => opt(w.id, w.name + (w.shared ? ' (shared)' : ''), tr.use || '')).join('')}</select></label>${types.map(ty => `<label class="fld"><span>${h(ty)} tasks</span><select data-tftype="${h(ty)}">${wopts((tr.types || {})[ty] || '')}</select></label>`).join('')}</form>
-        <p class="muted small">Each task type can follow its own workflow. When a project mixes workflows, its board shows one column per category (To Do · Waiting · In Progress · Done) and each card shows its own status.</p>
+        `<form class="grid-form" id="tfuse"><label class="fld"><span>Team default</span><select name="use">${opt('', 'Board columns (simple — any move)', tr.use || '')}${all.map(w => opt(w.id, w.name + (w.shared ? ' (shared)' : ''), tr.use || '')).join('')}</select></label></form>
+        <p class="muted small">Every task of a project follows <b>one</b> set of statuses, whatever its type (Task, Story, Bug are labels). A project uses the team default unless its own is picked in <b>Edit project → Task statuses</b>.</p>
         ${
           ps.length
             ? (() => {
-                const own = ps.filter(p => {
-                  const x = TaskFlow.projPick(tr, p.id);
-                  return x.all || Object.values(x.types).some(Boolean);
-                }).length;
-                return `<details ${own ? 'open' : ''}><summary class="small"><b>Projects with their own workflow</b> (${own})</summary><p class="muted small">A project can follow its own workflow for all its tasks (<b>All types</b>) or for one task type. A type's own choice wins over All types; <b>Team default</b> follows the team's choice above.</p><div style="overflow-x:auto"><table class="tbl" id="tfprojs"><thead><tr><th>Project</th><th>All types</th>${types.map(ty => `<th>${h(ty)}</th>`).join('')}</tr></thead><tbody>${ps
+                const own = ps.filter(p => TaskFlow.projPick(tr, p.id).all && !Lanes.is(p)).length;
+                return `<details ${own ? 'open' : ''}><summary class="small"><b>Which statuses each project uses</b> (${own} with their own)</summary><p class="muted small">To change a project's statuses: open the project → <b>Edit project → Task statuses</b>.</p><div style="overflow-x:auto"><table class="tbl" id="tfprojs"><thead><tr><th>Project</th><th>Task statuses</th><th></th></tr></thead><tbody>${ps
                   .map(p => {
-                    const x = TaskFlow.projPick(tr, p.id);
-                    return `<tr><td>${h(p.name)}</td><td><select data-tfproj="${h(p.id)}" data-tfpty="">${wopts(x.all)}</select></td>${types.map(ty => `<td><select data-tfproj="${h(p.id)}" data-tfpty="${h(ty)}">${wopts(x.types[ty] || '')}</select></td>`).join('')}</tr>`;
+                    const x = TaskFlow.projPick(tr, p.id).all;
+                    const w = Lanes.is(p) ? null : TaskFlow.find(sc, x);
+                    return `<tr><td>${h(p.name)}</td><td>${Lanes.is(p) ? '<span class="muted">Lanes (its lane template)</span>' : w ? h(w.name) : `<span class="muted">Team default</span>`}</td><td><a class="link" href="#/project/${h(p.id)}">Open project →</a></td></tr>`;
                   })
                   .join('')}</tbody></table></div></details>`;
               })()
@@ -123,18 +119,7 @@ const TaskFlowAdmin = {
           TaskFlowAdmin.bindAutos(root, sc);
         }
         const us = root.querySelector('#tfusesave');
-        if (us)
-          us.onclick = () => {
-            const types = {};
-            root.querySelectorAll('[data-tftype]').forEach(s => {
-              if (s.value) types[s.dataset.tftype] = s.value;
-            });
-            TaskFlowAdmin.switchTo(sc, {
-              use: root.querySelector('#tfuse [name=use]').value,
-              types,
-              projects: TaskFlowAdmin.projectsFrom(root, sc),
-            });
-          };
+        if (us) us.onclick = () => TaskFlowAdmin.switchTo(sc, { use: root.querySelector('#tfuse [name=use]').value });
         const open = w => {
           TFE.draft = JSON.parse(JSON.stringify(w));
           App.render();
@@ -389,28 +374,12 @@ const TaskFlowAdmin = {
     };
   },
 
-  /* the "Projects with their own workflow" table → settings-taskflow-<team>.projects, as { all, types }.
-     Projects not in the table (finished or canceled) and task types not in the team's list keep what they had. */
-  projectsFrom(root, team) {
-    const old = TaskFlow.teamRec(team).projects || {};
-    const out = Object.assign({}, old);
-    const rows = {};
-    root.querySelectorAll('[data-tfproj]').forEach(s => {
-      const pid = s.dataset.tfproj;
-      const r = rows[pid] || (rows[pid] = { all: '', types: {}, shown: new Set() });
-      const ty = s.dataset.tfpty;
-      if (ty) {
-        r.shown.add(ty);
-        if (s.value) r.types[ty] = s.value;
-      } else r.all = s.value;
-    });
-    for (const [pid, r] of Object.entries(rows)) {
-      const was = TaskFlow.projPick({ projects: old }, pid).types;
-      for (const [ty, w] of Object.entries(was)) if (w && !r.shown.has(ty)) r.types[ty] = w;
-      if (r.all || Object.keys(r.types).length) out[pid] = { all: r.all, types: r.types };
-      else delete out[pid];
-    }
-    return out;
+  /* a project's own statuses (Edit project → Task statuses) → settings-taskflow-<team>.projects[pid] = { all: wfId } ('' = team default) */
+  setProject(team, pid, wf) {
+    const projects = Object.assign({}, TaskFlow.teamRec(team).projects || {});
+    if (wf) projects[pid] = { all: wf, types: {} };
+    else delete projects[pid];
+    TaskFlowAdmin.switchTo(team, { projects });
   },
   /* changing which workflow projects use: tasks whose status is not in the new one are moved (asked first) */
   switchTo(team, patch) {
@@ -726,15 +695,15 @@ const TaskFlowAdmin = {
       manager: '',
     };
     const t = { id: '_tftest', c: 'ptask', project: p.id, status, assignee: mine ? who : '_nobody', checklist: [] };
-    const o = TaskFlow.of;
-    TaskFlow.of = () => TaskFlow.norm(w);
+    const o = TaskFlow.scheme;
+    TaskFlow.scheme = () => TaskFlow.norm(w); // "Test as…": this workflow for a moment
     try {
       const ms = TaskFlow.moves(t, who);
       return ms.length
         ? `<div class="li-list">${ms.map(m => `<div class="li"><span>${m.ok ? '✓' : '🔒'} <b>${h(m.tr.name || m.tr.to)}</b> → ${h(m.tr.to)}</span><span class="muted small">${h(m.ok ? [(m.tr.valid || []).length ? 'then checks: ' + m.tr.valid.map(v => TaskFlow.VALIDS[v.k]).join(', ') : '', (m.tr.screen || []).length ? 'asks: ' + m.tr.screen.join(', ') : ''].filter(Boolean).join(' · ') : m.why.join(', '))}</span></div>`).join('')}</div>`
         : empty(`No way out of “${status}”.`);
     } finally {
-      TaskFlow.of = o;
+      TaskFlow.scheme = o;
     }
   },
   saveDraft() {
@@ -807,3 +776,65 @@ const TaskFlowAdmin = {
 };
 
 /* where it shows: Admin → Work & workflows → Project tasks (and Follow-ups) — pages/admin-nav.js */
+
+/* ---------- Edit project → Task statuses: the project's ONE set of statuses (all task types) ----------
+ * Kept in the team's workflow settings (an admin decision: super admin, or an Admin with Task workflows for the team);
+ * others see it, fixed. Changing it moves tasks whose status the new set does not have (the usual step). */
+(function wireProjectStatuses() {
+  const S = Schemas.project;
+  if (!S) return;
+  const want = new WeakMap();
+  const FIELD = {
+    key: 'taskflow',
+    label: 'Task statuses',
+    type: 'select',
+    blank: false,
+    showIf: r => !Lanes.is(r),
+    hint: 'Every task of the project follows these statuses, whatever its type',
+    options: r => {
+      r = r || UI._recBase;
+      const sv = r && r.id ? Store.get(r.id) : null;
+      if (sv && TaskFlow.ownFlow(sv)) return [['@own', 'Its own statuses (set with ⚙ Board on the board)']];
+      const team = (r && r.team) || App.viewTeam || 'apps';
+      const cur = r && r.id ? TaskFlow.projPick(TaskFlow.teamRec(team), r.id).all : '';
+      const def = TaskFlow.find(team, TaskFlow.teamRec(team).use) || TaskFlow.find(team, TaskFlow.dept().use);
+      const all = [
+        ['', 'Team default — ' + (def ? def.name : 'board columns')],
+        ...TaskFlow.listFor(team).map(w => [w.id, w.name + (w.shared ? ' (shared)' : '')]),
+      ];
+      return TaskFlowAdmin.can(team, 'task-workflows') ? all : all.filter(o => o[0] === cur);
+    },
+  };
+  Schemas.extend('project', {
+    name: 'task statuses',
+    prepare: rec =>
+      rec && rec.id
+        ? Object.assign({}, rec, {
+            taskflow: TaskFlow.ownFlow(rec) ? '@own' : TaskFlow.projPick(TaskFlow.teamRec(Scrum.teamOf(rec)), rec.id).all,
+          })
+        : rec,
+    fields(list) {
+      if (list.some(f => f.key === 'taskflow')) return list;
+      const out = list.slice();
+      const ix = out.findIndex(f => f.key === 'mode');
+      out.splice(ix < 0 ? out.length : ix + 1, 0, FIELD);
+      return out;
+    },
+    before(r) {
+      if ('taskflow' in r) {
+        want.set(r, r.taskflow || '');
+        delete r.taskflow;
+      }
+    },
+    saved(out, prev) {
+      if (!want.has(out)) return;
+      const wf = want.get(out);
+      want.delete(out);
+      if (Lanes.is(out) || wf === '@own' || TaskFlow.ownFlow(out)) return; // own statuses: changed with ⚙ Board
+      const team = Scrum.teamOf(out);
+      const cur = TaskFlow.projPick(TaskFlow.teamRec(team), out.id).all;
+      if (wf === cur || !TaskFlowAdmin.can(team, 'task-workflows')) return;
+      setTimeout(() => TaskFlowAdmin.setProject(team, out.id, wf), 60);
+    },
+  });
+})();

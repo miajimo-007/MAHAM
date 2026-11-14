@@ -245,17 +245,26 @@ const FollowUp = {
   },
 
   /* ---------- actions ---------- */
-  chase(r, e) {
+  /* the record after a chase (not saved) — chase() saves one, the list's bulk action saves several with Undo */
+  chased(r, e) {
     const x = FollowUp.norm(r);
     const on = e.on || U.todayStr();
-    const out = Object.assign({}, x, {
+    return Object.assign({}, x, {
       chases: [...(x.chases || []), { on, how: e.how || 'Email', reply: String(e.reply || '').trim(), by: App.me, at: Date.now() }].slice(
         -80
       ),
       next: FollowUp.nextFrom(x, on > U.todayStr() ? on : U.todayStr()),
     });
+  },
+  chase(r, e) {
+    const out = FollowUp.chased(r, e);
     Store.save(out);
     return out;
+  },
+  /* a move that can run straight from the list (nothing that must be filled in): the first allowed one to `to`, or null */
+  quickMove(r, to) {
+    const x = FollowUp.norm(r);
+    return (TaskFlow.moves(x).find(m => m.ok && m.tr.to === to && !TaskFlow.check(x, m.tr, {}).length) || {}).tr || null;
   },
   run(r, trId, form) {
     return TaskFlow.run(FollowUp.norm(r), trId, form);
@@ -326,65 +335,49 @@ const FollowUp = {
 
 /* ---------- the engine: follow-ups use the task-workflow engine ---------- */
 (function wire() {
-  const ft = TaskFlow.forTask;
-  TaskFlow.forTask = t => (t && t.c === 'central' ? FollowUp.flowOf(t) : ft(t));
-  const vf = TaskFlow.validFail;
-  TaskFlow.validFail = (v, t, form) => {
-    const x = vf(v, t, form);
-    if (x && t && t.c === 'central' && v.k === 'field') {
-      if (v.field === 'redmine') return 'fill in the ' + (FollowUp.party(t.party).ref || 'reference no.');
-      if (v.field === 'expected') return 'fill in the expected date';
-    }
-    return x;
-  };
-  const cf = TaskFlow.condFail;
-  TaskFlow.condFail = (c, t, who) => {
-    if (t && t.c === 'central') {
+  // follow-ups run on the task-workflow engine with a few rules of their own (TaskFlow.KINDS, domain/taskflow.js)
+  const team = t => t.team || 'apps';
+  const inTeam = (t, roles) =>
+    Store.members()
+      .filter(m => m.active !== false && (m.team || 'apps') === team(t) && roles.includes(m.role || 'analyst'))
+      .map(m => m.id);
+  TaskFlow.KINDS.central = {
+    flow: t => FollowUp.flowOf(t),
+    condFail(c, t, who) {
+      // '' = allowed, a reason = not, undefined = the normal rule
       if (c.k === 'assignee') return t.analyst === who || (who === App.me && App.forMe(t.analyst)) ? '' : 'only the analyst';
       if (c.k === 'planner') return FollowUp.isLead(who) ? '' : 'only a team leader / manager';
       if (c.k === 'subsDone' || c.k === 'stage') return '';
-    }
-    return cf(c, t, who);
-  };
-  TaskFlow.canMove = t =>
-    t && t.c === 'central' ? FollowUp.canEdit(t) : Scrum.canWork(t) || (Scrum.member(Scrum.proj(t.project)) && !t.assignee);
-  const ap = TaskFlow.apply;
-  TaskFlow.apply = function (t, tr, form, who) {
-    const o = ap.call(this, t, tr, form, who);
-    if (t && t.c === 'central') {
+      return undefined;
+    },
+    validMsg(v, t, x) {
+      if (v.k !== 'field') return x;
+      if (v.field === 'redmine') return 'fill in the ' + (FollowUp.party(t.party).ref || 'reference no.');
+      if (v.field === 'expected') return 'fill in the expected date';
+      return x;
+    },
+    canMove: t => FollowUp.canEdit(t),
+    afterApply(o, t, tr, form) {
       o.side = o.side.filter(x => x.c !== 'pcomment');
       for (const k of ['redmine', 'expected']) if (form && form[k]) o.r[k] = form[k];
-    }
-    return o;
-  };
-  const wk = Work.key;
-  Work.key = t => (t && t.c === 'central' ? FollowUp.key(t) : wk(t));
-  const ta = TaskFlow.toApprove;
-  TaskFlow.toApprove = () =>
-    ta().concat(
+    },
+    approvers(t, tr) {
+      const out = new Set();
+      for (const c of tr.approve || []) {
+        if (c.k === 'planner') inTeam(t, ['teamleader', 'manager']).forEach(id => out.add(id));
+        if (c.k === 'people') (c.ids || []).forEach(id => out.add(id));
+        if (c.k === 'roles') inTeam(t, c.roles || []).forEach(id => out.add(id));
+      }
+      return [...out];
+    },
+    toApprove: () =>
       Store.all('central')
         .filter(r => r.pending)
         .filter(r => {
           const tr = FollowUp.flowOf(r).trs.find(x => x.id === r.pending.tr);
           return tr && TaskFlow.approver(r, tr);
-        })
-    );
-  const ab = TaskFlow.approvers;
-  TaskFlow.approvers = (t, tr) => {
-    if (!(t && t.c === 'central')) return ab(t, tr);
-    const out = new Set();
-    for (const c of tr.approve || []) {
-      if (c.k === 'planner')
-        Store.members()
-          .filter(m => m.active !== false && (m.team || 'apps') === (t.team || 'apps') && ['teamleader', 'manager'].includes(m.role))
-          .forEach(m => out.add(m.id));
-      if (c.k === 'people') (c.ids || []).forEach(id => out.add(id));
-      if (c.k === 'roles')
-        Store.members()
-          .filter(m => m.active !== false && (m.team || 'apps') === (t.team || 'apps') && (c.roles || []).includes(m.role || 'analyst'))
-          .forEach(m => out.add(m.id));
-    }
-    return [...out];
+        }),
+    key: t => FollowUp.key(t),
   };
   // the old helpers now answer the new way
   Calc.centralComment = r => FollowUp.comment(r);
@@ -477,30 +470,34 @@ const FollowUp = {
     return miss.length ? 'Fill in ' + miss.map(f => f.label).join(', ') : '';
   };
   S.readOnly = r => !!r.id && !FollowUp.canEdit(FollowUp.norm(r));
-  const er = UI.editRecord;
-  UI.editRecord = function (coll, rec, opts) {
-    if (coll === 'central') {
-      if (rec && rec.id) rec = FollowUp.norm(Store.get(rec.id) || rec);
+  // the form: an old follow-up opens read the new way, the party's reference name and fields (Schemas.extend, schemas/index.js)
+  Schemas.extend('central', {
+    name: 'follow-up steps',
+    prepare: rec => (rec && rec.id ? FollowUp.norm(Store.get(rec.id) || rec) : rec),
+    fields(list, rec) {
       const pt = FollowUp.party(rec && rec.party);
-      const red2 = base.find(f => f.key === 'redmine');
-      if (red2) red2.label = pt.ref || 'Reference no.';
-      S.fields = base.concat(
-        Work.custom('fu')
-          .filter(f => Work.appliesTo(f, pt.name))
-          .map(f => Work.ui(f, { required: Work.required(f, pt.name) }))
-      );
-    }
-    const out = er.call(this, coll, rec, opts);
-    // a To Do / quick win / project task linked from a follow-up shows it
-    if (['todo', 'quickwin', 'ptask'].includes(coll) && rec && rec.id) {
-      const l = FollowUp.linkedTo(rec.id);
-      const body = document.querySelector('#modal .modal-body');
-      if (l.length && body)
-        body.insertAdjacentHTML(
-          'afterbegin',
-          `<div class="insights warnbox"><div>↗ Waiting on ${l.map(r => `<a href="#" data-edit="central|${h(r.id)}"><b>${h(FollowUp.key(r))}</b></a> ${h(FollowUp.party(r.party).name)} · ${h(FollowUp.norm(r).status)}`).join(', ')}</div></div>`
+      return base
+        .map(f => (f.key === 'redmine' ? Object.assign({}, f, { label: pt.ref || 'Reference no.' }) : f))
+        .concat(
+          Work.custom('fu')
+            .filter(f => Work.appliesTo(f, pt.name))
+            .map(f => Work.ui(f, { required: Work.required(f, pt.name) }))
         );
-    }
-    return out;
-  };
+    },
+  });
+  // a To Do / quick win / project task linked from a follow-up shows it
+  for (const coll of ['todo', 'quickwin', 'ptask'])
+    Schemas.extend(coll, {
+      name: 'waiting on a follow-up',
+      mount(form, rec) {
+        if (!rec || !rec.id) return;
+        const l = FollowUp.linkedTo(rec.id);
+        const body = form.closest('.modal-body');
+        if (l.length && body)
+          body.insertAdjacentHTML(
+            'afterbegin',
+            `<div class="insights warnbox"><div>↗ Waiting on ${l.map(r => `<a href="#" data-edit="central|${h(r.id)}"><b>${h(FollowUp.key(r))}</b></a> ${h(FollowUp.party(r.party).name)} · ${h(FollowUp.norm(r).status)}`).join(', ')}</div></div>`
+          );
+      },
+    });
 })();

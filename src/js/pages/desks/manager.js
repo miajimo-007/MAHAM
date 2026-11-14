@@ -69,6 +69,7 @@ P.manager = () => {
     !App.isDir() && !dirCard ? 'nothing from the director' : '',
     !App.isDir() && !pjCard ? 'no active projects' : '',
     !pendingQW.length ? 'no quick wins to approve' : '',
+    !overdue.length ? 'nothing overdue' : '',
   ].filter(Boolean);
   /* Team today: everyone counts as on duty unless marked — show only the exceptions */
   const offDay = U.isOff(today);
@@ -76,7 +77,7 @@ P.manager = () => {
   const swH = U.sum(swToday.map(s => s.hrs));
   const teamToday = card(
     `Team today ${offDay ? `<span class="count">${h(Store.holidayOf(today) || 'Weekend')}</span>` : `<span class="count">${team.length - exc.filter(x => x.a.status === 'OFF').length}/${team.length} on duty</span>`}`,
-    `${offDay ? '' : exc.length ? `<table class="tbl"><tbody>${exc.map(({ m, a }) => `<tr class="click" data-emp="${h(m.id)}"><td><b>${h(Store.memberShort(m.id))}</b></td><td>${a.status === 'OFF' ? UI.badge(a.leave || 'Off', 'warn') : UI.badge('On duty', 'good')}${+a.permHrs ? ' ' + UI.badge('Permission ' + a.permHrs + 'h') : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">✓ Everyone is on duty — nobody marked leave or permission.</p>'}<p class="muted small">Shadow work logged today: <b>${U.num(swH, 1)} h</b> · open To Dos: <b>${open.length}</b></p>`
+    `${offDay ? '' : exc.length ? `<table class="tbl"><tbody>${exc.map(({ m, a }) => `<tr class="click" data-emp="${h(m.id)}"><td><b>${h(Store.memberShort(m.id))}</b></td><td>${a.status === 'OFF' ? UI.badge(a.leave || 'Off', 'warn') : UI.badge('On duty', 'good')}${+a.permHrs ? ' ' + UI.badge('Permission ' + U.mins(a.permHrs)) : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">✓ Everyone is on duty — nobody marked leave or permission.</p>'}<p class="muted small">Shadow work logged today: <b>${U.num(swH, 1)} h</b> · open To Dos: <b>${open.length}</b></p>`
   );
   /* "Needs you": one line of counts at the top — click one to jump to its box */
   const toConfirm = Store.all('todo').filter(t => Store.canConfirmTodo(t, App.me)).length;
@@ -93,47 +94,179 @@ P.manager = () => {
       : []),
     [overdue.length, 'overdue To Dos', 'Overdue To Do'],
     [App.isDir() ? 0 : myMt.length, 'from the director', 'From the director'],
-    [riyMgr.length, 'Central follow-ups', '#/central'],
+    [riyMgr.length, 'external follow-ups', '#/central'],
   ].filter(x => x[0]);
   const needsYou = nyItems.length
     ? `<div class="needs-you"><b>Needs you</b>${nyItems.map(([n, l, to]) => `<a href="${to[0] === '#' ? to : '#'}" class="ny-chip" ${to[0] === '#' ? '' : `data-jump="${h(to)}"`}><span class="n">${n}</span> ${h(l)}</a>`).join('')}</div>`
     : '<div class="needs-you ok">✓ Nothing needs you right now.</div>';
-  const html = `${annBanner()}${FB.banner()}${Dir.nudgeBanner()}${actingNote}${leaveNote}
+  const hdBanner = updated
+    ? ''
+    : `<div class="insights warnbox"><div>⚠ ManageEngine data has <b>not been imported today</b> (last: ${meta.helpdeskUpdated ? U.fmtDate(meta.helpdeskUpdated) : 'never'}). Dashboards use the last import. <a class="btn sm primary" href="#/helpdesk/import">Import now</a></div></div>`;
+  const A = '',
+    Q = `${
+      !pendingQW.length
+        ? ''
+        : card(
+            `Quick wins waiting for approval <span class="count">${pendingQW.length}</span>`,
+            pendingQW.length
+              ? UI.cap('mgr-qw', pendingQW, 5)
+                  .map(
+                    q =>
+                      `<div class="li"><div class="grow click" data-edit="quickwin|${h(q.id)}"><b>${h(q.subject)}</b><div class="muted small">${h(Store.memberShort(q.analyst))} · ${h(q.module || '')} · ${h(q.type || '')} · expected ${U.fmtDate(q.expected) || '—'}${q.date && q.date < today ? ` · <b>waiting ${U.diffDays(q.date, today)} d</b>` : ''}</div></div>${App.can('approveQW') ? `<button class="btn sm primary" data-qwa="${h(q.id)}">Approve</button><button class="btn sm ghost" data-qwr="${h(q.id)}">Reject</button>` : ''}</div>`
+                  )
+                  .join('') + UI.capMore('mgr-qw', pendingQW.length, 5)
+              : empty('Nothing to approve.')
+          )
+    }`,
+    O = overdue.length
+      ? `${
+          overdue.length
+            ? card(
+                `Overdue To Do <span class="count">${overdue.length}</span>`,
+                `${overdue
+                  .sort((a, b) => b.days - a.days)
+                  .slice(0, Custom.target('overdueRows'))
+                  .map(
+                    t =>
+                      `<div class="li click" data-edit="todo|${h(t.r.id)}"><div class="grow"><b>${h(t.r.task)}</b><div class="muted small">${memberCell(t.r.analyst)} · due ${U.fmtDate(t.due)} · <b class="t-bad">${t.days} d late</b>${t.r.comment ? ` · 💬 ${h(t.r.comment)}` : ''}</div></div>${t.r.nudgedOn === today ? '<span class="muted small nw">asked ✓</span>' : `<button class="btn xs ghost" data-nudge="${h(t.r.id)}" title="Ask the analyst for an update — they see it on Analyst Desk">Ask for update</button>`}</div>`
+                  )
+                  .join('')}`,
+                `<a href="#/todo" class="link">${overdue.length > Custom.target('overdueRows') ? `All ${overdue.length} overdue →` : 'All To Do →'}</a>`
+              )
+            : '<div class="oneline">✓ Nothing overdue.</div>'
+        }`
+      : '';
+  /* Watch: what is about to go wrong (2026.11.13.3) — due today / tomorrow with no update from the person, quick wins
+   * past their expected date, follow-up chases due. Overdue To Dos keep their own part with "Ask for update". */
+  const tomorrow = U.addDays(today, 1);
+  const slip = [
+    ...open
+      .filter(
+        t => !t.r.virtual && t.due && t.due >= today && t.due <= tomorrow && !String(t.r.comment || '').trim() && t.r._by !== t.r.analyst
+      )
+      .map(t => ({
+        k: t.due === today ? 'Due today, no update yet' : 'Due tomorrow, no update yet',
+        e: 'todo|' + t.r.id,
+        t: t.r.task,
+        who: t.r.analyst,
+        x: 'due ' + U.fmtDate(t.due),
+      })),
+    ...Store.all('quickwin')
+      .filter(q => U.lc(q.status) === 'in-progress' && q.expected && q.expected < today && U.lc(q.approval) !== 'rejected')
+      .map(q => ({
+        k: 'Quick win past expected date',
+        e: 'quickwin|' + q.id,
+        t: q.subject,
+        who: q.analyst,
+        x: U.diffDays(q.expected, today) + ' d past ' + U.fmtDate(q.expected),
+      })),
+    ...(typeof FollowUpUI !== 'undefined'
+      ? FollowUpUI.rows()
+          .filter(x => x.open && x.due)
+          .map(x => ({
+            k: 'Follow-up chase due',
+            e: 'central|' + x.r.id,
+            t: (FollowUp.key(x.r) + ' ' + (x.r.subject || '')).trim(),
+            who: x.r.analyst,
+            x: (x.days ?? '—') + ' d open',
+          }))
+      : []),
+  ];
+  /* a button on each slipping item (2026.11.13.6): a To Do → Ask for update · a follow-up chase → ✓ Chased today / … */
+  const slipBtn = s => {
+    const [c, id] = s.e.split('|');
+    const r = Store.get(id);
+    if (!r) return '';
+    if (c === 'todo')
+      return r.nudgedOn === today
+        ? '<span class="muted small nw">asked ✓</span>'
+        : `<button class="btn xs ghost" data-nudge="${h(id)}" title="Ask the analyst for an update">Ask for update</button>`;
+    if (c === 'central' && typeof FollowUp !== 'undefined' && FollowUp.canEdit(FollowUp.norm(r)))
+      return `<span class="row-btns tight nw"><button class="btn xs" data-fuqc="${h(id)}" title="Log a chase for today">✓ Chased today</button><button class="btn xs ghost" data-fuch="${h(id)}" title="Log a chase with a note">…</button></span>`;
+    return '';
+  };
+  const slipCard = slip.length
+    ? card(
+        `Slipping <span class="count">${slip.length}</span>`,
+        UI.cap('mgr-slip', slip, 8)
+          .map(
+            s =>
+              `<div class="li click" data-edit="${h(s.e)}"><span class="wk-kind">${h(s.k)}</span><div class="grow"><b>${h(s.t)}</b> <span class="muted small">· ${h(Store.memberShort(s.who) || '—')} · ${h(s.x)}</span></div>${slipBtn(s)}</div>`
+          )
+          .join('') + UI.capMore('mgr-slip', slip.length, 8)
+      )
+    : '';
+  /* The team: one row per person (2026.11.13.3) — today (duty / off / permission), when they opened the app, open To Dos
+   * (late in red), shadow work this week, this month's score. Click a row → their page. Replaces the Team score and
+   * To Do in progress tiles, Team today and Team activity. */
+  const wkStart = U.addDays(today, -U.pd(today).getDay());
+  const curMo = new Date().getFullYear() === y ? new Date().getMonth() + 1 : 12;
+  const swY = Calc.shadow(y);
+  const tmOf = d => (d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+  const seenOf = id => {
+    try {
+      return Admin.seen(id) || {};
+    } catch (e) {
+      return {};
+    }
+  };
+  const tRows = team
+    .map(m => {
+      const a = att[today + '|' + m.id];
+      const s = seenOf(m.id);
+      const op = open.filter(t => !t.r.virtual && t.r.analyst === m.id);
+      const od = op.filter(t => t.timing === 'Delayed').length;
+      const swh = U.sum(swY.filter(x => x.r.analyst === m.id && x.r.date >= wkStart && x.r.date <= today).map(x => x.hrs));
+      let sc;
+      try {
+        const c = Calc.monthScore(y, m.id, curMo);
+        sc = c ? c.score : null;
+      } catch (e) {
+        sc = null;
+      }
+      const day =
+        a && a.status === 'OFF'
+          ? UI.badge(a.leave || 'Off / leave', 'warn')
+          : a && +a.permHrs
+            ? UI.badge('Permission ' + U.mins(a.permHrs))
+            : offDay && !a
+              ? `<span class="muted">${h(Store.holidayOf(today) || 'Weekend')}</span>`
+              : '<span class="t-good small">On duty</span>';
+      return `<tr class="click" data-emp="${h(m.id)}"><td><span class="dot ${s.today ? 'on' : ''}"></span> <b>${h(Store.memberShort(m.id))}</b></td><td>${day}</td><td>${s.today ? tmOf(s.first) : s.lastDay ? `<span class="muted">${U.fmtDate(s.lastDay)}</span>` : '<span class="muted">never</span>'}</td><td class="num">${op.length}${od ? ` <span class="t-bad">(${od} late)</span>` : ''}</td><td class="num">${swh ? U.num(swh, 1) + ' h' : '<span class="muted">—</span>'}</td><td class="num ${sc == null ? '' : sc >= 90 ? 't-good' : sc < 75 ? 't-bad' : ''}">${sc == null ? '<span class="muted">—</span>' : U.num(sc, 1)}</td></tr>`;
+    })
+    .join('');
+  const onDuty = team.length - team.filter(m => (att[today + '|' + m.id] || {}).status === 'OFF').length;
+  const openedN = team.filter(m => seenOf(m.id).today).length;
+  const teamBox = `<section class="desk-grp" data-dg="team"><div class="dg-head"><h3>The team <span class="count">${offDay ? h(Store.holidayOf(today) || 'Weekend') : `${onDuty}/${team.length} on duty`}</span></h3><span class="muted small">${open.filter(t => !t.r.virtual).length} To Do in progress${overdue.length ? ` · <b class="t-bad">${overdue.length} overdue</b>` : ''} · shadow today ${U.num(swH, 1)} h · opened today ${openedN}/${team.length}</span></div>
+    ${team.length ? `<div class="tbl-scroll"><table class="tbl dg-team"><thead><tr><th>Person</th><th>Today</th><th>Opened</th><th class="num">Open To Do</th><th class="num" title="Since Sunday">Shadow (week)</th><th class="num" title="${h(U.MONTHS[curMo - 1])} so far — live">Score (month)</th></tr></thead><tbody>${tRows}</tbody></table></div><p class="muted small">Click a person to open their page. “Opened” is when they first opened the app today (or the last day they did).</p>` : empty('Nobody scored in this team yet.')}
+    ${UsageR.mgrLine()}</section>`;
+  const html = `${annBanner()}${FB.banner()}${Dir.nudgeBanner()}${actingNote}${leaveNote}${hdBanner}
   ${App.isSuper() && Store.all('todo').length + Store.all('shadow').length === 0 ? `<div class="insights warnbox"><div>📥 The app has no data yet. <a class="btn sm primary" href="#/importdata">Import the old Excel sheets</a></div></div>` : ''}
   <div class="hello slim"><div><p class="muted">${U.fmtDate(today)}${U.isOff(today) ? ' · ' + h(Store.holidayOf(today) || 'Weekend') : ''} · ${h(Store.teamName(App.viewTeam))}${App.isDir() ? ' team' : ''}</p></div><span class="grow"></span>${App.can('assignTodo') && App.canEdit('todo') ? '<button class="btn primary" data-assign>＋ Assign a To Do</button>' : ''}${App.pageAllowed('reports') ? '<a class="btn" href="#/reports" data-repweek>📄 Weekly report</a>' : ''}</div>
-  ${needsYou}${(() => {
-    if (typeof TodoFollow === 'undefined') return '';
-    const l = TodoFollow.openForMe();
-    if (!l.length) return '';
-    return card(
-      `🙋 Follow-up requests <span class="count">${l.length}</span>`,
-      l
-        .map(a => {
-          const t = Store.get(a.on);
-          return `<div class="li"><div class="grow click" data-edit="todo|${h(a.on)}"><b>${h(a.text)}</b><div class="muted small">${h(Store.memberShort(a.by))} · from “${h(t ? t.task : '')}”</div></div><button class="btn xs primary" data-tfacc="${h(a.id)}">Make it a To Do</button> <button class="btn xs ghost" data-tfdec="${h(a.id)}">Decline</button></div>`;
-        })
-        .join('')
-    );
-  })()}${(() => {
-    if (typeof TodoFlow === 'undefined') return '';
-    const l = TodoFlow.stuck();
-    if (!l.length) return '';
-    return card(
-      `🔀 To Do steps over time <span class="count">${l.length}</span>`,
-      l
-        .slice(0, 8)
-        .map(t => {
-          const s = TodoFlow.state(t);
-          const st = s.steps[s.cur];
-          return `<div class="li click" data-edit="todo|${h(t.id)}"><div class="grow"><b>${h(t.task)}</b><div class="muted small">${h(st.name)} with ${h(Store.memberShort(s.with))} · ${s.stepLate} day${s.stepLate > 1 ? 's' : ''} over${s.backs ? ' · sent back ×' + s.backs : ''}</div></div></div>`;
-        })
-        .join('')
-    );
-  })()}
+  ${deskGroup(
+    'need',
+    'Needs you',
+    'decisions waiting for you — oldest first',
+    `${(() => {
+      if (typeof TodoFollow === 'undefined') return '';
+      const l = TodoFollow.openForMe();
+      if (!l.length) return '';
+      return card(
+        `🙋 Follow-up requests <span class="count">${l.length}</span>`,
+        l
+          .map(a => {
+            const t = Store.get(a.on);
+            return `<div class="li"><div class="grow click" data-edit="todo|${h(a.on)}"><b>${h(a.text)}</b><div class="muted small">${h(Store.memberShort(a.by))} · from “${h(t ? t.task : '')}”</div></div><button class="btn xs primary" data-tfacc="${h(a.id)}">Make it a To Do</button> <button class="btn xs ghost" data-tfdec="${h(a.id)}">Decline</button></div>`;
+          })
+          .join('')
+      );
+    })()}
   ${approvalsCard()}
   ${workCard}
   ${(() => {
-    const rv = Store.all('todo').filter(t => Store.canConfirmTodo(t, App.me));
+    const rv = Store.all('todo')
+      .filter(t => Store.canConfirmTodo(t, App.me))
+      .sort((a, b) => (a.finish || '').localeCompare(b.finish || ''));
     return rv.length
       ? card(
           `To Dos to confirm <span class="count">${rv.length}</span>`,
@@ -162,64 +295,37 @@ P.manager = () => {
         )
       : '';
   })()}
-  ${updated ? '' : `<div class="insights warnbox"><div>⚠ ManageEngine data has <b>not been imported today</b> (last: ${meta.helpdeskUpdated ? U.fmtDate(meta.helpdeskUpdated) : 'never'}). Dashboards use the last import. <a class="btn sm primary" href="#/helpdesk/import">Import now</a></div></div>`}
-  <div class="kpis">
-    ${UI.kpi('Team score', K.teamScore != null ? U.num(K.teamScore, 1) : '–', 'YTD average', UI.scoreClass(K.teamScore))}
-    ${UI.kpi('Quick wins to approve', pendingQW.length, 'waiting for you', pendingQW.length ? 'sc-c' : '')}
-    ${UI.kpi('To Do in progress', open.length, `<b class="${overdue.length ? 't-bad' : ''}">${overdue.length} overdue</b>`)}
-    ${UI.kpi('Central — your follow-up', riyMgr.length, '> 90 days under review', riyMgr.length ? 'sc-e' : '')}
-    ${UI.kpi('Help desk data', updated ? 'Today ✓' : 'Not today', updated ? 'imported' : 'import needed', updated ? 'sc-a' : 'sc-e')}
-  </div>
+  ${Q}
   ${fromDir}
-  ${GC.mgrCard()}
-  ${UsageR.mgrLine()}
-  ${quiet.length ? `<div class="oneline">✓ ${quiet.join(' · ').replace(/^./, c => c.toUpperCase())}</div>` : ''}
-  ${(() => {
-    // full rows only: Assign | Quick wins, Overdue | Team today + activity — a box with no partner moves up
-    const A = '',
-      Q = `${
-        !pendingQW.length
-          ? ''
-          : card(
-              `Quick wins waiting for approval <span class="count">${pendingQW.length}</span>`,
-              pendingQW.length
-                ? UI.cap('mgr-qw', pendingQW, 5)
-                    .map(
-                      q =>
-                        `<div class="li"><div class="grow click" data-edit="quickwin|${h(q.id)}"><b>${h(q.subject)}</b><div class="muted small">${h(Store.memberShort(q.analyst))} · ${h(q.module || '')} · ${h(q.type || '')} · expected ${U.fmtDate(q.expected) || '—'}</div></div>${App.can('approveQW') ? `<button class="btn sm primary" data-qwa="${h(q.id)}">Approve</button><button class="btn sm ghost" data-qwr="${h(q.id)}">Reject</button>` : ''}</div>`
-                    )
-                    .join('') + UI.capMore('mgr-qw', pendingQW.length, 5)
-                : empty('Nothing to approve.')
-            )
-      }`,
-      O = overdue.length
-        ? `${
-            overdue.length
-              ? card(
-                  `Overdue To Do <span class="count">${overdue.length}</span>`,
-                  `<table class="tbl"><thead><tr><th>Analyst</th><th>To Do</th><th>Due</th><th class="num">Days late</th><th></th></tr></thead><tbody>${overdue
-                    .sort((a, b) => b.days - a.days)
-                    .slice(0, Custom.target('overdueRows'))
-                    .map(
-                      t =>
-                        `<tr class="click" data-edit="todo|${h(t.r.id)}"><td>${memberCell(t.r.analyst)}</td><td>${h(t.r.task)}${t.r.comment ? `<div class="muted small">💬 ${h(t.r.comment)}</div>` : ''}</td><td class="nw">${U.fmtDate(t.due)}</td><td class="num t-bad">${t.days}</td><td class="nw">${t.r.nudgedOn === today ? '<span class="muted small">asked ✓</span>' : `<button class="btn xs ghost" data-nudge="${h(t.r.id)}" title="Ask the analyst for an update — they see it on Analyst Desk">Ask for update</button>`}</td></tr>`
-                    )
-                    .join('')}</tbody></table>`,
-                  `<a href="#/todo" class="link">${overdue.length > Custom.target('overdueRows') ? `All ${overdue.length} overdue →` : 'All To Do →'}</a>`
-                )
-              : '<div class="oneline">✓ Nothing overdue.</div>'
-          }`
-        : '';
-    const side = teamToday + teamActivityCard(team);
-    const row = (x, y) => (x && y ? `<div class="cols2"><div>${x}</div><div>${y}</div></div>` : x || y);
-    const l = [A, Q, O, side].filter(Boolean);
-    let out = '';
-    for (let i = 0; i < l.length; i += 2) {
-      out += row(l[i], l[i + 1] || '');
-      if (!i) out += HD2T.card();
-    }
-    return (overdue.length ? '' : '<div class="oneline">✓ Nothing overdue.</div>') + out;
-  })()}`;
+  ${GC.mgrCard()}`,
+    '✓ Nothing needs you right now.'
+  )}
+  ${deskGroup(
+    'watch',
+    'Watch',
+    'before it goes wrong',
+    `${(() => {
+      if (typeof TodoFlow === 'undefined') return '';
+      const l = TodoFlow.stuck();
+      if (!l.length) return '';
+      return card(
+        `🔀 To Do steps over time <span class="count">${l.length}</span>`,
+        l
+          .slice(0, 8)
+          .map(t => {
+            const s = TodoFlow.state(t);
+            const st = s.steps[s.cur];
+            return `<div class="li click" data-edit="todo|${h(t.id)}"><div class="grow"><b>${h(t.task)}</b><div class="muted small">${h(st.name)} with ${h(Store.memberShort(s.with))} · ${s.stepLate} day${s.stepLate > 1 ? 's' : ''} over${s.backs ? ' · sent back ×' + s.backs : ''}</div></div></div>`;
+          })
+          .join('')
+      );
+    })()}
+  ${O}
+  ${slipCard}
+  ${HD2T.card()}`,
+    '✓ Nothing slipping — no overdue or late work.'
+  )}
+  ${teamBox}`;
   return {
     title: 'Manager Desk',
     html,
@@ -282,6 +388,7 @@ P.manager = () => {
       if (ab) ab.onclick = () => assignTodoDialog();
       root.querySelectorAll('[data-qwa]').forEach(b => (b.onclick = () => decideQW(b.dataset.qwa, true)));
       root.querySelectorAll('[data-qwr]').forEach(b => (b.onclick = () => decideQW(b.dataset.qwr, false)));
+      deskEmpty(root);
       root.querySelectorAll('[data-emp]').forEach(
         tr =>
           (tr.onclick = () => {
@@ -293,12 +400,29 @@ P.manager = () => {
   };
 };
 
+/* Manager Desk sections (2026.11.13.3): one box per section — the boxes inside show as plain parts of it. Other files
+ * put their parts in with deskPut(html, 'need' | 'watch', part). A section with nothing in it shows one ✓ line. */
+function deskGroup(key, title, sub, inner, emptyText) {
+  return `<section class="desk-grp" data-dg="${key}"><div class="dg-head"><h3>${h(title)}</h3><span class="muted small">${h(sub)}</span></div><!--DG:${key}-->${inner}<div class="oneline dg-empty">${h(emptyText)}</div></section>`;
+}
+function deskPut(html, key, part) {
+  if (!part) return html;
+  const m = `<!--DG:${key}-->`;
+  return html.includes(m) ? html.replace(m, m + part) : html + part;
+}
+function deskEmpty(root) {
+  root.querySelectorAll('.desk-grp').forEach(g => {
+    const e = g.querySelector(':scope > .dg-empty');
+    if (e) e.style.display = g.querySelector('.card, .oneline:not(.dg-empty), .li') ? 'none' : '';
+  });
+}
+
 /* "Needs the director's decision" — or its state once sent */
 function escBtn(r) {
   const e = r.escalation;
   if (e && !e.answer) return `<span class="badge warn" title="${h(e.note)}">⚑ waiting for the director</span>`;
   if (e && e.answer) return `<span class="badge good" title="${h(e.answer.note)}">⚑ decided</span>`;
-  return `<button class="btn xs ghost" data-escalate="${h(r.id)}" title="Ask the director to decide something">⚑ Needs decision</button>`;
+  return `<button class="btn xs ghost" data-escalate="${h(r.id)}" title="Ask the director to decide something">⚑ Ask the director…</button>`;
 }
 
 /* Manager Desk: when each person opened the app (first and last time today, or the last day seen) */
@@ -323,12 +447,25 @@ function assignTodoDialog() {
       ${UI.field({ key: 'task', label: 'To Do', type: 'textarea', required: true, span: 2, rows: 2 }, '')}
       <div class="fld span2"><label>Assign to <i>*</i></label><div class="pick">${team.map(m => `<label class="check"><input type="checkbox" name="who" value="${h(m.id)}"> ${h(Store.memberShort(m.id))}</label>`).join('')}<button type="button" class="btn xs ghost" id="allwho">All</button></div></div>
       ${UI.field({ key: 'assigned', label: 'Assigned date', type: 'date' }, today)}
-      ${UI.field({ key: 'duration', label: 'Due in (days)', type: 'number', min: 0, step: 1 }, 0)}
+      ${UI.field({ key: 'duration', label: 'Due in (days)', type: 'number', min: 0, step: 1, hint: 'From the team’s time rules for the priority — change it if needed' }, typeof TimeRules !== 'undefined' ? TimeRules.defaultDays(App.viewTeam || 'apps', 'Normal', '') : 0)}
+      ${UI.field({ key: 'ref', label: 'Reference', type: 'text', hint: 'Request ID / SRS / E-CTS no. … (optional)' }, '')}
       ${UI.field({ key: 'instruction', label: 'Instruction for the analyst', type: 'textarea', span: 2, rows: 2 }, '')}
       <div class="fld span2 flag-row">${UI.field({ key: 'priority', label: 'Priority', type: 'select', options: ['High', 'Medium', 'Normal', 'Low'], blank: false }, 'Normal')}${UI.field({ key: 'fu', label: 'Follow-up (FU)', type: 'bool', checkLabel: 'Follow-up (FU)' }, false)}${UI.field({ key: 'milestone', label: 'Milestone', type: 'bool', checkLabel: '⭐ Milestone' }, false)}</div>
       <div class="fld" style="justify-content:flex-end"><button class="btn primary" type="submit">Assign</button></div></form>`,
     onMount(root) {
       const f = root.querySelector('#assign');
+      // due days follow the priority (the team's time rules, same as the To Do form) until someone types their own
+      const du = f && f.querySelector('[name=duration]'),
+        pr = f && f.querySelector('[name=priority]');
+      let touched = false;
+      if (du && pr && typeof TimeRules !== 'undefined') {
+        du.addEventListener('input', () => {
+          touched = true;
+        });
+        pr.addEventListener('change', () => {
+          if (!touched) du.value = TimeRules.defaultDays(App.viewTeam || 'apps', pr.value, '');
+        });
+      }
       if (f) {
         root.querySelector('#allwho').onclick = () => {
           const boxes = f.querySelectorAll('[name=who]');
@@ -342,6 +479,7 @@ function assignTodoDialog() {
             { key: 'assigned' },
             { key: 'duration', type: 'number' },
             { key: 'instruction' },
+            { key: 'ref' },
             { key: 'fu', type: 'bool' },
             { key: 'priority' },
             { key: 'milestone', type: 'bool' },
@@ -349,21 +487,28 @@ function assignTodoDialog() {
           const who = [...f.querySelectorAll('[name=who]:checked')].map(b => b.value);
           if (!v.task) return UI.toast('Write the To Do first', 'bad');
           if (!who.length) return UI.toast('Pick at least one analyst', 'bad');
+          // the same save rules as the To Do form (status, type → workflow …), one To Do per person
           Store.saveMany(
-            who.map(a => ({
-              c: 'todo',
-              task: v.task,
-              analyst: a,
-              assigned: v.assigned || today,
-              duration: +v.duration || 0,
-              instruction: v.instruction,
-              fu: v.fu,
-              priority: v.priority || 'Normal',
-              milestone: !!v.milestone,
-              status: 'In Progress',
-              finish: '',
-              comment: '',
-            }))
+            who.map(a => {
+              const r = {
+                c: 'todo',
+                task: v.task,
+                analyst: a,
+                assigned: v.assigned || today,
+                duration: +v.duration || 0,
+                instruction: v.instruction,
+                ref: v.ref || '',
+                fu: v.fu,
+                priority: v.priority || 'Normal',
+                milestone: !!v.milestone,
+                status: 'In Progress',
+                finish: '',
+                comment: '',
+              };
+              if (!r.ref) delete r.ref;
+              if (Schemas.todo.beforeSave) Schemas.todo.beforeSave(r);
+              return r;
+            })
           );
           UI.closeModal();
           UI.toast(`Assigned to ${who.length} analyst${who.length > 1 ? 's' : ''}`, 'good');

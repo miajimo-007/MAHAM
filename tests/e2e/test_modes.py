@@ -31,7 +31,7 @@ async def main():
         c('admin menu', await pg.locator('nav [data-nav="admin"]').count() == 1)
         c('first time → Admin page', (await J("location.hash")).startswith('#/admin'))
         t = await s.go('#/admin/home', 600)
-        c('daily checklist', 'Daily checklist' in t and 'Backup' in t)
+        c('daily checklist', 'Daily checklist' in t and 'BACKUP' in t.upper())   # backup is a tile since 2026.11.13.1
         c('stuck To Dos card', 'To Dos waiting too long' in t and 'Old finished' in t)
         await pg.click('[data-askconfirm="apps-mgr"]'); await pg.wait_for_timeout(300)
         c('ask to confirm → nudge to the manager', await J("Store.all('nudge', '*').some(n => n.kind === 'confirm' && n.to === 'apps-mgr' && n.ids.includes('st1'))"))

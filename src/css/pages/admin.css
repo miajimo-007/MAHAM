@@ -35,7 +35,7 @@
   text-align: center;
 }
 .tbl.admin tr.hid td {
-  background: #f4f4f6;
+  background: color-mix(in srgb, #f4f4f6 var(--lt), var(--card));
 }
 .tbl.admin tr.hid input:not([type='checkbox']) {
   color: var(--muted);
@@ -170,15 +170,15 @@
   white-space: nowrap;
 }
 .chk.ok {
-  background: #e7f6ec;
-  color: #166534;
+  background: color-mix(in srgb, #e7f6ec var(--lt), var(--card));
+  color: color-mix(in srgb, #166534 var(--ltt), var(--ink));
 }
 .chk.no {
-  background: #fdecec;
-  color: #991b1b;
+  background: color-mix(in srgb, #fdecec var(--lt), var(--card));
+  color: color-mix(in srgb, #991b1b var(--ltt), var(--ink));
 }
 .tbl.locks td.locked {
-  background: #eef6f4;
+  background: color-mix(in srgb, #eef6f4 var(--lt), var(--card));
 }
 .tiny {
   font-size: 10px;
@@ -205,8 +205,8 @@
   flex-wrap: wrap;
 }
 .preview-bar .btn {
-  background: #fff;
-  color: #1f2937;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
+  color: color-mix(in srgb, #1f2937 var(--ltt), var(--ink));
 }
 @media (max-width: 700px) {
   .adm-search {
@@ -232,7 +232,7 @@
 }
 .chipcb.on {
   border-color: var(--accent, #0f766e);
-  background: #eef6f4;
+  background: color-mix(in srgb, #eef6f4 var(--lt), var(--card));
 }
 .chipcb input {
   margin: 0;
@@ -272,7 +272,7 @@
   opacity: 0.6;
 }
 .ag-item.late b {
-  color: var(--bad, #b91c1c);
+  color: var(--bad, color-mix(in srgb, #b91c1c var(--ltt), var(--ink)));
 }
 .ag-kind {
   flex: 0 0 auto;
@@ -280,32 +280,32 @@
   font-weight: 650;
   padding: 2px 8px;
   border-radius: 6px;
-  background: #eef2f7;
+  background: color-mix(in srgb, #eef2f7 var(--lt), var(--card));
   white-space: nowrap;
   margin-top: 2px;
 }
 .ag-kind.k-task {
-  background: #e0ecff;
-  color: #1e40af;
+  background: color-mix(in srgb, #e0ecff var(--lt), var(--card));
+  color: color-mix(in srgb, #1e40af var(--ltt), var(--ink));
 }
 .ag-kind.k-meet {
-  background: #f3e8ff;
-  color: #6b21a8;
+  background: color-mix(in srgb, #f3e8ff var(--lt), var(--card));
+  color: color-mix(in srgb, #6b21a8 var(--ltt), var(--ink));
 }
 .ag-kind.k-proj {
-  background: #e7f6ec;
-  color: #166534;
+  background: color-mix(in srgb, #e7f6ec var(--lt), var(--card));
+  color: color-mix(in srgb, #166534 var(--ltt), var(--ink));
 }
 .ag-kind.k-req {
-  background: #fff4dc;
-  color: #92400e;
+  background: color-mix(in srgb, #fff4dc var(--lt), var(--card));
+  color: color-mix(in srgb, #92400e var(--ltt), var(--ink));
 }
 .ag-kind.k-mtg {
-  background: #e6f4f1;
+  background: color-mix(in srgb, #e6f4f1 var(--lt), var(--card));
   color: #0f766e;
 }
 tr.sel td {
-  background: #eef6f4;
+  background: color-mix(in srgb, #eef6f4 var(--lt), var(--card));
 }
 .ov-filters select,
 .ov-filters input[type='search'] {
@@ -317,7 +317,7 @@ tr.sel td {
   width: auto;
 }
 .tbl.ovsum tr.org td {
-  background: #f1f5f9;
+  background: color-mix(in srgb, #f1f5f9 var(--lt), var(--card));
   font-weight: 600;
 }
 .tbl.ovsum td.sub {
@@ -335,7 +335,7 @@ tr.sel td {
   align-items: start;
 }
 .ov-col {
-  background: #eef2f6;
+  background: color-mix(in srgb, #eef2f6 var(--lt), var(--card));
   border-radius: var(--r);
   padding: 10px;
   min-width: 0;
@@ -362,7 +362,7 @@ tr.sel td {
 .ov-card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-left: 4px solid #cbd5e1;
+  border-left: 4px solid color-mix(in srgb, #cbd5e1 var(--lt), var(--line));
   border-radius: 10px;
   padding: 9px 11px;
   box-shadow: var(--shadow);
@@ -396,30 +396,30 @@ tr.sel td {
   font-size: 11px;
   padding: 1px 7px;
   border-radius: 6px;
-  background: #f1f5f9;
+  background: color-mix(in srgb, #f1f5f9 var(--lt), var(--card));
   color: var(--muted);
   white-space: nowrap;
 }
 .ov-due.late {
-  background: #fdecec;
-  color: #b91c1c;
+  background: color-mix(in srgb, #fdecec var(--lt), var(--card));
+  color: color-mix(in srgb, #b91c1c var(--ltt), var(--ink));
   font-weight: 650;
 }
 .ov-due.today {
-  background: #e6f4f1;
+  background: color-mix(in srgb, #e6f4f1 var(--lt), var(--card));
   color: #0f766e;
   font-weight: 650;
 }
 .ov-due.soon {
-  background: #fff4dc;
-  color: #92400e;
+  background: color-mix(in srgb, #fff4dc var(--lt), var(--card));
+  color: color-mix(in srgb, #92400e var(--ltt), var(--ink));
 }
 .seg {
   display: inline-flex;
   gap: 4px;
 }
 .tbl.ovsum tr.orgall td {
-  background: #e2e8f0;
+  background: color-mix(in srgb, #e2e8f0 var(--lt), var(--card));
   font-weight: 700;
 }
 .ov-dept {
@@ -432,7 +432,7 @@ tr.sel td {
 }
 .pathcode {
   font-size: 12.5px;
-  background: #f1f5f9;
+  background: color-mix(in srgb, #f1f5f9 var(--lt), var(--card));
   padding: 2px 6px;
   border-radius: 6px;
   word-break: break-all;
@@ -440,8 +440,8 @@ tr.sel td {
 .pathbox {
   display: grid;
   gap: 4px;
-  background: #eef6f4;
-  border: 1px solid #cfe5df;
+  background: color-mix(in srgb, #eef6f4 var(--lt), var(--card));
+  border: 1px solid color-mix(in srgb, #cfe5df var(--lt), var(--line));
   border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 14px;
@@ -491,12 +491,12 @@ details.guide ul {
   border-bottom: 1px solid var(--line);
 }
 .sysbanner.bad {
-  background: #fdecec;
-  color: #7f1d1d;
+  background: color-mix(in srgb, #fdecec var(--lt), var(--card));
+  color: color-mix(in srgb, #7f1d1d var(--ltt), var(--ink));
 }
 .sysbanner.warn {
-  background: #fff4dc;
-  color: #78350f;
+  background: color-mix(in srgb, #fff4dc var(--lt), var(--card));
+  color: color-mix(in srgb, #78350f var(--ltt), var(--ink));
 }
 .insights.addto {
   margin-bottom: 10px;
@@ -526,7 +526,7 @@ details.guide ul {
 .tl-track {
   position: relative;
   height: 22px;
-  background: #f1f5f9;
+  background: color-mix(in srgb, #f1f5f9 var(--lt), var(--card));
   border-radius: 6px;
 }
 .tl-head .tl-track {
@@ -641,7 +641,7 @@ details.guide ul {
   margin: 6px 0 14px;
   padding: 10px 16px;
   border-left: 4px solid #0f766e;
-  background: #eef6f4;
+  background: color-mix(in srgb, #eef6f4 var(--lt), var(--card));
   border-radius: 8px;
   font-style: italic;
 }
@@ -728,7 +728,7 @@ details.guide ul {
   border: 1px solid var(--c);
   color: var(--c);
   font-size: 13px;
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
 }
 .fl-chip.on {
   background: var(--c);
@@ -793,13 +793,13 @@ details.guide ul {
 }
 .sm-skip,
 .btn.sm-skip {
-  background: #f1f5f9;
+  background: color-mix(in srgb, #f1f5f9 var(--lt), var(--card));
   color: #64748b;
 }
 .sm-set .btn,
 .btn.sm-set {
-  background: #ede9fe;
-  color: #5b21b6;
+  background: color-mix(in srgb, #ede9fe var(--lt), var(--card));
+  color: color-mix(in srgb, #5b21b6 var(--ltt), var(--ink));
 }
 td.sm-cell.own .btn {
   font-weight: 700;
@@ -819,18 +819,18 @@ td.sm-cell.own .btn {
 .fb-d {
   white-space: pre-wrap;
   margin-top: 4px;
-  color: #334155;
+  color: color-mix(in srgb, #334155 var(--ltt), var(--ink));
 }
 .fb-reply {
   margin-top: 6px;
   padding: 6px 10px;
-  background: #f0fdfa;
+  background: color-mix(in srgb, #f0fdfa var(--lt), var(--card));
   border-left: 3px solid #0f766e;
   border-radius: 4px;
   font-size: 13px;
 }
 .card-sub {
-  background: #f8fafc;
+  background: color-mix(in srgb, #f8fafc var(--lt), var(--card));
   padding: 10px;
   border-radius: 6px;
   margin-bottom: 10px;
@@ -846,7 +846,7 @@ td.sm-cell.own .btn {
   margin: 10px 0;
 }
 .hdl {
-  border: 1px solid #e2e8f0;
+  border: 1px solid color-mix(in srgb, #e2e8f0 var(--lt), var(--line));
   border-radius: 8px;
   padding: 8px;
   display: flex;
@@ -855,16 +855,16 @@ td.sm-cell.own .btn {
   align-items: flex-start;
 }
 .hdl.open {
-  background: #ecfdf5;
-  border-color: #a7f3d0;
+  background: color-mix(in srgb, #ecfdf5 var(--lt), var(--card));
+  border-color: color-mix(in srgb, #a7f3d0 var(--lt), var(--line));
 }
 .hdl.lock {
-  background: #f8fafc;
-  color: #475569;
+  background: color-mix(in srgb, #f8fafc var(--lt), var(--card));
+  color: color-mix(in srgb, #475569 var(--ltt), var(--ink));
 }
 .hdl.unl {
-  background: #fffbeb;
-  border-color: #fcd34d;
+  background: color-mix(in srgb, #fffbeb var(--lt), var(--card));
+  border-color: color-mix(in srgb, #fcd34d var(--lt), var(--line));
 }
 .adm-tabs {
   flex-wrap: wrap;
@@ -878,12 +878,12 @@ td.sm-cell.own .btn {
   letter-spacing: 0.06em;
   color: #94a3b8;
   padding: 0 4px 10px 14px;
-  border-left: 1px solid #e2e8f0;
+  border-left: 1px solid color-mix(in srgb, #e2e8f0 var(--lt), var(--line));
   margin-left: 6px;
   align-self: flex-end;
 }
 .tr-t td.custom {
-  background: #fef3c7;
+  background: color-mix(in srgb, #fef3c7 var(--lt), var(--card));
 }
 .adm-tabs .tab {
   padding-left: 10px;

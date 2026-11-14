@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="css/pages/project.css" />
     <link rel="stylesheet" href="css/responsive.css" />
     <link rel="stylesheet" href="css/phone.css" />
+    <link rel="stylesheet" href="css/theme.css" />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e4a6b'/%3E%3Ctext x='16' y='23' font-family='Segoe UI,Arial' font-size='19' font-weight='700' fill='white' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E"
@@ -48,6 +49,8 @@
     <script src="js/config/seed-data.js"></script>
     <script src="js/config/owner.js"></script>
     <script src="js/config/app-config.js"></script>
+    <script src="js/app/theme.js"></script>
+    <script src="js/config/whatsnew.js"></script>
     <script src="js/util/utils.js"></script>
     <script src="js/util/dates.js"></script>
     <script src="js/util/browser-storage.js"></script>
@@ -84,6 +87,8 @@
     <script src="js/domain/meetings.js"></script>
     <script src="js/domain/personal.js"></script>
     <script src="js/domain/refnotes.js"></script>
+    <script src="js/domain/kb.js"></script>
+    <script src="js/domain/worklinks.js"></script>
     <script src="js/domain/todoflow.js"></script>
     <script src="js/domain/timerules.js"></script>
     <script src="js/domain/todorules.js"></script>
@@ -93,7 +98,9 @@
     <script src="js/domain/director.js"></script>
     <script src="js/ui/core.js"></script>
     <script src="js/ui/forms.js"></script>
+    <script src="js/ui/datebox.js"></script>
     <script src="js/ui/table.js"></script>
+    <script src="js/ui/views.js"></script>
     <script src="js/ui/widgets.js"></script>
     <script src="js/ui/scrum-board.js"></script>
     <script src="js/schemas/index.js"></script>
@@ -103,6 +110,8 @@
     <script src="js/domain/taskflow.js"></script>
     <script src="js/domain/workitems.js"></script>
     <script src="js/domain/followup.js"></script>
+    <script src="js/domain/flowtrust.js"></script>
+    <script src="js/domain/lanes.js"></script>
     <script src="js/schemas/reference.js"></script>
     <script src="js/schemas/meetings.js"></script>
     <script src="js/domain/todotime.js"></script>
@@ -116,6 +125,7 @@
     <script src="js/pages/performance/dashboard.js"></script>
     <script src="js/pages/performance/employee.js"></script>
     <script src="js/pages/performance/performance.js"></script>
+    <script src="js/pages/performance/tasksov.js"></script>
     <script src="js/pages/performance/lazy.js"></script>
     <script src="js/pages/work/todo.js"></script>
     <script src="js/pages/work/shadow.js"></script>
@@ -127,6 +137,7 @@
     <script src="js/pages/reference/courses.js"></script>
     <script src="js/pages/reference/directory.js"></script>
     <script src="js/pages/reference/info.js"></script>
+    <script src="js/pages/reference/kb.js"></script>
     <script src="js/pages/work/requests.js"></script>
     <script src="js/pages/work/meetings.js"></script>
     <script src="js/pages/work/mytasks.js"></script>
@@ -167,6 +178,11 @@
     <script src="js/pages/about/feedback.js"></script>
     <script src="js/pages/performance/reports.js"></script>
     <script src="js/pages/admin/admin-nav.js"></script>
+    <script src="js/pages/work/lanes.js"></script>
+    <script src="js/pages/work/kanban.js"></script>
+    <script src="js/pages/work/scrumguide.js"></script>
+    <script src="js/pages/work/boardedit.js"></script>
+    <script src="js/pages/desks/deskcalm.js"></script>
     <script src="js/app/state.js"></script>
     <script src="js/app/connect.js"></script>
     <script src="js/app/session.js"></script>
@@ -174,6 +190,8 @@
     <script src="js/app/preview.js"></script>
     <script src="js/app/mode.js"></script>
     <script src="js/app/router.js"></script>
+    <script src="js/app/whatsnew.js"></script>
+    <script src="js/app/search.js"></script>
     <script src="js/data/storage/vfs.js"></script>
     <script src="js/data/storage/cloud.js"></script>
     <script src="js/data/storage/storage.js"></script>

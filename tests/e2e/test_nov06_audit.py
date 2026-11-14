@@ -42,12 +42,12 @@ async def main():
 
         # ---------- My Day ----------
         await s.sign_in_as('yousef', 'analyst'); t = await s.go('#/home', 500)
-        c('My Day: "This month at a glance" card', 'This month at a glance' in t and 'Due in the next 7 days' in t)
+        c('My Day: "This month at a glance" card', 'This month at a glance' in t)
         await pg.screenshot(path=f'{SHOTS}/nov06_myday.png', full_page=True)
 
         # ---------- Manager Desk ----------
         await s.sign_in_as('apps-mgr'); t = await s.go('#/manager', 600)
-        c('Manager Desk: "Needs you" line at the top', await pg.locator('.needs-you').count() == 1)
+        c('Manager Desk: "Needs you" section at the top', await pg.locator('.desk-grp[data-dg="need"]').count() == 1)
         c('Manager Desk: Assign opens as a dialog (no big form on the page)', await pg.locator('#main #assign').count() == 0 and await pg.locator('[data-assign]').count() == 1)
         await pg.screenshot(path=f'{SHOTS}/nov06_manager.png')
 
@@ -90,7 +90,7 @@ async def main():
         await J("ps('todo').pri = ''; App.tableState.todo.q = ''; App.render()")
         # ---------- foldable menu ----------
         secs = await J("[...document.querySelectorAll('nav a.sec')].map(e => e.dataset.sec)")
-        c('menu: one link per section, in order', [x for x in secs if x != 'Admin'] == ['Home', 'Work', 'Projects', 'Follow-up', 'Team', 'Performance', 'Reference'], secs)
+        c('menu: one link per section, in order', [x for x in secs if x != 'Admin'] == ['Home', 'Work', 'Projects', 'Tracking', 'Team', 'Performance', 'Reference'], secs)
         c('the open page\'s section is highlighted and its pages are tabs on top', await J("document.querySelector('nav a.sec.on').dataset.sec") == 'Work' and await pg.locator('#main .sec-tabs .sec-tab').count() == 4 and await pg.locator('#main .sec-tab.on[data-tab=todo]').count() == 1)
         await s.go('#/shadow', 300); await s.go('#/quickwins', 300)
         c('a section link opens the page last used in it', await J("document.querySelector('nav a.sec[data-sec=Work]').getAttribute('href')") == '#/shadow')

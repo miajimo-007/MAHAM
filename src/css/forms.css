@@ -41,8 +41,8 @@
   flex-wrap: wrap;
 }
 .chip {
-  border: 1px solid #cdd7dd;
-  background: #fff;
+  border: 1px solid color-mix(in srgb, #cdd7dd var(--lt), var(--line));
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   border-radius: 20px;
   padding: 3px 9px;
   font-size: 12px;
@@ -56,7 +56,7 @@
 }
 .note {
   background: var(--warn-soft);
-  color: #7a4a00;
+  color: color-mix(in srgb, #7a4a00 var(--ltt), var(--ink));
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 12.5px;
@@ -88,4 +88,27 @@
 #imppaste {
   font-family: Consolas, monospace;
   font-size: 12px;
+}
+/* "More details" fold in record forms (ui/forms.js) */
+.more-fields {
+  border-top: 1px solid var(--line2);
+  padding-top: 8px;
+}
+.more-fields > summary {
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 13px;
+  color: var(--ink2);
+  padding: 4px 0;
+  list-style-position: inside;
+}
+.more-fields > summary .muted {
+  font-weight: 400;
+  margin-left: 6px;
+}
+.more-fields[open] > summary .muted {
+  display: none;
+}
+.more-fields > .grid-form {
+  margin-top: 8px;
 }

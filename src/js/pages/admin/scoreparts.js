@@ -398,9 +398,7 @@ Calc.saveScoringParts = function (team, weights, custom, msg) {
       if (!out || !out.html) return out;
       const rc = ScorePartsUI.ratingCard();
       if (!rc) return out;
-      const at = out.html.indexOf('<div class="needs-you');
-      const end = at >= 0 ? out.html.indexOf('</div>', at) + 6 : -1;
-      out.html = end > 5 ? out.html.slice(0, end) + rc + out.html.slice(end) : out.html + rc;
+      out.html = deskPut(out.html, 'need', rc); // Manager Desk → Needs you (2026.11.13.3)
       const m0 = out.mount;
       out.mount = root => {
         if (m0) m0(root);

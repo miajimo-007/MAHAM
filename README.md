@@ -136,7 +136,7 @@ docs/                   architecture, data model, permissions, development notes
 
 ## Versioning
 
-Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.11.10.2**. See [CHANGELOG](CHANGELOG.md).
+Versions are dates: `YYYY.MM.DD.n`. Current version: **2026.11.13.7**. See [CHANGELOG](CHANGELOG.md).
 
 ## License
 

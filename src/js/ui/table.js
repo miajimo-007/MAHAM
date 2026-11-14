@@ -1,13 +1,27 @@
 /* MAHAM — Sortable, searchable data table with Excel export. */
 'use strict';
 
+try {
+  if (localStorage.getItem('maham.dense') === '1') document.body.classList.add('dense');
+} catch (e) {
+  /* compact rows: this PC only */
+}
+
 Object.assign(UI, {
   /* ---------- data table ---------- */
   // state persisted per table id in App.tableState
   // bulk: [{ label, ok: row => bool, run: rows => void, cls }] adds tick boxes and an action bar
   // a column with edit: { type: 'select' | 'date', options, ok: row => bool, value: row => v, save: (row, v) => void } is changed right in the table
   table({ id, rows, cols, onRow, empty, pageSize = 100, toolbar = '', exportName, defaultSort, bulk }) {
+    const fresh = !App.tableState[id];
     const st = (App.tableState[id] = App.tableState[id] || { q: '', sort: defaultSort || null, dir: -1, limit: pageSize });
+    if (fresh && UI.viewDefault) {
+      const dv = UI.viewDefault(id);
+      if (dv) {
+        st.dfltView = dv.id;
+        setTimeout(() => UI.viewApply(dv), 0);
+      }
+    } // my default view, once per session
     if (!st.limit) st.limit = pageSize;
     let list = rows;
     /* reference notes: 📝 mark, "Has notes" filter, search inside notes, a Notes column in Excel */
@@ -46,6 +60,27 @@ Object.assign(UI, {
     st.sel = (st.sel || []).filter(x => ids.has(x));
     const sel = new Set(st.sel);
     App.tableRows[id] = { list, cols, exportName, bulk: bk, notes: anyNotes ? r => (nCount(r) ? RefNotes.plain(recOf(r).id) : '') : null };
+    /* a column that is empty for every row listed is not shown (Excel still has it) — 2026.11.13.4 */
+    if (list.length) {
+      const blankV = v => v == null || v === '' || v === '—' || v === '–' || v === '-';
+      const seen = c => {
+        for (const r of list.slice(0, 300)) {
+          try {
+            const v = c.html
+              ? String(c.html(r) ?? '')
+                  .replace(/<[^>]*>/g, '')
+                  .trim()
+              : String(c.get ? (c.get(r) ?? '') : '').trim();
+            if (!blankV(v) || (c.edit && c.edit.ok(r)) || (c.html && /<(button|select|input)/.test(String(c.html(r) || '')))) return true;
+          } catch (e) {
+            return true;
+          }
+        }
+        return false;
+      };
+      const keep = cols.filter(c => c.keep || !c.label || seen(c));
+      if (keep.length && keep.length < cols.length) cols = keep;
+    }
     const selRows = canBulk ? list.filter(r => sel.has(UI.rowId(r))) : [];
     const bar =
       canBulk && selRows.length
@@ -62,7 +97,7 @@ Object.assign(UI, {
         if (c.edit.type === 'date')
           return `<input type="date" class="inl" data-tinl="${id}|${i}|${h(c.key)}" value="${h(v || '')}" title="Change ${h(c.label)}">`;
         const opts = typeof c.edit.options === 'function' ? c.edit.options(r) : c.edit.options;
-        return `<select class="inl" data-tinl="${id}|${i}|${h(c.key)}" title="Change ${h(c.label)}">${opts
+        return `<select class="inl" data-tinl="${id}|${i}|${h(c.key)}" title="Change ${h(c.label)}" style="${selW(opts)}${c.edit.color && c.edit.color(r) ? `;border-left:5px solid ${h(c.edit.color(r))}` : ''}">${opts
           .map(o => {
             const [val, lab] = Array.isArray(o) ? o : [o, o];
             return `<option value="${h(val)}" ${String(v || '') === String(val) ? 'selected' : ''}>${h(lab)}</option>`;
@@ -72,15 +107,37 @@ Object.assign(UI, {
       return c.html ? c.html(r) : h(c.text ? c.text(r) : c.get(r));
     };
     const markCol = cols.findIndex(c => !c.edit && c.label); // the 📝 mark goes in the first plain column
+    /* columns of long text (Subject, To Do, Title …) keep a readable width instead of one word per line; the buttons column
+     * (key 'act') stays fixed at the right edge, so it is never scrolled out of sight; a box in a cell is as wide as its
+     * longest choice ("Accepted", not "Accepte") */
+    const sample = shown.slice(0, 40);
+    const txtLen = c => {
+      const g = c.text || c.get;
+      if (!g || c.edit || !sample.length) return 0;
+      let n = 0;
+      for (const r of sample) {
+        try {
+          n += String(g(r) ?? '').length;
+        } catch (e) {
+          /* skip */
+        }
+      }
+      return n / sample.length;
+    };
+    const colCls = cols.map(c => [c.cls || '', c.key === 'act' ? 'act' : '', txtLen(c) >= 28 ? 'tx' : ''].filter(Boolean).join(' '));
+    const selW = opts => {
+      const n = Math.max(4, ...opts.map(o => String(Array.isArray(o) ? (o[1] ?? o[0]) : o).length));
+      return `width:${Math.min(160, Math.round(n * 7.2 + 32))}px;max-width:none`;
+    };
     const cellM = (c, r, i, ci) =>
       cell(c, r, i) +
       (ci === markCol && nCount(r)
         ? ` <span class="rn-mark" title="${nCount(r)} note${nCount(r) > 1 ? 's' : ''} for future reference">📝</span>`
         : '');
     return `<div class="tbl-wrap" data-tbl="${id}">
-      <div class="tbl-tools"><input class="search" type="search" placeholder="Search…" value="${h(st.q)}" data-tsearch="${id}" aria-label="Search table">${anyNotes ? `<label class="check chip-check rn-flt" title="Only items with notes for future reference"><input type="checkbox" data-tnotes="${id}" ${st.notes ? 'checked' : ''}> 📝 Has notes</label>` : ''}${toolbar}${bar}<span class="grow"></span><span class="muted">${total > shown.length ? `showing ${shown.length.toLocaleString()} of ` : ''}${total.toLocaleString()} row${total === 1 ? '' : 's'}</span>${exportName && App.can('export') ? `<button class="btn sm ghost" data-texport="${id}" title="Export these rows to Excel">⇩ Excel</button>` : ''}</div>
-      <div class="tbl-scroll"><table class="tbl"><thead><tr>${canBulk ? `<th class="sel"><input type="checkbox" data-tselall="${id}" title="Select all shown" ${shown.length && shown.every(r => sel.has(UI.rowId(r))) ? 'checked' : ''}></th>` : ''}${cols.map(c => `<th class="${c.cls || ''}" data-tsort="${id}|${c.key}" style="${c.w ? `width:${c.w}` : ''}">${h(c.label)}${st.sort === c.key ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
-      <tbody>${shown.length ? shown.map((r, i) => `<tr ${onRow ? `data-trow="${id}|${i}" class="click"` : ''}${UI.rowId(r) ? ` data-rid="${h(UI.rowId(r))}"` : ''}${sel.has(UI.rowId(r)) && canBulk ? ' data-sel="1"' : ''}>${canBulk ? `<td class="sel">${bk.some(a => a.ok(r)) ? `<input type="checkbox" data-tsel="${id}|${h(UI.rowId(r))}" ${sel.has(UI.rowId(r)) ? 'checked' : ''} aria-label="Select row">` : ''}</td>` : ''}${cols.map((c, ci) => `<td class="${c.cls || ''} ${/^(Date|Assigned|Due|Finished|Created|Resolved|Expected|Start|End|Presentation)$/.test(c.label) ? 'nw' : ''}">${cellM(c, r, i, ci)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${cols.length + (canBulk ? 1 : 0)}" class="empty">${empty || 'Nothing here yet.'}</td></tr>`}</tbody></table></div>
+      <div class="tbl-tools"><input class="search" type="search" placeholder="Search…" value="${h(st.q)}" data-tsearch="${id}" aria-label="Search table">${UI.viewsBar ? UI.viewsBar(id) : ''}${anyNotes ? `<label class="check chip-check rn-flt" title="Only items with notes for future reference"><input type="checkbox" data-tnotes="${id}" ${st.notes ? 'checked' : ''}> 📝 Has notes</label>` : ''}${toolbar}${bar}<span class="grow"></span><button type="button" class="btn xs ghost tv-dense" data-tdense title="Shorter rows — more of the list on the screen (remembered on this PC)">${document.body.classList.contains('dense') ? '☰ Normal rows' : '☰ Compact rows'}</button><span class="muted">${total > shown.length ? `showing ${shown.length.toLocaleString()} of ` : ''}${total.toLocaleString()} row${total === 1 ? '' : 's'}</span>${exportName && App.can('export') ? `<button class="btn sm ghost" data-texport="${id}" title="Export these rows to Excel">⇩ Excel</button>` : ''}</div>
+      <div class="tbl-scroll"><table class="tbl"><thead><tr>${canBulk ? `<th class="sel"><input type="checkbox" data-tselall="${id}" title="Select all shown" ${shown.length && shown.every(r => sel.has(UI.rowId(r))) ? 'checked' : ''}></th>` : ''}${cols.map((c, ci) => `<th class="${colCls[ci]}" data-tsort="${id}|${c.key}" style="${c.w ? `width:${c.w}` : ''}">${h(c.label)}${st.sort === c.key ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
+      <tbody>${shown.length ? shown.map((r, i) => `<tr ${onRow ? `data-trow="${id}|${i}" class="click"` : ''}${UI.rowId(r) ? ` data-rid="${h(UI.rowId(r))}"` : ''}${sel.has(UI.rowId(r)) && canBulk ? ' data-sel="1"' : ''}>${canBulk ? `<td class="sel">${bk.some(a => a.ok(r)) ? `<input type="checkbox" data-tsel="${id}|${h(UI.rowId(r))}" ${sel.has(UI.rowId(r)) ? 'checked' : ''} aria-label="Select row">` : ''}</td>` : ''}${cols.map((c, ci) => `<td class="${colCls[ci]} ${/^(Date|Assigned|Due|Finished|Created|Resolved|Expected|Start|End|Presentation)$/.test(c.label) ? 'nw' : ''}">${cellM(c, r, i, ci)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${cols.length + (canBulk ? 1 : 0)}" class="empty">${empty || 'Nothing here yet.'}</td></tr>`}</tbody></table></div>
       ${total > shown.length ? `<div class="more"><button class="btn sm" data-tmore="${id}">Show more (${(total - shown.length).toLocaleString()} left)</button></div>` : ''}
     </div>`;
   },
@@ -88,6 +145,20 @@ Object.assign(UI, {
     return (r && (r.id || (r.r && r.r.id))) || '';
   },
   bindTables(root, handlers) {
+    if (UI.bindViews) UI.bindViews(root); // saved views (ui/views.js)
+    root.querySelectorAll('[data-tdense]').forEach(
+      b =>
+        (b.onclick = () => {
+          const on = !document.body.classList.contains('dense');
+          document.body.classList.toggle('dense', on);
+          try {
+            localStorage.setItem('maham.dense', on ? '1' : '');
+          } catch (e) {
+            /* this PC only */
+          }
+          App.render(true);
+        })
+    );
     root.querySelectorAll('[data-tsearch]').forEach(inp => {
       inp.oninput = U.debounce(() => {
         const st = App.tableState[inp.dataset.tsearch];

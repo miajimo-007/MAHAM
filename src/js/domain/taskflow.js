@@ -323,31 +323,86 @@ const TaskFlow = {
     return { all: x.all || '', types: x.types || {} };
   },
   /* this project + this type → this project (all types) → the team's workflow for that type → the team default → the department default → board columns */
+  /* ---------- which workflow — ONE place ----------
+   * KINDS: records that are not project tasks but run on this engine, by collection (follow-ups: domain/followup.js)
+   *   { flow(t), condFail(c, t, who) → reason | '' | undefined (= use the normal rule), validMsg(v, t, reason), canMove(t),
+   *     afterApply(o, t, tr, form), approvers(t, tr), toApprove() → [records], key(t) }
+   * MODES: project modes with their own statuses, by project.mode (Lanes: domain/lanes.js)
+   *   { of(p, type) → workflow for a new task / the board, forTask(t, p) → the task's workflow } */
+  KINDS: {},
+  MODES: {},
+  kindOf(t) {
+    return (t && TaskFlow.KINDS[t.c]) || null;
+  },
+  modeOf(p) {
+    return (p && TaskFlow.MODES[p.mode]) || null;
+  },
+  /* a project + type → its workflow (a project mode first, then the project / team / department scheme) */
   of(p, type) {
+    const m = TaskFlow.modeOf(p);
+    if (m && m.of)
+      try {
+        const w = m.of(p, type);
+        if (w) return w;
+      } catch (e) {
+        console.error('workflow mode', e);
+      }
+    return TaskFlow.scheme(p, type);
+  },
+  /* a task → its workflow (its kind, e.g. a follow-up → its project's mode, e.g. Lanes → the scheme by type) */
+  forTask(t) {
+    const k = TaskFlow.kindOf(t);
+    if (k && k.flow) return k.flow(t);
+    const p = Scrum.proj(t && t.project);
+    const m = TaskFlow.modeOf(p);
+    if (m && m.forTask)
+      try {
+        const w = m.forTask(t, p);
+        if (w) return w;
+      } catch (e) {
+        console.error('workflow mode', e);
+      }
+    return TaskFlow.scheme(p, (t && t.type) || 'Task');
+  },
+  /* the project / team / department scheme (before project modes): ONE set of statuses per project, for every task type —
+     the project's own choice (Edit project → Task statuses) → the team default → the department default → the board columns.
+     (Choices per task type, from before 2026.11.11.7, are no longer used.) */
+  scheme(p) {
+    return TaskFlow.ownFlow(p) || TaskFlow.schemeBase(p);
+  },
+  /* a Kanban / Scrum project with ITS OWN statuses (⚙ Board on its board, 2026.11.12.8): project.board.statuses =
+     [{ id, name, color, cat }] — free moves between them (like a lane). It no longer follows the team / chosen workflow. */
+  _own: new Map(),
+  ownFlow(p) {
+    if (!p || p.mode === 'lanes' || !p.board || !Array.isArray(p.board.statuses) || typeof Lanes === 'undefined') return null;
+    const st = Lanes.cleanStatuses(p.board.statuses);
+    if (!st.length) return null;
+    const key = p.id + '|' + JSON.stringify(st);
+    if (TaskFlow._own.has(key)) return TaskFlow._own.get(key);
+    const w = TaskFlow.norm({
+      id: 'own-' + p.id,
+      name: 'Its own statuses',
+      own: true,
+      start: st[0].name,
+      statuses: st.map(s => ({ name: s.name, cat: s.cat, color: s.color })),
+      trs: st.map(s => ({ id: 'os-' + s.id, name: s.name, from: ['*'], to: s.name })),
+    });
+    if (TaskFlow._own.size > 200) TaskFlow._own.clear();
+    TaskFlow._own.set(key, w);
+    return w;
+  },
+  /* the team / chosen workflow (what a project follows when it has no own statuses) */
+  schemeBase(p) {
     if (!TaskFlow._cache || TaskFlow._cache.ver !== Store.ver) TaskFlow._cache = { ver: Store.ver, m: new Map() };
     const team = p ? Scrum.teamOf(p) : App.viewTeam || 'apps';
     const tr = TaskFlow.teamRec(team),
       d = TaskFlow.dept();
-    type = type || 'Task';
-    const pp = p ? TaskFlow.projPick(tr, p.id) : { all: '', types: {} };
-    const pty = pp.types[type] || '',
-      pick = pp.all,
-      ty = (tr.types || {})[type] || '';
-    const key = team + '|' + pty + '|' + pick + '|' + ty;
+    const pick = p ? TaskFlow.projPick(tr, p.id).all : '';
+    const key = team + '|' + pick;
     if (TaskFlow._cache.m.has(key)) return TaskFlow._cache.m.get(key);
-    const w = TaskFlow.norm(
-      TaskFlow.find(team, pty) ||
-        TaskFlow.find(team, pick) ||
-        TaskFlow.find(team, ty) ||
-        TaskFlow.find(team, tr.use) ||
-        TaskFlow.find(team, d.use) ||
-        TaskFlow.seed(team)
-    );
+    const w = TaskFlow.norm(TaskFlow.find(team, pick) || TaskFlow.find(team, tr.use) || TaskFlow.find(team, d.use) || TaskFlow.seed(team));
     TaskFlow._cache.m.set(key, w);
     return w;
-  },
-  forTask(t) {
-    return TaskFlow.of(Scrum.proj(t && t.project), (t && t.type) || 'Task');
   },
   /* every workflow the project's tasks can follow (one per task type, de-duplicated) */
   allOf(p) {
@@ -404,6 +459,11 @@ const TaskFlow = {
   /* ---------- the engine ---------- */
   /* rules → reasons it fails ('' = ok). who = person id (default me) */
   condFail(c, t, who) {
+    const k = TaskFlow.kindOf(t);
+    if (k && k.condFail) {
+      const x = k.condFail(c, t, who);
+      if (x !== undefined) return x;
+    }
     const p = Scrum.proj(t.project);
     const m = Store.member(who) || {};
     switch (c.k) {
@@ -433,6 +493,11 @@ const TaskFlow = {
     return '';
   },
   validFail(v, t, form) {
+    const x = TaskFlow.validBase(v, t, form);
+    const k = TaskFlow.kindOf(t);
+    return x && k && k.validMsg ? k.validMsg(v, t, x) || x : x;
+  },
+  validBase(v, t, form) {
     const val = k => (form && form[k] != null && form[k] !== '' ? form[k] : t[k]); // custom fields (cf_…) work the same
     switch (v.k) {
       case 'field': {
@@ -489,6 +554,8 @@ const TaskFlow = {
     return (tr.approve || []).some(c => !TaskFlow.condFail(c, t, who));
   },
   approvers(t, tr) {
+    const k = TaskFlow.kindOf(t);
+    if (k && k.approvers) return k.approvers(t, tr);
     const p = Scrum.proj(t.project);
     const team = p ? Scrum.teamOf(p) : 'apps';
     const out = new Set();
@@ -565,6 +632,9 @@ const TaskFlow = {
   },
   /* waiting for me to approve */
   toApprove() {
+    return TaskFlow.toApproveTasks().concat(...Object.values(TaskFlow.KINDS).map(k => (k.toApprove ? k.toApprove() : [])));
+  },
+  toApproveTasks() {
     return Store.all('ptask')
       .filter(t => t.pending && Scrum.canSee(Scrum.proj(t.project)))
       .filter(t => {
@@ -632,7 +702,10 @@ const TaskFlow = {
         text: `${ptKey(t)} “${t.title}”: ${tr.name || tr.to} → ${tr.to}`,
         at: Date.now(),
       });
-    return { r, side };
+    const o = { r, side };
+    const k = TaskFlow.kindOf(t);
+    if (k && k.afterApply) k.afterApply(o, t, tr, form);
+    return o;
   },
   /* one "then" action (moves and automation rules share them) */
   who(a, r, t, p, me) {
@@ -674,17 +747,19 @@ const TaskFlow = {
       if (to && to !== who) tell.add(to);
     }
   },
+  /* may this person move it at all? (a follow-up: its own rule) */
+  canMove(t) {
+    const k = TaskFlow.kindOf(t);
+    if (k && k.canMove) return k.canMove(t);
+    return Scrum.canWork(t) || (Scrum.member(Scrum.proj(t.project)) && !t.assignee);
+  },
   /* run a transition: checks, one save, history, notices → '' or the reason it did not run */
   /* opts.approving: the approver runs a move someone asked for (their "who may" rules are what the approval replaces) */
   run(t, trId, form, opts) {
     opts = opts || {};
     const tr = opts.approving ? TaskFlow.forTask(t).trs.find(x => x.id === trId) : (TaskFlow.moves(t).find(x => x.tr.id === trId) || {}).tr;
     if (!tr) return 'That move is not allowed from ' + (t.status || 'here');
-    if (
-      !opts.approving &&
-      !(TaskFlow.canMove ? TaskFlow.canMove(t) : Scrum.canWork(t) || (Scrum.member(Scrum.proj(t.project)) && !t.assignee))
-    )
-      return 'You can only move your own items';
+    if (!opts.approving && !TaskFlow.canMove(t)) return 'You can only move your own items';
     if (!opts.approving && t.pending) return 'Waiting for an approval — ' + (t.pending.trName || '');
     const miss = opts.approving ? (tr.valid || []).map(v => TaskFlow.validFail(v, t, form)).filter(Boolean) : TaskFlow.check(t, tr, form);
     if (miss.length) return 'First ' + miss.join(', ');
@@ -806,8 +881,6 @@ Scrum.colIndex = t => {
 (function wireTaskForm() {
   const S = Schemas.ptask;
   if (!S) return;
-  const d0 = S.defaults;
-  S.defaults = () => Object.assign(d0(), { status: TaskFlow.of(Scrum.proj(UI._recProject), 'Task').start });
   const st = S.fields.find(f => f.key === 'status');
   if (st)
     st.options = () => {
@@ -831,42 +904,49 @@ Scrum.colIndex = t => {
     blank: '—',
     showIf: r => !!r && (Scrum.isDone(r) || !!r.resolution),
   });
-  const bs = S.beforeSave;
-  S.beforeSave = function (r, before) {
-    bs.call(this, r, before);
-    if (!before || !before.id) {
-      r.reporter = r.reporter || App.me;
-      const w = TaskFlow.forTask(r);
-      if (!r.status || !w.statuses.some(s => s.name === r.status)) r.status = w.start;
-    }
-    if (before && before.id && (before.type || 'Task') !== (r.type || 'Task')) {
-      const w = TaskFlow.forTask(r);
-      if (!w.statuses.some(x => x.name === r.status)) {
-        const c = TaskFlow.cat(before);
-        r.status = (w.statuses.find(x => U.lc(x.name) === U.lc(r.status)) || w.statuses.find(x => x.cat === c) || { name: w.start }).name;
-        r.hist = [...(before.hist || []), { at: Date.now(), by: App.me, from: before.status, to: r.status, tr: 'Type changed' }].slice(-60);
+  Schemas.extend('ptask', {
+    name: 'workflow',
+    defaults(d) {
+      d.status = TaskFlow.of(Scrum.proj(UI._recProject), 'Task').start;
+    },
+    after(r, before) {
+      if (!before || !before.id) {
+        r.reporter = r.reporter || App.me;
+        const w = TaskFlow.forTask(r);
+        if (!r.status || !w.statuses.some(s => s.name === r.status)) r.status = w.start;
       }
+      if (before && before.id && (before.type || 'Task') !== (r.type || 'Task')) {
+        const w = TaskFlow.forTask(r);
+        if (!w.statuses.some(x => x.name === r.status)) {
+          const c = TaskFlow.cat(before);
+          r.status = (w.statuses.find(x => U.lc(x.name) === U.lc(r.status)) || w.statuses.find(x => x.cat === c) || { name: w.start }).name;
+          r.hist = [...(before.hist || []), { at: Date.now(), by: App.me, from: before.status, to: r.status, tr: 'Type changed' }].slice(
+            -60
+          );
+        }
+        S._last = null;
+        return;
+      }
+      if (TaskFlow._running || !before || !before.id || before.status === r.status) {
+        S._last = null;
+        return;
+      }
+      S._last = before; // the form changed the status: validate() below checks it is a legal move, then records it
+      const ms = TaskFlow.movesTo(before, r.status).filter(m => m.ok);
+      const tr = ms[0] && ms[0].tr;
+      if (tr) {
+        const { r: x } = TaskFlow.apply(before, tr, { comment: r.comment, resolution: r.resolution });
+        for (const k of ['resolution', 'hist', 'assignee'])
+          if (k !== 'assignee' || (tr.post || []).some(a => a.k === 'assign')) r[k] = x[k];
+        if (!Scrum.isDone(r) && !r.resolution) r.resolution = '';
+      }
+    },
+
+    validate(out) {
+      const b = S._last;
       S._last = null;
-      return;
-    }
-    if (TaskFlow._running || !before || !before.id || before.status === r.status) {
-      S._last = null;
-      return;
-    }
-    S._last = before; // the form changed the status: validate() below checks it is a legal move, then records it
-    const ms = TaskFlow.movesTo(before, r.status).filter(m => m.ok);
-    const tr = ms[0] && ms[0].tr;
-    if (tr) {
-      const { r: x } = TaskFlow.apply(before, tr, { comment: r.comment, resolution: r.resolution });
-      for (const k of ['resolution', 'hist', 'assignee']) if (k !== 'assignee' || (tr.post || []).some(a => a.k === 'assign')) r[k] = x[k];
-      if (!Scrum.isDone(r) && !r.resolution) r.resolution = '';
-    }
-  };
-  const v0 = S.validate;
-  S.validate = out => {
-    const b = S._last;
-    S._last = null;
-    const x = b ? TaskFlow.legal(b, out, { comment: out.comment, resolution: out.resolution }) : '';
-    return x || (v0 ? v0(out) : '');
-  };
+      const x = b ? TaskFlow.legal(b, out, { comment: out.comment, resolution: out.resolution }) : '';
+      return x;
+    },
+  });
 })();

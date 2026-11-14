@@ -4,13 +4,32 @@
 Object.assign(UI, {
   /* ---------- form fields ---------- */
   memberOptions(sel, { all, includeInactive, blank } = {}) {
+    /* one rule: the people of the team being viewed; then, at the end and labelled with their own team, anyone else who is
+     * already chosen in this box, and the super admin (so they can always pick themselves, but are never mixed into the team) */
     const team = includeInactive ? Store.team() : Store.activeTeam();
-    if (sel && !team.some(m => m.id === sel) && Store.member(sel)) team.unshift(Store.member(sel));
+    const inTeam = new Set(team.map(m => m.id));
+    const outside = [...new Set([sel, Store.realSuper() ? App.me : ''])]
+      .filter(id => id && !inTeam.has(id))
+      .map(id => Store.member(id))
+      .filter(Boolean);
+    const where = m => (Store.topRole(m.role) ? 'Director level' : Store.teamName(m.team || 'apps'));
+    const opt = (m, label) => `<option value="${h(m.id)}" ${m.id === sel ? 'selected' : ''}>${h(label)}</option>`;
     return (
       (blank ? `<option value="">${blank === true ? '—' : h(blank)}</option>` : '') +
       (all ? `<option value="">All team</option>` : '') +
-      team.map(m => `<option value="${h(m.id)}" ${m.id === sel ? 'selected' : ''}>${h(m.name)}</option>`).join('')
+      team.map(m => opt(m, UI.personName(m.id))).join('') +
+      outside.map(m => opt(m, `${m.short || m.name} (${where(m)})`)).join('')
     );
+  },
+  /* the name shown in name boxes: the short name everyone sees in the lists (e.g. "Layla"); the full name is added only when
+   * two people share a short name. Admin screens and exports keep full names. */
+  personName(id) {
+    const m = Store.member(id);
+    const s = Store.memberShort(id);
+    if (!m || Store.anon(id)) return s;
+    return Store.members().some(x => x.id !== m.id && x.active !== false && (x.short || x.name) === s) && m.name !== s
+      ? `${s} (${m.name})`
+      : s;
   },
   options(list, sel, blank) {
     const arr = [...list].map(o => (Array.isArray(o) ? o : [o, o]));
@@ -100,6 +119,51 @@ Object.assign(UI, {
     return `<div class="fld ${f.span ? 'span' + f.span : ''} ${f.type === 'bool' ? 'fld-bool' : ''} ${f.cls || ''}"><label for="${id}">${h(f.label)}${f.required ? ' <i>*</i>' : ''}</label>${input}${f.hint ? `<small>${h(f.hint)}</small>` : ''}</div>`;
   },
   /* fields marked flag: true (priority, FU, milestone …) sit together on one row */
+  /* every work form in the same order (2026.11.13.2): the main text (To Do / Subject / Title, full width) → who → kind
+   * (task type, source, module, type, priority) → Reference (half width) → dates → status → the tick boxes → the rest
+   * (notes, manager boxes, workflow, custom fields) in their own order. Only the screen order changes, never the data. */
+  FORM_ORDER: new Set(['todo', 'shadow', 'quickwin', 'central', 'ptask', 'mytask']),
+  FORM_RANK: {
+    task: 0,
+    subject: 0,
+    title: 0,
+    analyst: 1,
+    assignee: 1,
+    requester: 1,
+    taskType: 2,
+    source: 2,
+    module: 2,
+    type: 2,
+    party: 2,
+    priority: 2,
+    ref: 3,
+    reqId: 3,
+    redmine: 3,
+    qwId: 3,
+    date: 4,
+    assigned: 4,
+    duration: 4,
+    extReason: 4,
+    start: 4,
+    plan: 4,
+    due: 4,
+    expected: 4,
+    next: 4,
+    minutes: 4,
+    finish: 4,
+    finishNote: 4,
+    status: 5,
+    resolution: 5,
+    approval: 5,
+  },
+  orderFields(coll, list) {
+    if (!UI.FORM_ORDER.has(coll)) return list;
+    const rank = f => (f.flag ? 6 : (UI.FORM_RANK[f.key] ?? 7));
+    return list
+      .map((f, i) => [f, i])
+      .sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1])
+      .map(x => x[0]);
+  },
   groupFlags(fields, render) {
     const out = [];
     let row = [];
@@ -202,7 +266,7 @@ Object.assign(UI, {
       if (ym && Store.lockMap()[`${rec.team || App.viewTeam || 'apps'}|${ym}`]) return false;
     }
     if (Store.mayChange && !Store.mayChange(rec)) return false;
-    const f = S.fields.find(x => x.key === key);
+    const f = (S.fieldsFor ? S.fieldsFor(rec) : S.fields).find(x => x.key === key);
     if (!f || (f.showIf && !f.showIf(rec)) || f.type === 'readonly') return false;
     const mgr = S.mgrOk ? S.mgrOk(rec) : App.can(S.mgrPerm || 'manageTeam');
     const dir = S.fullEdit ? S.fullEdit(rec) : (App.isDir() || App.isSuper()) && App.can('assignToManagers');
@@ -231,6 +295,7 @@ Object.assign(UI, {
       if (!rec) return;
     } // a check opens the To Do it checks
     const S = Schemas[coll];
+    if (S.prepare && rec) rec = S.prepare(rec); // Schemas.extend: e.g. an old follow-up read the new way
     const isNew = !rec || !rec.id;
     if (coll === 'todo' && !isNew && rec.analyst === App.me && typeof Admin !== 'undefined' && Admin.todoMark)
       try {
@@ -240,8 +305,20 @@ Object.assign(UI, {
       }
     UI._recProject = (rec && rec.project) || ''; // defaults() of project tasks need to know the project
     const base = Object.assign({ c: coll }, S.defaults ? S.defaults() : {}, rec || {});
+    if (
+      isNew &&
+      base.analyst === App.me &&
+      !(rec && rec.analyst) &&
+      App.viewTeam &&
+      App.viewTeam !== '*' &&
+      Store.realSuper() &&
+      !Store.team().some(m => m.id === App.me) &&
+      S.fields.some(f => f.key === 'analyst' && f.type === 'member')
+    )
+      base.analyst = ''; // another team: pick the person
     UI._recProject = base.project || '';
     UI._recBase = base;
+    const allFields = UI.orderFields(coll, S.fieldsFor ? S.fieldsFor(base) : S.fields); // Schemas.extend: fields added by other files (custom fields, Lane …); work forms in one order
     const lockYm = !isNew && Store.FAIR_COLLS.has(coll) && !App.can('lockScores') ? Store.recMonth(base) : '';
     const lockedMonth = !!(lockYm && Store.lockMap()[`${base.team || App.viewTeam || 'apps'}|${lockYm}`]);
     const notMine = !isNew && Store.mayChange && !Store.mayChange(base); // someone else's item, and no "Change or delete other people's items"
@@ -249,8 +326,12 @@ Object.assign(UI, {
     const mgr = (S.mgrOk ? S.mgrOk(base) : App.can(S.mgrPerm || 'manageTeam')) && !ro;
     const dir = (S.fullEdit ? S.fullEdit(base) : (App.isDir() || App.isSuper()) && App.can('assignToManagers')) && !ro;
     const lockedNow = !mgr && S.lockedFields ? S.lockedFields(base) : [];
-    const fields = S.fields
+    /* a box only the manager (or director) fills, still empty, is left out for everyone else: an analyst's new quick win no
+     * longer shows four grey boxes they cannot use. Once it holds something (e.g. the QW ID after approval) it shows, read-only. */
+    const blank = v => v == null || v === '' || v === false || (Array.isArray(v) && !v.length);
+    const fields = allFields
       .filter(f => !f.showIf || f.showIf(base))
+      .filter(f => ro || !((f.mgr && !mgr) || (f.dir && !dir)) || !blank(base[f.key]))
       .map(f =>
         ro || (f.mgr && !mgr) || (f.dir && !dir) || lockedNow.includes(f.key)
           ? Object.assign({}, f, {
@@ -260,10 +341,19 @@ Object.assign(UI, {
             })
           : f
       );
+    /* boxes marked more: true (or more(base) → true) fold under "More details", open by itself when one of them holds a value */
+    const defs = S.defaults ? S.defaults() : {};
+    const isMore = f => {
+      const o = f._orig || f;
+      return typeof o.more === 'function' ? !!o.more(base) : !!o.more;
+    };
+    const moreF = fields.filter(isMore),
+      mainF = fields.filter(f => !isMore(f));
+    const moreOpen = moreF.some(f => (!blank(base[f.key]) && String(base[f.key]) !== String(defs[f.key] ?? '')) || f.required);
     const roVal = (f, v) => {
       const o = f._orig;
       if (!o) return v;
-      if (o.type === 'member' || o.key === 'manager') return Store.memberName(v);
+      if (o.type === 'member' || o.key === 'manager' || o.key === 'assignee') return UI.personName(v);
       if (o.type === 'bool') return v ? 'Yes' : 'No';
       if (o.type === 'members') return (v || []).map(Store.memberShort).join(', ');
       if (o.type === 'date') return U.fmtDate(v);
@@ -274,13 +364,57 @@ Object.assign(UI, {
       !isNew && base._ts
         ? `<div class="meta">Last edited by <b>${h(Store.memberShort(base._by) || base._by)}</b> · ${h(U.fmtTs(base._ts))}</div>`
         : '';
+    const otherTeam =
+      isNew &&
+      Store.TEAM_SCOPED.has(coll) &&
+      App.viewTeam &&
+      App.viewTeam !== '*' &&
+      App.viewTeam !== ((Store.member(App.me) || {}).team || 'apps');
+    const canConvert =
+      !isNew &&
+      !ro &&
+      typeof Conv !== 'undefined' &&
+      Conv.KINDS[coll] &&
+      Object.keys(Conv.KINDS).some(k => k !== coll && !Conv.why(base, k));
+    const showSeen = coll === 'todo' && !isNew && base.analyst !== App.me && typeof Admin !== 'undefined' && Admin.canSee && Admin.canSee();
+    // the dialog, top to bottom
+    const body = [
+      otherTeam
+        ? `<div class="insights addto"><div>➕ Adding to <b>${h(Store.teamName(App.viewTeam))}</b> — switch team at the top to add it somewhere else.${Store.OWN_WORK.has(coll) ? ' Work is always saved in the team of the person it is for.' : ''}</div></div>`
+        : '',
+      `<form id="recform" class="grid-form" novalidate>${UI.groupFlags(mainF, f => UI.field(f, roVal(f, base[f.key])))}${moreF.length ? `<details class="fld span2 more-fields"${moreOpen ? ' open' : ''}><summary>More details <span class="muted small">${h(moreF.map(f => (f._orig || f).label).join(' · '))}</span></summary><div class="grid-form">${UI.groupFlags(moreF, f => UI.field(f, roVal(f, base[f.key])))}</div></details>` : ''}</form>`,
+      notMine && !lockedMonth
+        ? `<p class="note">🔒 Belongs to <b>${h(Store.memberShort(Store.recOwner(Store.db.get(base.id) || base)))}</b> — only they, or someone given “Change or delete other people's items”, can change or delete it.</p>`
+        : '',
+      lockedMonth
+        ? `<p class="note">🔒 ${h(Store.monthLabel(lockYm))} is locked — scores for this month are final, so only your manager can change it.</p>`
+        : '',
+      lockedNow.length ? '<p class="note">🔒 Approved — the details are locked. Your manager can still change them.</p>' : '',
+      S.formNote ? `<p class="note">${S.formNote}</p>` : '',
+      !isNew && S.formExtra ? S.formExtra(base) : '',
+      typeof Conv !== 'undefined' ? Conv.note(base) : '',
+      showSeen
+        ? `<div class="meta">Given ${U.fmtDate(base.assigned)} to ${h(Store.memberShort(base.analyst))} · ${Admin.seenLabel(base, true)}</div>`
+        : '',
+      meta,
+      !isNew && typeof WorkLinks !== 'undefined' ? WorkLinks.box(base) : '',
+      !isNew && typeof RefNotes !== 'undefined' ? RefNotes.box(base) : '',
+      !isNew && typeof KBUI !== 'undefined' ? KBUI.box(base) : '',
+    ].join('');
+    const actions = [
+      canDel ? '<button class="btn danger ghost" data-del>Delete</button>' : '',
+      canConvert ? '<button class="btn ghost" data-convert>⇄ Convert to…</button>' : '',
+      '<span class="grow"></span>',
+      `<button class="btn" data-cancel>${ro ? 'Close' : 'Cancel'}</button>`,
+      ro ? '' : `<button class="btn primary" data-save>${isNew ? 'Add' : 'Save'}</button>`,
+    ].join('');
     UI.modal({
       title:
         opts.title ||
         (ro ? 'View ' : isNew ? 'New ' : 'Edit ') + S.single + (!isNew && S.keyOf && S.keyOf(base) ? ' · ' + S.keyOf(base) : ''),
       wide: fields.length > 6,
-      body: `${isNew && Store.TEAM_SCOPED.has(coll) && App.viewTeam && App.viewTeam !== ((Store.member(App.me) || {}).team || 'apps') ? `<div class="insights addto"><div>➕ Adding to <b>${h(Store.teamName(App.viewTeam))}</b> — switch team at the top to add it somewhere else.</div></div>` : ''}<form id="recform" class="grid-form" novalidate>${UI.groupFlags(fields, f => UI.field(f, roVal(f, base[f.key])))}</form>${notMine && !lockedMonth ? `<p class="note">🔒 Belongs to <b>${h(Store.memberShort(Store.recOwner(Store.db.get(base.id) || base)))}</b> — only they, or someone given “Change or delete other people's items”, can change or delete it.</p>` : ''}${lockedMonth ? `<p class="note">🔒 ${h(Store.monthLabel(lockYm))} is locked — scores for this month are final, so only your manager can change it.</p>` : ''}${lockedNow.length ? '<p class="note">🔒 Approved — the details are locked. Your manager can still change them.</p>' : ''}${S.formNote ? `<p class="note">${S.formNote}</p>` : ''}${!isNew && S.formExtra ? S.formExtra(base) : ''}${typeof Conv !== 'undefined' ? Conv.note(base) : ''}${coll === 'todo' && !isNew && base.analyst !== App.me && typeof Admin !== 'undefined' && Admin.canSee && Admin.canSee() ? `<div class="meta">Given ${U.fmtDate(base.assigned)} to ${h(Store.memberShort(base.analyst))} · ${Admin.seenLabel(base, true)}</div>` : ''}${meta}${!isNew && typeof RefNotes !== 'undefined' ? RefNotes.box(base) : ''}`,
-      actions: `${canDel ? '<button class="btn danger ghost" data-del>Delete</button>' : ''}${!isNew && !ro && typeof Conv !== 'undefined' && Conv.KINDS[coll] && Object.keys(Conv.KINDS).some(k => k !== coll && !Conv.why(base, k)) ? '<button class="btn ghost" data-convert>⇄ Convert to…</button>' : ''}<span class="grow"></span><button class="btn" data-cancel>${ro ? 'Close' : 'Cancel'}</button>${ro ? '' : `<button class="btn primary" data-save>${isNew ? 'Add' : 'Save'}</button>`}`,
+      body,
+      actions,
       onMount: w => {
         const form = w.querySelector('#recform');
         w.querySelectorAll('[data-min]').forEach(
@@ -292,6 +426,8 @@ Object.assign(UI, {
         );
         if (S.onFormMount) S.onFormMount(form, base);
         if (!isNew && typeof RefNotes !== 'undefined') RefNotes.bind(w, base);
+        if (!isNew && typeof KBUI !== 'undefined') KBUI.bind(w, base);
+        if (!isNew && typeof WorkLinks !== 'undefined') WorkLinks.bind(w, base);
         w.querySelector('[data-cancel]').onclick = UI.tryClose;
         form.addEventListener('input', e => {
           const f = e.target.closest('.fld');
@@ -363,6 +499,7 @@ Object.assign(UI, {
           UI.closeModal();
           UI.saveUndo([out, ...extra, ...more], msg || opts.savedMsg || (isNew ? `${S.single} added` : 'Saved'));
           if (opts.after) opts.after(out);
+          if (S.afterSaved) S.afterSaved(out, base);
           App.render();
         };
         const save = async () => {

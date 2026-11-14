@@ -10,6 +10,24 @@
 .hello h1 {
   font-size: 24px;
 }
+/* Analyst Desk (2026.11.13.3): greeting, date and Today: buttons on one slim line */
+.hello.one {
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 8px 14px;
+}
+.hello.one h1 {
+  font-size: 17px;
+}
+.hello.one .hl-date {
+  margin: 0;
+}
+.hello.one .att-today {
+  margin-left: auto;
+}
+.att-today .off-note {
+  font-size: 12px;
+}
 .att-today {
   display: flex;
   gap: 6px;
@@ -22,9 +40,9 @@
   gap: 10px;
   margin-bottom: 10px;
 }
-.quick .q-row:nth-child(2) {
-  grid-template-columns: 1fr 200px;
-}
+.quick .q-row.q-subj {
+  grid-template-columns: minmax(0, 1fr) 180px;
+} /* Subject wide, Reference small (a class: the "Again" chips row shifted nth-child) */
 .quick .q-row.end {
   grid-template-columns: 1fr auto;
   align-items: end;

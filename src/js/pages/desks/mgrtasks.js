@@ -32,7 +32,7 @@ function chainButtons(mt) {
 
 P.mgrtasks = () => {
   if (!App.isMgr() && !App.isSuper() && !App.isActing())
-    return { title: 'Tasks from Director', html: empty('Only managers and the director use this page.') };
+    return { title: 'Tasks from the director', html: empty('Only managers and the director use this page.') };
   const s = ps('mgr');
   let rows = mineOrAll(Store.all('mgrtask')).map(mtDerive);
   if (s.mgr) rows = rows.filter(x => x.r.manager === s.mgr);
@@ -110,7 +110,7 @@ P.mgrtasks = () => {
     ],
   })}`;
   return {
-    title: top ? 'Manager Tasks' : 'Tasks from Director',
+    title: top ? 'Manager tasks' : 'Tasks from the director',
     html,
     mount(root) {
       UI.bindTables(root, { mgr: x => (x.group ? groupDialog(x) : UI.editRecord('mgrtask', x.r)) });

@@ -7,12 +7,12 @@
   --line2: #eef2f4;
   --bg: #f3f6f8;
   --card: #ffffff;
-  --side: #0c2a3d;
-  --side2: #123a52;
+  --side: var(--brand-side, #0c2a3d);
+  --side2: var(--brand-side2, #123a52);
   --sideink: #c9dbe6;
-  --accent: #0e7c86;
-  --accent2: #0e4a6b;
-  --accent-soft: #e3f3f4;
+  --accent: var(--brand-accent, #0e7c86);
+  --accent2: var(--brand-accent2, #0e4a6b);
+  --accent-soft: var(--brand-soft, #e3f3f4);
   --good: #1f8a4c;
   --good-soft: #e3f4ea;
   --warn: #b86e00;

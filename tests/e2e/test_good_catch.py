@@ -5,7 +5,7 @@ async def main():
     async with app_session() as s:
         pg = s.page; J = s.js
         await s.sign_in_as('yousef'); t = await s.go('#/oncall')
-        c('menu: Good Catch (Follow-up) and On-Call sheet (Team & Time)', 'Good Catch' in await pg.inner_text('nav') and 'On-Call sheet' in await pg.inner_text('nav') )
+        c('menu: Good Catch (Tracking) and On-Call sheet (Team & Time)', 'Good Catch' in await pg.inner_text('nav') and 'On-Call sheet' in await pg.inner_text('nav') )
         await s.go('#/oncall/goodcatch'); await pg.click('[data-add="gcatch"]'); await pg.wait_for_selector('#recform')
         c('patient-privacy reminder on the form', 'identify a patient' in await pg.inner_text('.modal'))
         await pg.fill('#recform [name=title]', 'Allergy banner hidden on small screens'); await pg.select_option('#recform [name=kind]', 'Enhancement opportunity')

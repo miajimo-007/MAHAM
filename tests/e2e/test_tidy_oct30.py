@@ -23,7 +23,7 @@ async def main():
         c('manager desk title shown once', t.count('Manager desk') == 0)
         c('no empty "From the director" box', 'No open tasks from the director' not in t)
         c('overdue row has Ask for update', await pg.locator('[data-nudge="td-a1"]').count() == 1)
-        await pg.locator('[data-nudge="td-a1"]').click(); await pg.wait_for_timeout(300)
+        await s.open_watch(); await pg.locator('[data-nudge="td-a1"]').click(); await pg.wait_for_timeout(300)
         c('nudge saved', await J("Store.get('td-a1').nudgedOn === U.todayStr()"))
         c('no half-empty rows', await J("[...document.querySelectorAll('#main .cols2')].every(el => el.children.length !== 1)"))
         await s.sign_in_as('yousef'); t = await s.go('#/home', 400)

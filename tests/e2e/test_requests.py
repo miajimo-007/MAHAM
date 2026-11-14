@@ -42,7 +42,7 @@ async def main():
         c('manager is told it goes to the director', 'go to the director' in note); await pg.click('[data-ok]'); await pg.wait_for_timeout(300)
         c('now Pending director, attendance not yet written', await s.js(f"Store.get('{rid}').status") == 'Pending director' and await s.js(f"!Store.get('att-{thu}-yousef')"))
         # 3 director approves (final)
-        await s.sign_in_as('khalid'); t = await s.go('#/home'); c('Director Desk shows it waiting', 'Needs your attention' in t and 'Approval' in t and 'Family trip' in t)
+        await s.sign_in_as('khalid'); t = await s.go('#/home'); c('Director Desk shows it waiting', 'Waiting for your approval' in t and 'Approval' in t and 'Family trip' in t)
         await pg.click(f'[data-rqok="{rid}"]'); await pg.wait_for_selector('#rqd'); await pg.fill('#rqd [name=comment]', 'Enjoy'); await pg.click('[data-ok]'); await pg.wait_for_timeout(300)
         c('Completed', await s.js(f"Store.get('{rid}').status") == 'Completed')
         att = await s.js(f"[Store.get('att-{thu}-yousef'), Store.get('att-{sun}-yousef'), Store.get('att-' + U.addDays('{thu}', 1) + '-yousef')]")

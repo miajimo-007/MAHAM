@@ -67,10 +67,10 @@ async def main():
         await s.js("UI.closeModal()")
         await s.js(f"Store.save(Object.assign({{}}, Store.get('{nr['id']}'), {{ next: U.todayStr() }}))")
         t = await s.go('#/home', 600)
-        c('Home: "Central chases due" with Chased today', 'Central chases due' in t and 'Dose range check' in t)
+        c('Home: "Follow-up chases due" with Chased today', 'Follow-up chases due' in t and 'Dose range check' in t)
         # ---------- summary, manager desk, export ----------
         await s.sign_in_as('apps-mgr'); t = await s.go('#/manager', 700)
-        c('Manager desk: Central card (open, escalated, oldest)', 'Central follow-ups' in t and 'open' in t)
+        c('Manager desk: External follow-ups card (open, escalated, oldest)', 'External follow-ups' in t and 'open' in t)
         await s.go('#/central', 600); await pg.click('[data-rtab="summary"]'); await pg.wait_for_timeout(400); t = await pg.inner_text('#main')
         c('Summary: by step, by module, oldest 10, per analyst', all(x in t for x in ['Open by step', 'Open by module', 'Oldest 10 open', 'Per analyst']))
         await pg.click('[data-rtab="list"]'); await pg.wait_for_timeout(300)

@@ -175,7 +175,7 @@ P.workdash = () => {
       ${card(
         'Projects',
         projs.length
-          ? `<table class="tbl"><thead><tr><th>Project</th><th class="num">Done</th><th class="num">Open</th><th class="num">Overdue</th><th style="width:22%">Done %</th></tr></thead><tbody>${projs
+          ? `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Project</th><th class="num">Done</th><th class="num">Open</th><th class="num">Overdue</th></tr></thead><tbody>${projs
               .map(p => {
                 const it = all.filter(t => t.project === p.id && t.status !== 'Canceled');
                 const d = it.filter(t => Scrum.isDone(t)).length;
@@ -187,9 +187,9 @@ P.workdash = () => {
               .sort((a, b) => b.l - a.l || b.o - a.o)
               .map(
                 x =>
-                  `<tr><td><a class="link" href="#/project/${h(x.p.id)}">${h(x.p.name)}</a></td><td class="num">${x.d}</td><td class="num">${x.o}</td><td class="num ${x.l ? 't-bad strong' : ''}">${x.l || ''}</td><td>${UI.bar(Math.round((100 * x.d) / x.it.length))}</td></tr>`
+                  `<tr><td><a class="link" href="#/project/${h(x.p.id)}">${h(x.p.name)}</a><div class="wd-done" title="${Math.round((100 * x.d) / x.it.length)}% done">${UI.bar(Math.round((100 * x.d) / x.it.length))}<span class="muted small">${Math.round((100 * x.d) / x.it.length)}% done</span></div></td><td class="num">${x.d}</td><td class="num">${x.o}</td><td class="num ${x.l ? 't-bad strong' : ''}">${x.l || ''}</td></tr>`
               )
-              .join('')}</tbody></table>`
+              .join('')}</tbody></table></div>`
           : empty('No projects.')
       )}
       ${card(
@@ -211,7 +211,7 @@ P.workdash = () => {
                 .slice(0, 30)
                 .map(
                   t =>
-                    `<div class="li click" data-edit="ptask|${h(t.id)}"><span class="mono small">${h(Work.key(t))}</span> ${h(t.title)} <span class="t-bad small">· due ${h(U.fmtDate(t.due))}</span> <span class="muted small">· ${h(t.assignee ? Store.memberShort(t.assignee) : 'unassigned')} · ${h(t.status)}</span></div>`
+                    `<div class="li click" data-edit="ptask|${h(t.id)}"><span class="mono small li-key">${h(Work.key(t))}</span><span class="li-title">${h(t.title)}<div class="muted small">${h(t.assignee ? Store.memberShort(t.assignee) : 'unassigned')} · ${typeof LanesUI !== 'undefined' ? LanesUI.chip(t) : h(t.status)}</div></span><span class="t-bad small li-meta">due ${h(U.fmtDate(t.due))}</span></div>`
                 )
                 .join('')}</div>`
             )

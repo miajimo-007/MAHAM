@@ -64,12 +64,12 @@ P.projects = sub => {
         : Scrum.hasTask(p)
           ? 'has a task'
           : 'view only';
-  const html = `${special ? '' : '<div class="kpis k4">'}${special ? '' : UI.kpi('Active projects', allRows.filter(x => x.open).length, '')}${special ? '' : UI.kpi('🟢 On track', n('green'), '', 'sc-a') + UI.kpi('🟡 At risk', n('amber'), '', n('amber') ? 'sc-c' : '')}${special ? '' : UI.kpi('🔴 Off track', n('red'), '', n('red') ? 'sc-e' : '') + '</div>'}
-  <div class="tabs">${tabs.map(([k, l]) => `<a class="tab ${tab === k ? 'on' : ''}" href="#/projects/${k}" data-pltab="${k}">${l} ${(c => (c === '' ? '' : `<span class="count">${c}</span>`))({ mine: vis.filter(isMine).length, team: vis.filter(p => my.has(Scrum.teamOf(p))).length, all: vis.length, portfolio: (wide ? vis : vis.filter(p => my.has(Scrum.teamOf(p)))).length, ideas: PM2.toDecide().length || '', workload: '', lessons: '' }[k])}</a>`).join('')}</div>
+  const html = `  <div class="tabs">${tabs.map(([k, l]) => `<a class="tab ${tab === k ? 'on' : ''}" href="#/projects/${k}" data-pltab="${k}">${l} ${(c => (c === '' ? '' : `<span class="count">${c}</span>`))({ mine: vis.filter(isMine).length, team: vis.filter(p => my.has(Scrum.teamOf(p))).length, all: vis.length, portfolio: (wide ? vis : vis.filter(p => my.has(Scrum.teamOf(p)))).length, ideas: PM2.toDecide().length || '', workload: '', lessons: '' }[k])}</a>`).join('')}</div>
   ${
     special
       ? { workload: () => PM2V.workload(), ideas: () => PM2V.requests(), lessons: () => PM2V.lessons() }[tab]()
-      : `<div class="page-actions">${filterBar('proj', flt)}${Scrum.canCreate() ? `${PM2.templates().length ? '<button class="btn" id="fromtpl">＋ From template</button>' : ''}${addBtn('project', 'New project')}` : ''}</div>
+      : `<div class="page-actions">${filterBar('proj', flt)}<span class="grow"></span>${Scrum.canCreate() ? `${PM2.templates().length ? '<button class="btn" id="fromtpl">＋ From template</button>' : ''}${addBtn('project', 'New project')}` : ''}</div>
+  ${listSum([`<b>${rows.length}</b> listed`, `<b>${allRows.filter(x => x.open).length}</b> active`, `🟢 <b>${n('green')}</b> on track`, `🟡 <b class="t-warn">${n('amber')}</b> at risk`, `🔴 <b class="t-bad">${n('red')}</b> off track`], { noLink: true })}
   ${
     tab === 'portfolio'
       ? portfolio(rows)
@@ -93,12 +93,7 @@ P.projects = sub => {
               get: x => x.r.category || '',
             },
             { key: 'team', label: 'Team', get: x => Store.teamName(Scrum.teamOf(x.r)) },
-            {
-              key: 'manager',
-              label: 'Owner',
-              html: x => `${h(Store.memberShort(x.r.manager))} <span class="muted small">${h(Store.titleOf(x.r.manager))}</span>`,
-              get: x => Store.memberShort(x.r.manager),
-            },
+            { key: 'manager', label: 'Owner', html: x => `${h(Store.memberShort(x.r.manager))}`, get: x => Store.memberShort(x.r.manager) },
             { key: 'me', label: 'Me', html: x => `<span class="muted small">${role(x.r)}</span>`, get: x => role(x.r) },
             { key: 'members', label: 'Members', cls: 'num', get: x => Scrum.people(x.r).length },
             {
@@ -129,7 +124,7 @@ P.projects = sub => {
               html: x =>
                 Flow.of(x.r)
                   ? `${h(Flow.stageOf(x.r).name)}${x.r.pending ? ' <span class="badge warn">approval</span>' : ''}${Flow.stuck(x.r) ? ` <span class="badge bad">${Flow.daysIn(x.r)}d</span>` : ''}`
-                  : h(x.r.status),
+                  : h(UI.statusLabel(x.r.status)),
               get: x => (Flow.of(x.r) ? Flow.stageOf(x.r).name : x.r.status),
             },
             {

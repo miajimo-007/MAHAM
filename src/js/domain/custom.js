@@ -95,7 +95,8 @@ const Custom = {
   /* ---------- menu ---------- */
   navLabel(k, d) {
     const n = Custom.get('nav', {})[k];
-    if (k === 'info' && n && /srs|e-?cts/i.test(n.label || '')) return d; // an old "Info & SRS" name is replaced
+    if (k === 'info' && n && /srs|e-?cts/i.test(n.label || '')) return d;
+    if (k === 'central' && n && /central/i.test(n.label || '')) return d; // old "Info & SRS" / "Central …" names are replaced
     return (n && n.label) || d;
   },
   navIcon(k, d) {
@@ -139,11 +140,11 @@ const Custom = {
   applyColor() {
     const p = Custom.palette();
     const s = document.documentElement.style;
-    s.setProperty('--accent', p.accent);
-    s.setProperty('--accent2', p.accent2);
-    s.setProperty('--accent-soft', p.soft);
-    s.setProperty('--side', p.side);
-    s.setProperty('--side2', p.side2);
+    s.setProperty('--brand-accent', p.accent);
+    s.setProperty('--brand-accent2', p.accent2);
+    s.setProperty('--brand-soft', p.soft);
+    s.setProperty('--brand-side', p.side);
+    s.setProperty('--brand-side2', p.side2); // brand colours: Light uses them as they are, Dark derives from them (css/theme.css)
     try {
       LS.set('bct.color', p);
     } catch (e) {
@@ -154,11 +155,11 @@ const Custom = {
     const p = LS.get('bct.color', null);
     if (!p) return;
     const s = document.documentElement.style;
-    s.setProperty('--accent', p.accent);
-    s.setProperty('--accent2', p.accent2);
-    s.setProperty('--accent-soft', p.soft);
-    s.setProperty('--side', p.side);
-    s.setProperty('--side2', p.side2);
+    s.setProperty('--brand-accent', p.accent);
+    s.setProperty('--brand-accent2', p.accent2);
+    s.setProperty('--brand-soft', p.soft);
+    s.setProperty('--brand-side', p.side);
+    s.setProperty('--brand-side2', p.side2);
   },
   /* ---------- words: one word swapped for another on every screen (menus, pages, pop-ups, printed reports) ---------- */
   _re: null,

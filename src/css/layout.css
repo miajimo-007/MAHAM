@@ -87,7 +87,7 @@ nav a:hover {
   color: #fff;
 }
 nav a.on {
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   color: var(--side);
   font-weight: 650;
 }
@@ -203,7 +203,7 @@ main {
   font-size: 26px;
 }
 .logo.img {
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   padding: 3px;
   overflow: hidden;
 }
@@ -253,9 +253,9 @@ main {
   align-items: center;
   gap: 12px;
   padding: 8px 20px;
-  background: #fef3c7;
-  color: #78350f;
-  border-bottom: 1px solid #fcd34d;
+  background: color-mix(in srgb, #fef3c7 var(--lt), var(--card));
+  color: color-mix(in srgb, #78350f var(--ltt), var(--ink));
+  border-bottom: 1px solid color-mix(in srgb, #fcd34d var(--lt), var(--line));
   font-size: 14px;
 }
 .mode-bar span {
@@ -301,7 +301,7 @@ nav a.sec .sec-n {
   margin-left: auto;
 }
 nav a.sec.on {
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   color: var(--side);
 }
 .nav-items {
@@ -349,7 +349,7 @@ nav a.sec.on {
 }
 .sec-tab:hover {
   color: var(--ink);
-  background: #eef4f6;
+  background: color-mix(in srgb, #eef4f6 var(--lt), var(--card));
 }
 .sec-tab.on {
   color: var(--accent2);
@@ -358,4 +358,44 @@ nav a.sec.on {
 .sec-tab .ni {
   width: auto;
   opacity: 0.75;
+}
+
+/* What's new (app/whatsnew.js) */
+.side-foot .wn-btn {
+  width: 100%;
+  margin-bottom: 6px;
+  justify-content: center;
+  background: transparent;
+  color: #cfe3ef;
+  border-color: #2a5a75;
+}
+.side-foot .wn-btn:hover {
+  background: var(--side2);
+}
+.modal.wn-modal {
+  max-width: 1000px;
+  width: 92vw;
+}
+.modal.wn-modal .modal-body {
+  max-height: 72vh;
+  overflow: auto;
+  font-size: 14px;
+}
+.wn-ver h4 {
+  margin: 4px 0 6px;
+}
+details.wn-ver {
+  border-top: 1px solid var(--line);
+  padding: 8px 0 2px;
+}
+details.wn-ver summary {
+  cursor: pointer;
+}
+.wn-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  line-height: 1.5;
+}
+.wn-list li {
+  margin-bottom: 6px;
 }

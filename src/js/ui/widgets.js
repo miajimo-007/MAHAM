@@ -36,6 +36,7 @@ Object.assign(UI, {
     'In Review': 'Review',
     'To Do': 'Open',
     'In Progress': 'In progress',
+    'In-Progress': 'In progress',
     'Not forwarded': 'Open',
   },
   statusLabel(s) {
@@ -46,6 +47,22 @@ Object.assign(UI, {
   },
   sbadge(s) {
     return UI.badge(UI.statusLabel(s), /review/i.test(s || '') ? 'warn' : UI.statusKind(s));
+  },
+  /* one coloured status chip for every kind of work (2026.11.13.2): To Do, quick wins and help desk requests get the same
+   * chip as project tasks and follow-ups, coloured by what the status counts as — the workflow colours
+   * (TaskFlow.CAT_COLOR): To Do grey · Waiting amber · In progress blue · Done green; canceled / rejected light grey. */
+  CAT_COLOR: { todo: '#64748b', wait: '#d97706', doing: '#2563eb', done: '#16a34a', off: '#94a3b8' },
+  statusCat(s) {
+    const x = U.lc(s);
+    if (!x) return '';
+    if (/cancel|reject|not needed|dropped/.test(x)) return 'off';
+    if (/done|resolved|closed|completed|solved|accepted|deployed/.test(x)) return 'done';
+    if (/review|wait|hold|pending|awaiting|follow up|blocked/.test(x)) return 'wait';
+    if (/progress|doing|ongoing|testing|started|active/.test(x)) return 'doing';
+    return 'todo';
+  },
+  schip(s) {
+    return s ? `<span class="tf-st sm" style="--c:${UI.CAT_COLOR[UI.statusCat(s)]}" title="${h(s)}">${h(UI.statusLabel(s))}</span>` : '';
   },
   scoreClass(v) {
     if (v == null) return 'sc-none';
@@ -63,6 +80,10 @@ Object.assign(UI, {
     return total > n && !App.tableState['cap:' + id]
       ? `<p class="small cap-more"><a href="#" class="link" data-capmore="${h(id)}">Show all ${total}</a> <span class="muted">· showing the first ${n}</span></p>`
       : '';
+  },
+  /* long explanations fold away: one small link that opens them (2026.11.13.4) */
+  howto(text) {
+    return text ? `<details class="howto"><summary>ⓘ How this works</summary><div class="howto-b">${text}</div></details>` : '';
   },
   kpi(label, value, sub, kind) {
     return `<div class="kpi ${kind || ''}"><div class="kpi-label">${h(label)}</div><div class="kpi-val">${value}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;

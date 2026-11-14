@@ -5,7 +5,7 @@ async def main():
     async with app_session() as s:
         pg = s.page
         nav = await pg.inner_text('nav')
-        c('admin menu: Admin, System Check, every desk and the ManageEngine import', all(x in nav for x in ['Admin', 'System Check', 'Director Desk', 'Manager Desk', 'All Teams Overview', 'Tasks from Director', 'Projects', 'ManageEngine Import']))
+        c('admin menu: Admin, System Check, every desk and the ManageEngine import', all(x in nav for x in ['Admin', 'System Check', 'Director Desk', 'Manager Desk', 'All Teams Overview', 'Tasks from the director', 'Projects', 'ManageEngine Import']))
         t = await s.go('#/syscheck'); c('System Check opens', 'Everyone' in t and 'Latest changes' in t)
         await pg.click('#sc_test'); await pg.wait_for_timeout(1500)
         c('save test writes and reads back', 'read back correctly' in await pg.inner_text('#toasts'))

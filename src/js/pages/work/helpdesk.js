@@ -14,7 +14,10 @@ P.helpdesk = sub => {
     now = new Date(),
     mo = now.getFullYear() === y ? now.getMonth() + 1 : 12;
   const all = Calc.helpdesk(y);
-  if (tab === 'overview') {
+  if (tab === 'overview' && !Calc.helpdesk(null).length) {
+    // nothing imported yet: one line instead of tables of zeros (2026.11.13.4)
+    body = `<div class="oneline">No help desk requests yet. ${App.isSuper() || App.can('importME') ? '<a class="link" href="#/helpdesk/import">Import from ManageEngine →</a>' : 'They appear here once your manager imports them from ManageEngine.'}</div>`;
+  } else if (tab === 'overview') {
     const team = Store.scoredTeam();
     const meta = Store.meta();
     const openBC = Calc.helpdesk(null).filter(x => x.bc && !x.closed && !x.central);
@@ -54,7 +57,7 @@ P.helpdesk = sub => {
           )
             .map(
               x =>
-                `<tr><td>${h(x.r.reqId)}</td><td>${h(x.r.subject)}</td><td>${memberCell(x.mid)}</td><td>${h(x.r.requester)}</td><td>${UI.sbadge(x.r.status)}</td><td class="num">${U.diffDays(x.r.created, U.todayStr())}d</td></tr>`
+                `<tr><td>${h(x.r.reqId)}</td><td>${h(x.r.subject)}</td><td>${memberCell(x.mid)}</td><td>${h(x.r.requester)}</td><td>${UI.schip(x.r.status)}</td><td class="num">${U.diffDays(x.r.created, U.todayStr())}d</td></tr>`
             )
             .join('')}</tbody></table>${UI.capMore('hd-open', openBC.length, 50)}`
         : empty('No open requests.')
@@ -94,7 +97,7 @@ P.helpdesk = sub => {
         { key: 'tech', label: 'Technician', get: x => x.r.technician },
         { key: 'requester', label: 'Requester', get: x => x.r.requester },
         { key: 'group', label: 'Group', get: x => (x.r.group || '').replace(/^EHR /, '') },
-        { key: 'status', label: 'Status', html: x => UI.sbadge(x.r.status), get: x => x.r.status },
+        { key: 'status', label: 'Status', html: x => UI.schip(x.r.status), get: x => x.r.status },
         { key: 'created', label: 'Created', get: x => U.fmtDT(x.r.created), sortVal: x => x.r.created },
         { key: 'resolved', label: 'Resolved', get: x => U.fmtDT(x.r.resolved), sortVal: x => x.r.resolved || '' },
         {

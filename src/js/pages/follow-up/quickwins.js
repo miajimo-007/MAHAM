@@ -15,18 +15,17 @@ P.quickwins = () => {
   if (s.ap) rows = rows.filter(x => (x.r.approval || 'Pending') === s.ap);
   if (s.ms) rows = rows.filter(x => x.r.milestone);
   rows.sort((a, b) => (b.r.qwId || '').localeCompare(a.r.qwId || '') || (b.r.date || '').localeCompare(a.r.date || ''));
+  const nw = newInLists();
   const uniq = list => new Set(list.map(x => x.r.qwId || x.r.subject)).size;
-  const monthly = U.MONTHS.map((m, i) => ({ label: m, value: Calc.qwCompletedIds(y, i + 1).size }));
-  const html = `<div class="kpis k4">${UI.kpi('Completed', Calc.qwCompletedIds(y).size, 'unique QW IDs, accepted')}${UI.kpi('In progress', uniq(allY.filter(x => U.lc(x.r.status) === 'in-progress')), '')}${UI.kpi('Awaiting approval', allY.filter(x => !x.r.approval).length, 'need manager decision')}${UI.kpi('Overdue', allY.filter(x => /Overdue/.test(x.c)).length, '', allY.some(x => /Overdue/.test(x.c)) ? 'sc-e' : '')}</div>
-  ${card(`Quick wins completed by month — ${y}`, UI.barChart(monthly, { height: 130, width: 1100, fmt: v => U.num(v, 0), emptyText: 'No quick wins completed yet this year.' }))}
-  <div class="page-actions">${filterBar('qw', [
+  const html = `<div class="page-actions">${filterBar('qw', [
     { key: 'analyst', type: 'member' },
     { key: 'month', type: 'month' },
-    { key: 'st', label: 'Status', options: Store.list('qwStatus') },
+    { key: 'st', label: 'Status', options: UI.statusOpts(Store.list('qwStatus')) },
     { key: 'ap', label: 'Approval', options: ['Accepted', 'Rejected', 'Pending'] },
     { key: 'ms', type: 'toggle', label: '⭐ Milestones only' },
     { key: 'hist', type: 'toggle', label: `Show rejected (history · ${allY.filter(x => qwHistory(x.r, true)).length})`, dflt: false },
-  ])}${addBtn('quickwin', 'New quick win')}</div>
+  ])}<span class="grow"></span>${addBtn('quickwin', 'New quick win')}</div>
+  ${listSum([`<b>${rows.length}</b> listed`, `<b class="t-good">${Calc.qwCompletedIds(y).size}</b> completed in ${y} (unique QW IDs, accepted)`, { t: `<b class="t-warn">${uniq(allY.filter(x => U.lc(x.r.status) === 'in-progress'))}</b> in progress`, f: ['qw', 'st', 'In-Progress'] }, { t: `<b>${allY.filter(x => !x.r.approval).length}</b> awaiting approval`, f: ['qw', 'ap', 'Pending'] }, `<b class="t-bad">${allY.filter(x => /Overdue/.test(x.c)).length}</b> overdue`])}
   ${UI.table({
     id: 'qw',
     rows,
@@ -41,18 +40,26 @@ P.quickwins = () => {
       {
         key: 'subject',
         label: 'Subject',
-        html: x => h(x.r.subject) + UI.flagTags(x.r) + QS.tag(x.r) + Conv.tag(x.r),
+        html: x =>
+          (nw.has(x.r.id) ? '<span class="new-dot" title="New or changed by someone else since you last looked"></span>' : '') +
+          h(x.r.subject) +
+          UI.flagTags(x.r) +
+          QS.tag(x.r) +
+          Conv.tag(x.r) +
+          WorkLinks.tag(x.r),
         get: x => x.r.subject,
       },
       { key: 'type', label: 'Type', get: x => x.r.type },
       {
         key: 'status',
         label: 'Status',
-        html: x => UI.sbadge(x.r.status),
+        html: x => UI.schip(x.r.status),
         get: x => x.r.status,
+        text: x => UI.statusLabel(x.r.status),
         edit: {
           type: 'select',
-          options: () => [['', '—'], ...Store.list('qwStatus')],
+          color: x => (x.r.status ? UI.CAT_COLOR[UI.statusCat(x.r.status)] : ''),
+          options: () => [['', '—'], ...UI.statusOpts(Store.list('qwStatus'))],
           ok: x => UI.canEditField('quickwin', x.r, 'status'),
           value: x => x.r.status || '',
           save: (x, v) => UI.saveField('quickwin', x.r, 'status', v, 'Status changed'),
@@ -83,13 +90,15 @@ P.quickwins = () => {
       {
         key: 'c',
         label: 'Auto comment',
-        html: x => UI.sbadge(x.c) + (x.r.managerComment ? `<div class="muted small">💬 ${h(x.r.managerComment)}</div>` : ''),
+        html: x =>
+          (/^(Pending Manager Approval|Wait for Manager approval|Completed|Rejected|Manager Rejected)$/.test(x.c) ? '' : UI.sbadge(x.c)) +
+          (x.r.managerComment ? `<div class="muted small">💬 ${h(x.r.managerComment)}</div>` : ''),
         get: x => x.c,
       },
     ],
   })}`;
   return {
-    title: 'Quick Wins',
+    title: 'Quick wins',
     html: QS.card() + html,
     mount(root) {
       QS.bind(root);

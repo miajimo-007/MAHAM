@@ -11,6 +11,7 @@ Object.assign(App, {
     'dashboard',
     'employee',
     'performance',
+    'tasksov',
     'lazy',
     'quickwins',
     'oncall',
@@ -21,7 +22,7 @@ Object.assign(App, {
     'admin',
   ],
   pageAllowed(k) {
-    if (['dashboard', 'performance', 'lazy', 'projperf'].includes(k) && !App.can('viewDashboards')) return false;
+    if (['dashboard', 'performance', 'tasksov', 'lazy', 'projperf'].includes(k) && !App.can('viewDashboards')) return false;
     if (k === 'admin') return App.isSuper() || AdminRole.any(App.me);
     if (k === 'syscheck') return App.isSuper() || AdminRole.sees('syscheck');
     if (k === 'adminperson' || k === 'settings' || k === 'importdata') return App.isSuper();
@@ -33,7 +34,7 @@ Object.assign(App, {
         Store.pageOn(App.me, 'meetings', App.viewTeam) &&
         (Meetings.canRun() || Store.all('meeting').some(m => (m.attendees || []).includes(App.me)))
       );
-    if (k === 'about' || k === 'feedback') return true;
+    if (k === 'about' || k === 'feedback' || k === 'kb') return true; // the Knowledge base: everyone (each article says who may read it)
     if (k === 'usage') return Admin.canSee(); // Admin decides (permission "See usage")
     if (k === 'perf') return PERF_TABS.some(([x]) => App.pageAllowed(x));
     if (k === 'oneonone' || k === 'overview') return App.isDir() || App.isSuper();
@@ -105,11 +106,15 @@ Object.assign(App, {
     document.title = Custom.swap(Custom.navLabel(App.page, pg.title)) + ' · ' + Store.appName();
     const lvl = Store.PAGES.some(p => p[0] === App.page) ? App.level(App.page) : 'edit';
     main.innerHTML =
-      (lvl === 'view'
-        ? '<div class="insights viewonly"><div>👁 <b>View only</b> — you can look at this page but not change anything.</div></div>'
-        : '') + pg.html;
+      (lvl === 'view' ? '<div class="viewonly-tag" title="You can look at this page but not change anything">👁 View only</div>' : '') +
+      pg.html;
     main.insertAdjacentHTML('afterbegin', App.secTabs()); // the section's pages as tabs
     if (pg.mount) pg.mount(main);
+    try {
+      UI.noBreak(main);
+    } catch (e) {
+      /* layout only */
+    } // IDs / keys / dates never break in the middle (ui/core.js)
     if (typeof Admin !== 'undefined' && Admin.afterRender)
       try {
         Admin.afterRender(main);
@@ -126,6 +131,7 @@ Object.assign(App, {
       })
     );
     if (typeof bindMineActions === 'function') bindMineActions(main);
+    if (typeof bindLogTime === 'function') bindLogTime(main); // ⏱ in My work
     if (typeof PT !== 'undefined') PT.bind(main);
     main.querySelectorAll('[data-capmore]').forEach(
       a =>

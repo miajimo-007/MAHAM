@@ -26,12 +26,28 @@ const PMV = {
       ch('Sponsor', p.sponsor),
     ].join('');
     return `<div class="kpis k4">${UI.kpi('Health', `${ic} ${txt}`, h(hl.from), { green: 'sc-a', amber: 'sc-c', red: 'sc-e' }[hl.k])}${UI.kpi('Progress', prog + '%', `${items.filter(t => Scrum.isDone(t)).length} of ${items.length} tasks done`)}${UI.kpi('Next milestone', nm ? h(nm.name) : '–', nm ? (PM.late(nm) ? '<b class="t-bad">late</b> · ' : '') + U.fmtDate(nm.end) : '')}${UI.kpi('Open risks & issues', openR.length, `${hi.length} high${late ? ` · ${late} task${late === 1 ? '' : 's'} overdue` : ''}`, hi.length ? 'sc-e' : '')}</div>
+    ${(() => {
+      const miss = [
+        !charter ? (plan ? 'no charter (Edit project → goal, scope, sponsor)' : 'no charter') : '',
+        !PM.phases(p.id).length ? 'no phases or milestones' : '',
+        !u ? 'no status update' : '',
+      ].filter(Boolean);
+      const add = [
+        plan && !PM.phases(p.id).length
+          ? '<a href="#" class="link" data-pmph="phase">＋ Phase</a> <a href="#" class="link" data-pmph="milestone">＋ Milestone</a>'
+          : '',
+        canAdd && !u ? '<a href="#" class="link" data-pmupd>＋ Weekly update</a>' : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      return miss.length ? `<div class="oneline">Not filled in yet: ${miss.join(' · ')}${add ? ' — ' + add : ''}</div>` : '';
+    })()}
     <div class="cols2"><div>
       ${PM2V.closeoutCard(p)}
-      ${card('Charter', charter || empty(plan ? 'No charter yet — click "Edit project" and fill in the goal, scope, success criteria and sponsor.' : 'No charter yet.'))}
-      ${card(`Latest status update${u ? ' · ' + U.fmtDate(u.date) : ''}`, u ? PMV.updateBody(u) : empty('No status update yet.'), canAdd ? '<a href="#" class="link" data-pmupd>＋ Weekly update</a>' : '')}
+      ${charter ? card('Charter', charter) : ''}
+      ${u ? card(`Latest status update · ${U.fmtDate(u.date)}`, PMV.updateBody(u), canAdd ? '<a href="#" class="link" data-pmupd>＋ Weekly update</a>' : '') : ''}
     </div><div>
-      ${card('Phases & milestones', PMV.phaseList(p, plan), plan ? '<a href="#" class="link" data-pmph="phase">＋ Phase</a> · <a href="#" class="link" data-pmph="milestone">＋ Milestone</a>' : '')}
+      ${PM.phases(p.id).length ? card('Phases & milestones', PMV.phaseList(p, plan), plan ? '<a href="#" class="link" data-pmph="phase">＋ Phase</a> · <a href="#" class="link" data-pmph="milestone">＋ Milestone</a>' : '') : ''}
       ${PM2V.slipCard(p)}
       ${PM2V.lessonsCard(p)}
       ${hi.length ? card(`High risks & issues <span class="count">${hi.length}</span>`, hi.map(PMV.raidRow).join('')) : ''}

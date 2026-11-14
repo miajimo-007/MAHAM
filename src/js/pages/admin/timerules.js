@@ -76,11 +76,11 @@ const TimeRulesUI = {
       ${card('Requests (leave, permission …)', `<div class="grid-form">${n('r_days', 'Days to decide', R.requests.approveDays)}</div>`)}
       </div><div>
       ${card('Project tasks', `<div class="grid-form">${n('k_grace', 'Grace days after the due date', R.ptask.grace)}<div></div>${n('k_pct', 'Project at risk: % of tasks late', R.ptask.riskLatePct)}${n('k_left', '…or working days to its due date (with work left)', R.ptask.riskDaysLeft)}</div>`)}
-      ${card('Follow-ups and quick wins', `<div class="grid-form">${n('s_fu', 'Follow-up stuck after (days)', R.stuck.followup)}${n('s_qw', 'Quick win stuck after (days)', R.stuck.quickwin)}</div><p class="muted small">Central follow-ups — working days since the last chase or move:</p><div class="grid-form">${n('ry_a', 'Need analyst follow-up after', R.central.analyst)}${n('ry_l', 'Need team leader follow-up after', R.central.leader)}${n('ry_m', 'Need manager follow-up after', R.central.manager)}${n('ry_c', 'Next chase after (working days)', R.central.chase)}</div>`)}
+      ${card('Follow-ups and quick wins', `<div class="grid-form">${n('s_fu', 'Follow-up stuck after (days)', R.stuck.followup)}${n('s_qw', 'Quick win stuck after (days)', R.stuck.quickwin)}</div><p class="muted small">External follow-ups — working days since the last chase or move:</p><div class="grid-form">${n('ry_a', 'Need analyst follow-up after', R.central.analyst)}${n('ry_l', 'Need team leader follow-up after', R.central.leader)}${n('ry_m', 'Need manager follow-up after', R.central.manager)}${n('ry_c', 'Next chase after (working days)', R.central.chase)}</div>`)}
       ${card(
         'Escalation',
         `<div class="grid-form">${n('e_mgr', 'On the Manager Desk at (days late)', R.escalate.manager)}${n('e_dir', 'On the Director Desk at (days late)', R.escalate.director)}</div><p class="muted small">Counted after the grace days, in working days, from the item's <b>last update</b> (any note, status change or edit restarts the clock). Only work opened after the time rules started counts.</p>
-        <div class="fld"><label>Show on the desks</label><div class="row-btns wrap">${TimeRules.KINDS.map(([k, l]) => `<label class="check chip-check"><input type="checkbox" data-show="${k}" ${!R.show || R.show[k] !== false ? 'checked' : ''}> ${h(l)}</label>`).join('')}</div><p class="muted small">Untick what your team cannot act on (e.g. follow-ups waiting on Central).</p></div>`
+        <div class="fld"><label>Show on the desks</label><div class="row-btns wrap">${TimeRules.KINDS.map(([k, l]) => `<label class="check chip-check"><input type="checkbox" data-show="${k}" ${!R.show || R.show[k] !== false ? 'checked' : ''}> ${h(l)}</label>`).join('')}</div><p class="muted small">Untick what your team cannot act on (e.g. follow-ups waiting on another party).</p></div>`
       )}
       </div></div>
       <div class="row-btns"><button type="button" class="btn" id="trprev">Preview the effect</button><span class="grow"></span><button type="button" class="btn primary" id="trsave">Save time rules${s ? ' for ' + h(Store.teamName(s)) : ' (department default)'}</button></div><div id="trout"></div></form>
@@ -298,14 +298,6 @@ const TimeRulesUI = {
 };
 
 (function () {
-  const addChips = (html, chips) => {
-    chips = chips.filter(c => c[0]);
-    if (!chips.length) return html;
-    const ch = chips.map(([n, l]) => `<a href="#" class="ny-chip"><span class="n">${n}</span> ${h(l)}</a>`).join('');
-    if (html.includes('<div class="needs-you"><b>Needs you</b>'))
-      return html.replace('<div class="needs-you"><b>Needs you</b>', '<div class="needs-you"><b>Needs you</b>' + ch);
-    return html.replace(/<div class="needs-you ok">[^<]*<\/div>/, `<div class="needs-you"><b>Needs you</b>${ch}</div>`);
-  };
   if (P.manager) {
     const base = P.manager;
     P.manager = function () {
@@ -314,16 +306,18 @@ const TimeRulesUI = {
       const w = TodoTime.waiting();
       const late = TimeRulesUI.deskCard('manager') + TimeRulesUI.riskCard();
       const wait = TimeRulesUI.waitingCard();
-      out.html = addChips(out.html, [
-        [w.holds.length, 'holds to confirm'],
-        [w.asks.length, 'asks for more time'],
-        [late ? TimeRules.lateItems(TimeRulesUI.deskTeams('manager')).length : 0, 'late items'],
-        [TimeRulesUI.missingPts().length, 'project tasks missing a due date or points'],
-      ]);
-      const at = out.html.indexOf('<div class="needs-you');
-      const end = at >= 0 ? out.html.indexOf('</div>', at) + 6 : -1;
-      if (end > 5) out.html = out.html.slice(0, end) + wait + late + out.html.slice(end);
-      else out.html += wait + late;
+      // Manager Desk sections (2026.11.13.3): holds / time asks are decisions; late work, projects at risk and project
+      // tasks that cannot be scored go under Watch
+      const miss = TimeRulesUI.missingPts().length;
+      out.html = deskPut(out.html, 'need', wait);
+      out.html = deskPut(
+        out.html,
+        'watch',
+        late +
+          (miss
+            ? `<div class="oneline">⚠ <b>${miss}</b> project task${miss === 1 ? '' : 's'} missing a due date or story points — they cannot be scored. <a class="link" href="#/projects">Projects →</a></div>`
+            : '')
+      );
       const m0 = out.mount;
       out.mount = root => {
         if (m0) m0(root);
@@ -337,7 +331,7 @@ const TimeRulesUI = {
     P.director = function () {
       const out = base.apply(this, arguments);
       if (!out || !out.html) return out;
-      out.html += TimeRulesUI.deskCard('director');
+      out.html = deskPut(out.html, 'watch', TimeRulesUI.deskCard('director')); // Director Desk → Watch (2026.11.13.4)
       const m0 = out.mount;
       out.mount = root => {
         if (m0) m0(root);

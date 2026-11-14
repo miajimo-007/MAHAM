@@ -1,6 +1,19 @@
 /* MAHAM — Record types: director task, project, sprint, project task. */
 'use strict';
 
+/* project task form: Scrum projects show points and sprint up front; a project with no sprints has no Sprint box */
+const PTF = {
+  proj: r => Scrum.proj((r && r.project) || UI._recProject),
+  scrum: r => {
+    const p = PTF.proj(r);
+    return !!p && PM.mode(p) === 'scrum';
+  },
+  sprints: r => {
+    const p = PTF.proj(r);
+    return !p || PM.mode(p) === 'scrum' || Scrum.sprints(p.id).length > 0 || !!(r && r.sprint);
+  },
+};
+
 Object.assign(Schemas, {
   mgrtask: {
     single: 'Task for manager',
@@ -18,10 +31,7 @@ Object.assign(Schemas, {
         type: 'select',
         required: true,
         options: () =>
-          App.assignees().map(m => [
-            m.id,
-            `${Store.memberName(m.id)} (${Store.topRole(m.role) ? Store.titleOf(m) : Store.teamName(m.team)})`,
-          ]),
+          App.assignees().map(m => [m.id, `${UI.personName(m.id)} (${Store.topRole(m.role) ? Store.titleOf(m) : Store.teamName(m.team)})`]),
         blank: true,
       },
       { dir: true, key: 'urgency', label: 'Urgency', type: 'select', options: L('urgency'), blank: false, flag: true },
@@ -188,7 +198,15 @@ Object.assign(Schemas, {
         flag: true,
       },
       { key: 'milestone', label: 'Milestone', type: 'bool', checkLabel: '⭐ Milestone', flag: true },
-      { mgr: true, key: 'points', label: 'Story points', type: 'select', options: () => Scrum.POINTS.map(String), blank: false },
+      {
+        mgr: true,
+        key: 'points',
+        more: r => !PTF.scrum(r),
+        label: 'Story points',
+        type: 'select',
+        options: () => Scrum.POINTS.map(String),
+        blank: false,
+      },
       {
         mgr: true,
         key: 'assignee',
@@ -196,13 +214,15 @@ Object.assign(Schemas, {
         type: 'select',
         options: () => {
           const p = Scrum.proj(UI._recProject);
-          return p ? Scrum.people(p).map(id => [id, Store.memberName(id)]) : [];
+          return p ? Scrum.people(p).map(id => [id, UI.personName(id)]) : [];
         },
         blank: 'Unassigned',
       },
       {
         mgr: true,
         key: 'sprint',
+        more: r => !PTF.scrum(r),
+        showIf: r => PTF.sprints(r),
         label: 'Sprint',
         type: 'select',
         options: () =>
@@ -211,13 +231,14 @@ Object.assign(Schemas, {
             .map(s => [s.id, s.name + (s.status === 'Active' ? ' (active)' : '')]),
         blank: 'Backlog',
       },
-      { mgr: true, key: 'start', label: 'Start date', type: 'date' },
+      { mgr: true, key: 'start', more: true, label: 'Start date', type: 'date' },
       { mgr: true, key: 'due', label: 'Due date', type: 'date' },
-      { mgr: true, key: 'est', label: 'Estimated hours', type: 'number', min: 0, step: 0.5 },
-      { key: 'actual', label: 'Actual hours', type: 'number', min: 0, step: 0.5, hint: 'fill in when it is done' },
+      { mgr: true, key: 'est', more: true, label: 'Estimated hours', type: 'number', min: 0, step: 0.5 },
+      { key: 'actual', more: true, label: 'Actual hours', type: 'number', min: 0, step: 0.5, hint: 'fill in when it is done' },
       {
         mgr: true,
         key: 'parent',
+        more: true,
         label: 'Subtask of',
         type: 'select',
         options: () =>
@@ -229,6 +250,7 @@ Object.assign(Schemas, {
       {
         mgr: true,
         key: 'after',
+        more: true,
         label: 'Starts after (depends on)',
         type: 'select',
         options: () => Scrum.items(UI._recProject).map(t => [t.id, ptKey(t) + ' · ' + t.title]),

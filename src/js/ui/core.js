@@ -77,10 +77,36 @@ const UI = {
     wrap.querySelector('[data-close]').onclick = UI.tryClose;
     document.addEventListener('keydown', UI._esc);
     if (onMount) onMount(wrap);
+    wrap.addEventListener('input', UI._grow);
+    wrap.querySelectorAll('textarea').forEach(t => {
+      if (t.value) UI._grow({ target: t });
+    }); // long text boxes fit what is in them
+    try {
+      UI.noBreak(wrap);
+    } catch (e) {
+      /* layout only */
+    }
     wrap._start = UI.formState(wrap); // to know later whether anything was typed
     const f = wrap.querySelector('input:not([type=hidden]):not([readonly]),select,textarea');
     if (f) setTimeout(() => f.focus(), 30);
     return wrap;
+  },
+  /* IDs, keys, dates and numbers never break in the middle ("TD-" / "12", "08-" / "Nov-" / "2026"): a cell or label whose
+     whole text is one short word gets "nw" (no wrap). Run after every page and window is drawn. */
+  noBreak(root) {
+    if (!root) return;
+    for (const el of root.querySelectorAll('td, th, span, a, b, small, .li > *')) {
+      if (el.children.length || el.classList.contains('nw')) continue;
+      const t = (el.textContent || '').trim();
+      if (t.length >= 3 && t.length <= 24 && !/\s/.test(t) && /[-\d]/.test(t)) el.classList.add('nw');
+    }
+  },
+  /* a text box grows with what is typed (2026.11.13.4) */
+  _grow(e) {
+    const t = e.target;
+    if (!t || t.tagName !== 'TEXTAREA' || !t.closest('#modal')) return;
+    t.style.height = 'auto';
+    t.style.height = Math.min(window.innerHeight * 0.5, t.scrollHeight + 2) + 'px';
   },
   _esc(e) {
     if (e.key === 'Escape') UI.tryClose();

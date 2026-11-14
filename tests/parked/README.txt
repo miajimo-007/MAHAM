@@ -1,0 +1,1 @@
+Tests for updates parked on 12 Nov 2026 (see ../../UPDATES-SINCE-2026.11.11.2.md). run_all.py does not run this folder. Older versions of test_lanes.py / test_task_workflows.py for 2026.11.11.2 were not kept; these test the later behaviour.

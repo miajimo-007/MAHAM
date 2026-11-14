@@ -1,0 +1,188 @@
+/* MAHAM — Light / Dark and the glass look (2026.11.13.7).
+ * html.dark switches every token; the fixed colours in the other stylesheets follow through --lt / --ltt
+ * (see tokens: light 100% = unchanged). Glass is always on: a soft colour wash behind the page and frosted panels.
+ * The menu (sidebar) stays solid navy in Light; in Dark it is frosted too. Pop-ups and sticky cells stay solid. */
+:root {
+  --lt: 100%;
+  --ltt: 100%;
+  --card-solid: #ffffff;
+  --wash1: rgba(14, 124, 134, 0.2);
+  --wash2: rgba(99, 102, 241, 0.14);
+  --wash3: rgba(184, 110, 0, 0.1);
+  --glass: rgba(255, 255, 255, 0.64);
+  --glass-line: rgba(255, 255, 255, 0.8);
+  --glass-hi: rgba(255, 255, 255, 0.95);
+  --glass-shadow: 0 8px 28px rgba(16, 34, 46, 0.1);
+}
+html.dark {
+  --ink: #e4ecf1;
+  --ink2: #b7c6d0;
+  --muted: #8fa0ac;
+  --line: #2a3b48;
+  --line2: #213140;
+  --bg: #0b141c;
+  --card: #14212c;
+  --card-solid: #14212c;
+  --sideink: #c6d6e0;
+  --side: color-mix(in srgb, var(--brand-side, #0c2a3d) 45%, #04090d);
+  --side2: color-mix(in srgb, var(--brand-side2, #123a52) 55%, #04090d);
+  --accent: color-mix(in srgb, var(--brand-accent, #0e7c86) 72%, #ffffff);
+  --accent2: color-mix(in srgb, var(--brand-accent2, #0e4a6b) 35%, #e6f4fb);
+  --accent-soft: color-mix(in srgb, var(--brand-accent, #0e7c86) 26%, #14212c);
+  --good: #4cc283;
+  --good-soft: #143022;
+  --warn: #e7a531;
+  --warn-soft: #3a2c12;
+  --bad: #ef7c72;
+  --bad-soft: #3d1d1b;
+  --sc-a: #173a26;
+  --sc-b: #24361a;
+  --sc-c: #3a3316;
+  --sc-d: #3d2a17;
+  --sc-e: #45221e;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 10px rgba(0, 0, 0, 0.25);
+  --lt: 16%;
+  --ltt: 25%;
+  --wash1: rgba(60, 180, 191, 0.2);
+  --wash2: rgba(110, 110, 255, 0.22);
+  --wash3: rgba(231, 165, 49, 0.08);
+  --glass: rgba(20, 33, 44, 0.62);
+  --glass-line: rgba(255, 255, 255, 0.09);
+  --glass-hi: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+/* the wash behind everything */
+body {
+  background:
+    radial-gradient(1100px 640px at 12% -10%, var(--wash1), transparent 60%),
+    radial-gradient(900px 560px at 100% 0%, var(--wash2), transparent 58%),
+    radial-gradient(1000px 700px at 55% 112%, var(--wash3), transparent 62%), var(--bg);
+  background-attachment: fixed;
+}
+/* frosted panels */
+.card,
+.kpi,
+.tbl-wrap,
+.desk-grp,
+.dc-strip,
+.adm-tile,
+.ov-card,
+.pcard,
+.ag-day,
+.needs-you,
+.howto-b {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  border-color: var(--glass-line);
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 var(--glass-hi);
+}
+.card .card,
+.card .kpi,
+.desk-grp .card,
+.card .tbl-wrap,
+.dc-main .desk-grp .card {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  background: transparent;
+}
+.top {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  border-bottom-color: var(--glass-line);
+}
+html.dark .side {
+  background: rgba(7, 18, 26, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+  border-right: 1px solid var(--glass-line);
+}
+/* things that sit on top of other things stay solid (readable) */
+.tbl th,
+.tbl td.act,
+.tbl th.act,
+.adm-results,
+.dc-gh,
+.modal,
+.modal-box,
+.dropdown,
+.menu-pop,
+#recform .fld:focus-within > small:not(.err-msg) {
+  background-color: var(--card-solid);
+}
+/* form controls in Dark */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #0f1b25;
+  color: var(--ink);
+  border-color: var(--line);
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--muted);
+}
+html.dark .btn:not(.primary):not(.danger) {
+  background-color: #1a2a36;
+  color: var(--ink);
+  border-color: var(--line);
+}
+html.dark .btn.ghost {
+  background-color: transparent;
+}
+html.dark .tbl tr:hover td {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+html.dark img:not([src^='data:image/svg']) {
+  opacity: 0.92;
+}
+/* the Light / Dark switch in the top bar */
+.theme-sw {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.theme-sw button {
+  background: transparent;
+  border: 0;
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.theme-sw button + button {
+  border-left: 1px solid var(--line);
+}
+.theme-sw button[aria-pressed='true'] {
+  background: var(--accent);
+  color: #fff;
+}
+@media print {
+  body {
+    background: #fff;
+  }
+  .card,
+  .kpi,
+  .tbl-wrap,
+  .desk-grp {
+    backdrop-filter: none;
+    background: #fff;
+    box-shadow: none;
+  }
+}
+/* Dark: primary buttons a little deeper so white text reads well */
+html.dark .btn.primary,
+html.dark .dc-chip[aria-pressed='true'],
+html.dark .theme-sw button[aria-pressed='true'] {
+  background-color: color-mix(in srgb, var(--brand-accent, #0e7c86) 88%, #ffffff);
+  border-color: transparent;
+  color: #fff;
+}

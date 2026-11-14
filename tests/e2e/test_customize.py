@@ -73,7 +73,7 @@ async def main():
         # restore defaults + import back
         await s.go('#/admin/custom', 400)
         await pg.locator('#cz-all').click(); await pg.locator('.modal [data-yes]').click(); await pg.wait_for_timeout(500)
-        c('restore all: words, menu, targets back to original', await J("Custom.target('teamScore')") == 80 and 'Quick Wins' in await J("document.querySelector('nav').innerText"))
+        c('restore all: words, menu, targets back to original', await J("Custom.target('teamScore')") == 80 and 'Quick wins' in await J("document.querySelector('nav').innerText"))
         c('restore all keeps the app name', await J("Store.appName()") == 'MAHAMMI')
         n = await J(f"Custom.restore({__import__('json').dumps(bundle)})"); await pg.wait_for_timeout(300)
         c('bundle loads back', n >= 2 and await J("Custom.target('teamScore')") == 90 and await J("Custom.get('words',{})['Quick Win']") == 'Improvement')

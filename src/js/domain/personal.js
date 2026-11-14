@@ -299,6 +299,14 @@ const PT = {
           PT.add(b.dataset.ptnew || '');
         })
     );
+    root.querySelectorAll('[data-mwqw]').forEach(
+      b =>
+        (b.onclick = e => {
+          e.preventDefault();
+          e.stopPropagation();
+          UI.editRecord('quickwin', {});
+        })
+    ); // My work: ＋ Quick win (the same form as the Quick Wins page)
   },
   add(plan) {
     UI.editRecord('mytask', { owner: App.me, status: 'Open', priority: 'Normal', plan: plan || '', repeat: '' });

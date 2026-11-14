@@ -10,6 +10,7 @@ SHOTS = os.path.join(ROOT, 'tests', 'screenshots'); os.makedirs(SHOTS, exist_ok=
 
 # the real folder picker needs a person to click; tests use a private in-browser folder instead
 INIT = r"""
+try { localStorage.setItem('bct.test.nowhatsnew', '1'); } catch (e) {}   // the "What's new" window would cover the page (test_whats_new turns it back on)
 window.showDirectoryPicker = async () => {
   const root = await navigator.storage.getDirectory();
   return root.getDirectoryHandle('MAHAM', { create: true });
@@ -23,6 +24,8 @@ class Session:
     def __init__(self, page): self.page = page; self.errors = []; page.on('pageerror', lambda e: self.errors.append(str(e)))
     async def js(self, code): return await self.page.evaluate(code)
     async def go(self, hsh, wait=350): await self.js(f"location.hash='{hsh}'"); await self.page.wait_for_timeout(wait); return await self.page.inner_text('#main')
+    async def open_watch(self):   # calm desks (2026.11.13.6): open every Watch line, then the page text
+        await self.js("document.querySelectorAll('.dc-wl').forEach(w => w.classList.add('open'))"); return await self.page.inner_text('#main')
     async def sign_in_as(self, member_id, mode='admin'): await self.js(f"App.setMe('{member_id}'); App.mode = '{mode}'; App.launch()"); await self.page.wait_for_timeout(350)
 
 async def sign_in_page(page, member_id, pin='1234'):

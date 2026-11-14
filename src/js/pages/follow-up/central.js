@@ -86,7 +86,7 @@ const FollowUpUI = {
     if (!FollowUp.canEdit(r)) return UI.toast('Only the analyst (or a team leader / manager) can log a chase', 'bad');
     UI.modal({
       title: `Chased — ${FollowUp.key(r)}`,
-      body: `<p class="muted small">${h(r.subject || '')} · ${h(r.status)}</p><form class="grid-form" id="chf">${UI.field({ key: 'on', label: 'When', type: 'date' }, U.todayStr())}${UI.field({ key: 'how', label: 'How', type: 'select', options: FollowUp.HOW, blank: false }, 'Email')}${UI.field({ key: 'reply', label: 'What they said', type: 'textarea', rows: 3, span: 2, placeholder: 'e.g. Under review with the Central team, answer next week' })}</form>`,
+      body: `<p class="muted small">${h(r.subject || '')} · ${h(r.status)}</p><form class="grid-form" id="chf">${UI.field({ key: 'on', label: 'When', type: 'date' }, U.todayStr())}${UI.field({ key: 'how', label: 'How', type: 'select', options: FollowUp.HOW, blank: false }, 'Email')}${UI.field({ key: 'reply', label: 'What they said', type: 'textarea', rows: 3, span: 2, placeholder: 'e.g. Under review with their team, answer next week' })}</form>`,
       actions: '<button class="btn primary" id="chgo">Save chase</button>',
       onMount(w) {
         w.querySelector('#chgo').onclick = () => {
@@ -142,6 +142,100 @@ const FollowUpUI = {
           App.render();
         })
     );
+  },
+  /* ---------- several at once (tick boxes in the list) ---------- */
+  bulk() {
+    const can = x => x.open && FollowUp.canEdit(x.r);
+    const n = k => `${k} follow-up${k === 1 ? '' : 's'}`;
+    return [
+      {
+        label: '📞 Chased today',
+        ok: can,
+        run: rows => {
+          UI.saveUndo(
+            rows.map(x => FollowUp.chased(Store.get(x.r.id), { how: 'Email', reply: '' })),
+            `${n(rows.length)} chased today`
+          );
+          App.render(true);
+        },
+      },
+      {
+        label: '📅 Next chase on…',
+        ok: can,
+        run: (rows, done) => {
+          UI.modal({
+            title: `Next chase — ${n(rows.length)}`,
+            body: `<form class="grid-form" id="ncf">${UI.field({ key: 'next', label: 'Next chase on', type: 'date', required: true }, U.addDays(U.todayStr(), 7))}</form>`,
+            actions: '<span class="grow"></span><button class="btn" data-c>Cancel</button><button class="btn primary" data-ok>Set</button>',
+            onMount: w => {
+              w.querySelector('[data-c]').onclick = UI.closeModal;
+              w.querySelector('[data-ok]').onclick = () => {
+                const d = w.querySelector('[name=next]').value;
+                if (!d) return UI.toast('Pick a date', 'bad');
+                UI.closeModal();
+                done();
+                UI.saveUndo(
+                  rows.map(x => Object.assign({}, FollowUp.norm(Store.get(x.r.id)), { next: d })),
+                  `Next chase ${U.fmtDate(d)} — ${n(rows.length)}`
+                );
+                App.render(true);
+              };
+            },
+          });
+          return false;
+        },
+      },
+      {
+        label: '➜ Move to step…',
+        ok: x => FollowUp.canEdit(x.r) && !x.r.pending && TaskFlow.moves(x.r).some(m => m.ok),
+        run: (rows, done) => {
+          const steps = [
+            ...new Set(
+              rows.flatMap(x =>
+                TaskFlow.moves(x.r)
+                  .filter(m => m.ok)
+                  .map(m => m.tr.to)
+              )
+            ),
+          ];
+          UI.modal({
+            title: `Move ${n(rows.length)}`,
+            body: `<p class="muted small">Each one moves only if its workflow allows that move from where it is and nothing has to be filled in for it (a reason, a reference no.). The others are skipped — open them to move them one by one.</p><form class="grid-form" id="mvf">${UI.field({ key: 'to', label: 'Move to', type: 'select', options: steps, blank: false })}</form>`,
+            actions:
+              '<span class="grow"></span><button class="btn" data-c>Cancel</button><button class="btn primary" data-ok>Move</button>',
+            onMount: w => {
+              w.querySelector('[data-c]').onclick = UI.closeModal;
+              w.querySelector('[data-ok]').onclick = () => {
+                const to = w.querySelector('[name=to]').value;
+                let moved = 0,
+                  waiting = 0;
+                const skipped = [];
+                for (const x of rows) {
+                  const r = Store.get(x.r.id);
+                  const tr = r && FollowUp.quickMove(r, to);
+                  if (!tr) {
+                    skipped.push(FollowUp.key(x.r));
+                    continue;
+                  }
+                  const err = FollowUp.run(r, tr.id, {});
+                  if (err === 'pending') waiting++;
+                  else if (err) skipped.push(FollowUp.key(x.r));
+                  else moved++;
+                }
+                UI.closeModal();
+                done();
+                App.render(true);
+                UI.toast(
+                  `${moved} moved to ${to}${waiting ? ` · ${waiting} sent for approval` : ''}${skipped.length ? ` · skipped: ${skipped.slice(0, 6).join(', ')}${skipped.length > 6 ? '…' : ''}` : ''}`,
+                  skipped.length && !moved ? 'warn' : 'good'
+                );
+              };
+            },
+          });
+          return false;
+        },
+      },
+    ];
   },
   /* ---------- the export for Central (no internal notes) ---------- */
   async exportFor(rows) {
@@ -271,31 +365,7 @@ P.central = () => {
   let body;
   if (tab === 'summary') body = FollowUpUI.summary(all);
   else
-    body = `<div class="kpis k5">${UI.kpi(
-      'Chase due',
-      n(x => x.due),
-      'next chase today or before',
-      n(x => x.due) ? 'sc-c' : ''
-    )}${UI.kpi(
-      'Need analyst follow-up',
-      n(x => x.lvl === 'analyst'),
-      `${FollowUp.targets().analyst}+ working days since last chase`,
-      n(x => x.lvl === 'analyst') ? 'sc-c' : ''
-    )}${UI.kpi(
-      'Need team leader follow-up',
-      n(x => x.lvl === 'leader'),
-      `${FollowUp.targets().leader}+ days`,
-      n(x => x.lvl === 'leader') ? 'sc-d' : ''
-    )}${UI.kpi(
-      'Need manager follow-up',
-      n(x => x.lvl === 'manager'),
-      `${FollowUp.targets().manager}+ days`,
-      n(x => x.lvl === 'manager') ? 'sc-e' : ''
-    )}${UI.kpi(
-      'Waiting deployment',
-      n(x => x.open && /deploy/i.test(x.r.status))
-    )}</div>
-    <div class="page-actions">${filterBar('riy', [
+    body = `<div class="page-actions">${filterBar('riy', [
       { key: 'analyst', type: 'member' },
       { key: 'st', label: 'Step', options: steps },
       { key: 'mod', label: 'Module', options: [...new Set(all.map(x => x.r.module).filter(Boolean))].sort() },
@@ -312,12 +382,14 @@ P.central = () => {
       },
       { key: 'month', type: 'month' },
       { key: 'open', type: 'toggle', label: 'Open only', dflt: true },
-    ])}${addBtn('central', 'New follow-up')}<button class="btn ghost" id="fuexp" title="Open follow-ups: reference no., subject, step, days open — no internal notes">⇩ List for Central</button></div>
+    ])}<span class="grow"></span>${addBtn('central', 'New follow-up')}<button class="btn ghost" id="fuexp" title="Open follow-ups: reference no., subject, step, days open — no internal notes">⇩ List to send them</button></div>
+    ${listSum([`<b>${rows.length}</b> listed`, { t: `<b class="t-bad">${n(x => x.due)}</b> chase due`, f: ['riy', 'lvl', 'due'] }, { t: `<b>${n(x => x.lvl === 'analyst')}</b> need analyst follow-up`, f: ['riy', 'lvl', 'analyst'] }, { t: `<b class="t-warn">${n(x => x.lvl === 'leader')}</b> need team leader`, f: ['riy', 'lvl', 'leader'] }, { t: `<b class="t-bad">${n(x => x.lvl === 'manager')}</b> need manager`, f: ['riy', 'lvl', 'manager'] }, `<b>${n(x => x.open && /deploy/i.test(x.r.status))}</b> waiting deployment`], { noLink: true })}
     ${UI.table({
       id: 'riy',
       rows,
-      exportName: 'Central FU',
+      exportName: 'External FU',
       onRow: true,
+      bulk: FollowUpUI.bulk(),
       cols: [
         { key: 'key', label: 'Key', get: x => FollowUp.key(x.r), sortVal: x => +x.r.n || 0 },
         { key: 'date', label: 'Date', get: x => U.fmtDate(x.r.date), sortVal: x => x.r.date || '' },
@@ -327,6 +399,7 @@ P.central = () => {
           html: x =>
             h(x.r.subject || '') +
             (x.r.requester ? ` <span class="muted small">· ${h(x.r.requester)}</span>` : '') +
+            (x.r.priority === 'High' ? ' <span class="t-bad small">High</span>' : '') +
             (x.r.link ? ' <span title="Linked">🔗</span>' : '') +
             ((x.r.chases || []).length
               ? `<div class="muted small">📞 ${h(U.fmtDate(x.r.chases[x.r.chases.length - 1].on))}${x.r.chases[x.r.chases.length - 1].reply ? ': ' + h(x.r.chases[x.r.chases.length - 1].reply.slice(0, 80)) : ''}</div>`
@@ -338,8 +411,30 @@ P.central = () => {
         {
           key: 'status',
           label: 'Step',
-          html: x => FollowUpUI.stepChip(x.r) + (x.r.priority === 'High' ? ' <span class="t-bad small">High</span>' : ''),
+          html: x =>
+            FollowUpUI.stepChip(x.r) +
+            (x.r.priority === 'High' ? ' <span class="t-bad small">High</span>' : '') +
+            (x.r.pending ? ' <span class="muted small">⏳ approval</span>' : ''),
           get: x => x.r.status,
+          // change the step right here: only the moves the workflow allows; a move that needs details opens its screen
+          edit: {
+            type: 'select',
+            color: x => TaskFlow.color(x.r),
+            ok: x => FollowUp.canEdit(x.r) && !x.r.pending && TaskFlow.moves(x.r).some(m => m.ok),
+            value: () => '',
+            options: x => [
+              ['', x.r.status],
+              ...TaskFlow.moves(x.r)
+                .filter(m => m.ok)
+                .map(m => [m.tr.id, `→ ${m.tr.to}${(m.tr.name || m.tr.to) !== m.tr.to ? ' (' + m.tr.name + ')' : ''}`]),
+            ],
+            save: (x, v) => {
+              if (!v) return;
+              App.pendingRender = true;
+              FollowUpUI.go(x.r.id, v);
+              if (!UI.$('#modal')) App.render(true);
+            },
+          },
         },
         { key: 'redmine', label: 'Redmine', get: x => x.r.redmine || '' },
         { key: 'days', label: 'Days open', cls: 'num', get: x => (x.days == null ? '' : x.days), sortVal: x => x.days || 0 },
@@ -356,7 +451,18 @@ P.central = () => {
           html: x => (x.open && x.r.next ? `<span class="${x.due ? 't-bad strong' : 'muted'}">${h(U.fmtDate(x.r.next))}</span>` : ''),
           get: x => x.r.next || '',
         },
-        { key: 'c', label: 'Needs', html: x => (x.open ? UI.sbadge(x.c) : '<span class="muted small">closed</span>'), get: x => x.c },
+        {
+          key: 'c',
+          label: 'Needs',
+          cls: 'wrapc',
+          html: x =>
+            x.open
+              ? x.c
+                ? `<span class="small strong t-${UI.statusKind(x.c) || 'muted'}">${h(x.c)}</span>`
+                : ''
+              : '<span class="muted small">closed</span>',
+          get: x => x.c,
+        },
         {
           key: 'act',
           label: '',
@@ -370,7 +476,7 @@ P.central = () => {
     })}`;
   const html = FollowUpUI.upgradeCard() + head + body;
   return {
-    title: 'Central Follow-up',
+    title: 'External Follow-up',
     html,
     mount(root) {
       UI.bindTables(root, { riy: x => UI.editRecord('central', x.r) });
@@ -415,7 +521,7 @@ P.central = () => {
     const l = Store.all('central').filter(r => r.analyst === App.me && FollowUp.chaseDue(r));
     if (!l.length) return pg;
     const c = card(
-      `↗ Central chases due <span class="count">${l.length}</span>`,
+      `↗ Follow-up chases due <span class="count">${l.length}</span>`,
       `<div class="li-list">${l
         .map(r0 => {
           const r = FollowUp.norm(r0);
@@ -441,21 +547,22 @@ P.central = () => {
       const esc = rows.filter(x => x.lvl === 'leader' || x.lvl === 'manager');
       if (!rows.length) return pg;
       const c = card(
-        `↗ Central follow-ups <span class="count">${rows.length} open</span>`,
+        `↗ External follow-ups <span class="count">${rows.length} open</span>`,
         `<p class="small">${esc.length} escalated (team leader / manager) · ${rows.filter(x => x.due).length} chase due · <a class="link" href="#/central" data-rsum>Summary →</a></p>${rows
-          .sort((x, y) => (y.days || 0) - (x.days || 0))
+          .sort((x, y) => !!y.due - !!x.due || (y.days || 0) - (x.days || 0))
           .slice(0, 5)
           .map(
             x =>
-              `<div class="li click" data-edit="central|${h(x.r.id)}"><span class="mono small">${h(FollowUp.key(x.r))}</span> ${h(x.r.subject || '')} <span class="muted small">· ${x.days} d · ${h(x.r.status)} · ${h(Store.memberShort(x.r.analyst))}</span></div>`
+              `<div class="li"><span class="grow click" data-edit="central|${h(x.r.id)}"><span class="mono small">${h(FollowUp.key(x.r))}</span> ${h(x.r.subject || '')} <span class="muted small">· ${x.days} d · ${h(x.r.status)} · ${h(Store.memberShort(x.r.analyst))}</span>${x.due ? ' <b class="t-bad small">chase due</b>' : ''}</span>${FollowUp.canEdit(x.r) ? `<span class="row-btns tight nw"><button class="btn xs${x.due ? '' : ' ghost'}" data-fuqc="${h(x.r.id)}" title="Log a chase for today">✓ Chased today</button><button class="btn xs ghost" data-fuch="${h(x.r.id)}" title="Log a chase with a note">…</button></span>` : ''}</div>`
           )
           .join('')}`
-      );
+      ); // chase from the desk (2026.11.13.6)
       const m = pg.mount;
       return Object.assign({}, pg, {
-        html: pg.html + c,
+        html: deskPut(pg.html, 'watch', c),
         mount(root) {
-          if (m) m.call(this, root);
+          /* Manager Desk → Watch (2026.11.13.5) */ if (m) m.call(this, root);
+          FollowUpUI.bind(root);
           const l = root.querySelector('[data-rsum]');
           if (l)
             l.onclick = () => {

@@ -262,7 +262,7 @@ const TimeRules = {
             push({
               id: q.id,
               kind: 'Follow-up',
-              title: q.subject || q.reqId || 'Central follow-up',
+              title: q.subject || q.reqId || 'External follow-up',
               who: q.analyst,
               team,
               days: n,

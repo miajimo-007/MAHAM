@@ -19,12 +19,12 @@ async def main():
         await pg.click('#modal [data-yes]'); await pg.wait_for_timeout(300)
         c('forwarded to 2 analysts → In Progress, 0 of 2', await st() == 'In Progress' and await J(f"JSON.stringify(Chain.progress(Store.get('{await mid()}')))") == '{"done":0,"total":2}')
         # director sees the chain
-        await s.sign_in_as('khalid'); t = await s.go('#/home')
+        await s.sign_in_as('khalid'); t = await s.go('#/home'); t = await s.open_watch()
         c('director sees 0 of 2 and the names', '0 of 2 analysts done' in t and 'Yousef' in t and 'Nora' in t)
         # analyst works and finishes; update rolls up
         await s.sign_in_as('yousef'); a = await todo('yousef')
         await J(f"Store.save(Object.assign({{}}, Store.get('{a['id']}'), {{comment: 'Checked 40 of 60 order sets', finish: U.todayStr(), status: 'Resolved'}}))")
-        await s.sign_in_as('khalid'); t = await s.go('#/home')
+        await s.sign_in_as('khalid'); t = await s.go('#/home'); t = await s.open_watch()
         c("director sees 1 of 2 and Yousef's update", '1 of 2 analysts done' in t and 'Checked 40 of 60 order sets' in t)
         # manager re-assigns Nora's part to Layla
         await s.sign_in_as('apps-mgr'); await s.go('#/mgrtasks'); await pg.click(f'[data-fwd="{await mid()}"]'); await pg.wait_for_selector('#fwdf')

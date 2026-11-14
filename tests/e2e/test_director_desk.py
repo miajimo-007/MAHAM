@@ -10,8 +10,8 @@ async def main():
         await J("""Store.saveMany([
           {c: 'mgrtask', id: 'dd1', task: 'Late audit', manager: 'apps-mgr', team: 'apps', date: U.addDays(U.todayStr(), -10), due: U.addDays(U.todayStr(), -2), status: 'Open'},
           {c: 'project', id: 'ddp', name: 'Old rollout', manager: 'apps-mgr', team: 'apps', start: U.addDays(U.todayStr(), -60), due: U.addDays(U.todayStr(), -5), status: 'In Progress', members: []}])"""); await J("Store.flush()")
-        t = await s.go('#/home', 600)
-        c('Needs your attention lists the overdue task and project', 'Needs your attention' in t and 'Late audit' in t and 'Old rollout' in t, t[:800])
+        t = await s.go('#/home', 600); t = await s.open_watch()
+        c('Watch lists the overdue task and the project behind (2026.11.13.6)', 'Projects behind' in t and 'Late audit' in t and 'Old rollout' in t, t[:800])
         await pg.click('[data-askup="dd1"]'); await pg.fill('.modal [name=text]', 'Where are we?'); await pg.click('.modal [data-ok]'); await pg.wait_for_timeout(300); await J("Store.flush()")
         await s.sign_in_as('apps-mgr'); await J("Store.sync(true)"); t = await s.go('#/home', 600)
         c('manager sees the request for an update', 'asked for an update' in t and 'Where are we?' in t)

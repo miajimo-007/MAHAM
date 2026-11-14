@@ -133,6 +133,31 @@ function myWork(who) {
           href: '#/project/' + p.id,
         });
   }
+  if (me === App.me) {
+    // what used to be the separate "Needs your action" card
+    for (const x of Calc.helpdesk(null))
+      if (x.mid === me && !x.closed)
+        out.push({
+          r: x.r,
+          kind: 'Help desk',
+          title: `#${x.r.reqId} — ${x.r.subject || ''}`,
+          due: '',
+          src: x.r.status || 'Open',
+          href: '#/helpdesk',
+        });
+    for (const r of Store.all('central', '*')) {
+      if (r.analyst !== me) continue;
+      const c = Calc.centralComment(r);
+      if (c && !['Request closed', 'New', 'Waiting deployment'].includes(c))
+        out.push({ r, kind: 'Follow-up', title: r.subject || '', due: '', src: c, edit: 'central|' + r.id });
+    }
+    for (const r of Store.all('quickwin', '*')) {
+      if (r.analyst !== me || qwHistory(r)) continue;
+      const c = Calc.qwComment(r);
+      if (/Overdue|Due|Insert|Read Comment|Follow/.test(c))
+        out.push({ r, kind: 'Quick win', title: r.subject || '', due: '', src: c, edit: 'quickwin|' + r.id });
+    }
+  }
   for (const x of out) {
     x.late = !!x.due && x.due < today;
   }
@@ -156,7 +181,25 @@ function newForMe() {
   if (!seen) return [];
   return myWork().filter(x => (x.r._ts || 0) > seen && x.r._by !== App.me);
 }
+/* the lists' "new" dot: new or changed by someone else since I last looked — as it was when I opened the app this time,
+ * so leaving the desk does not clear the dots in the lists (2026.11.13.4) */
+const SEEN0 = {};
+function seen0() {
+  const k = App.me;
+  if (k && !(k in SEEN0)) SEEN0[k] = LS.get('bct.seen.' + k, 0);
+  return SEEN0[k] || 0;
+}
+function newInLists() {
+  const seen = seen0();
+  if (!seen) return new Set();
+  return new Set(
+    myWork()
+      .filter(x => (x.r._ts || 0) > seen && x.r._by !== App.me)
+      .map(x => x.r.id)
+  );
+}
 function markSeen() {
+  seen0();
   LS.set('bct.seen.' + App.me, Date.now());
 }
 function myWorkCard() {
@@ -187,26 +230,125 @@ function myWorkCard() {
     Personal: 'k-mtg',
     'Meeting action': 'k-meet',
     Meeting: 'k-req',
+    'Help desk': 'k-task',
+    'Follow-up': 'k-req',
+    'Quick win': 'k-proj',
   };
-  const extra = x =>
+  const badges = x =>
     x.r.c !== 'todo'
       ? ''
-      : `${x.r.priority === 'High' ? ' ' + UI.badge('High', 'bad') : ''}${x.r.dirUpdated && x.r.dirUpdated >= U.addDays(today, -7) ? ' ' + UI.badge('updated by director', 'warn') : ''}${x.r.nudgedOn && x.r.nudgedOn >= U.addDays(today, -3) ? ' ' + UI.badge('🔔 ' + Store.memberShort(x.r.nudgedBy) + ' asked for an update', 'warn') : ''}${x.r.dirNote ? `<div class="small">📝 Director: ${h(x.r.dirNote)}</div>` : ''}`;
+      : [
+          x.r.priority === 'High' ? ' ' + UI.badge('High', 'bad') : '',
+          x.r.dirUpdated && x.r.dirUpdated >= U.addDays(today, -7) ? ' ' + UI.badge('updated by director', 'warn') : '',
+          x.r.nudgedOn && x.r.nudgedOn >= U.addDays(today, -3)
+            ? ' ' + UI.badge('🔔 ' + Store.memberShort(x.r.nudgedBy) + ' asked for an update', 'warn')
+            : '',
+          x.r.dirNote ? `<div class="small">📝 Director: ${h(x.r.dirNote)}</div>` : '',
+        ].join('');
+  const target = x => (x.edit ? `data-edit="${h(x.edit)}"` : x.href ? `data-href="${h(x.href)}"` : `data-proj="${h(x.proj)}"`);
+  const due = x =>
+    !x.due
+      ? ''
+      : `<span class="ov-due ${x.late ? 'late' : x.due === today ? 'today' : ''}">${x.late ? 'overdue · ' : ''}${x.due === today ? 'today' : U.fmtDate(x.due)}</span>`;
+  const buttons = x =>
+    [
+      MyLog.can(x.r)
+        ? ` <button class="btn sm ghost" data-mwlog="${h(x.r.id)}" title="Log shadow work for this (linked to it)">⏱</button>`
+        : '',
+      x.offer
+        ? ` <button class="btn sm primary" data-ptacc="${h(x.r.id)}">Accept</button> <button class="btn sm ghost" data-ptdec="${h(x.r.id)}">Decline</button>`
+        : x.r.c === 'todo' && typeof TodoFlow !== 'undefined' && TodoFlow.withMe(x.r)
+          ? ' ' + TodoFlow.buttons(x.r)
+          : ['action', 'todo', 'mytask'].includes(x.r.c)
+            ? ` <button class="btn sm" data-mineok="${h(x.r.id)}" title="Mark as done today">✓ Done</button>`
+            : '',
+    ].join('');
   const row = x =>
-    `<div class="li click" ${x.edit ? `data-edit="${h(x.edit)}"` : x.href ? `data-href="${h(x.href)}"` : `data-proj="${h(x.proj)}"`}><span class="ag-kind ${kc[x.kind]}">${h(x.kind)}</span><div class="grow"><b>${h(x.title)}</b>${nw.has(x.r.id) ? ' <span class="badge warn">new</span>' : ''}${extra(x)}<div class="muted small">${h(x.src)}</div></div>${x.due ? `<span class="ov-due ${x.late ? 'late' : x.due === today ? 'today' : ''}">${x.late ? 'overdue · ' : ''}${x.due === today ? 'today' : U.fmtDate(x.due)}</span>` : ''}${x.offer ? ` <button class="btn sm primary" data-ptacc="${h(x.r.id)}">Accept</button> <button class="btn sm ghost" data-ptdec="${h(x.r.id)}">Decline</button>` : x.r.c === 'todo' && typeof TodoFlow !== 'undefined' && TodoFlow.withMe(x.r) ? ' ' + TodoFlow.buttons(x.r) : x.r.c === 'action' || x.r.c === 'todo' || x.r.c === 'mytask' ? ` <button class="btn sm" data-mineok="${h(x.r.id)}" title="Mark as done today">✓ Done</button>` : ''}</div>`;
+    `<div class="li click" ${target(x)}><span class="ag-kind ${kc[x.kind] || ''}">${h(x.kind)}</span><div class="grow"><b>${h(x.title)}</b>${nw.has(x.r.id) ? ' <span class="badge warn">new</span>' : ''}${x.r.c === 'ptask' && typeof LanesUI !== 'undefined' ? ' ' + LanesUI.chip(x.r) : ''}${badges(x)}<div class="muted small">${h(x.src)}</div></div>${due(x)}${buttons(x)}</div>`;
   const wrow = t =>
     `<div class="li click waiting" data-edit="todo|${h(t.id)}"><span class="ag-kind k-task">To Do</span><div class="grow"><b>${h(t.task)}</b><div class="muted small">✓ done ${t.finish === today ? 'today' : U.fmtDate(t.finish)} — waiting for your manager to confirm</div></div></div>`;
+  /* one list, in the order to work through it */
+  const groups = [
+    ['⚠ Late', x => x.late],
+    ['Due today', x => !x.late && x.due === today],
+    ['Waiting on you', x => !x.due],
+    ['Coming up', x => x.due && x.due > today],
+  ];
+  const all = !!App.tableState['cap:mywork'];
+  let left = all ? 999 : 10;
+  const parts = [];
+  for (const [label, test] of groups) {
+    const g = l.filter(test);
+    if (!g.length || left <= 0) continue;
+    parts.push(`<div class="mw-h">${label} <span class="count">${g.length}</span></div>` + g.slice(0, left).map(row).join(''));
+    left -= g.length;
+  }
+  if (wait.length)
+    parts.push(
+      `<div class="mw-h">Done — waiting for your manager <span class="count">${wait.length}</span></div>` + wait.map(wrow).join('')
+    );
+  const links = [
+    App.pageAllowed('quickwins') && App.canEdit('quickwin') ? '<a href="#" class="link" data-mwqw>＋ Quick win</a>' : '',
+    App.pageAllowed('mytasks') ? '<a href="#" class="link" data-ptnew="">＋ Personal task</a>' : '',
+    App.pageAllowed('todo') ? '<a href="#/todo" class="link">All To Dos →</a>' : '',
+  ]
+    .filter(Boolean)
+    .join(' <span class="muted">·</span> ');
   return card(
     `My work <span class="count">${l.length}</span>${nw.size ? ` <span class="badge warn">${nw.size} new</span>` : ''}`,
-    l.length || wait.length
-      ? `<div class="scroll-list">${l.slice(0, 30).map(row).join('')}${wait.map(wrow).join('')}</div>`
-      : empty('Nothing assigned to you right now. 🎉'),
-    [
-      App.pageAllowed('mytasks') ? '<a href="#" class="link" data-ptnew="">＋ Personal task</a>' : '',
-      App.pageAllowed('todo') ? '<a href="#/todo" class="link">All To Dos →</a>' : '',
-    ]
-      .filter(Boolean)
-      .join(' <span class="muted">·</span> ')
+    parts.length ? parts.join('') + (all ? '' : UI.capMore('mywork', l.length, 10)) : empty('Nothing waiting on you right now. 🎉'),
+    links
+  );
+}
+
+/* ⏱ Log time: shadow work for an item in My work, with the item's ID as the Reference, linked to it (To Do / quick win — WorkLinks) */
+const MyLog = {
+  KINDS: new Set(['todo', 'ptask', 'mgrtask', 'mytask', 'action', 'quickwin', 'central']),
+  can(r) {
+    return !!r && MyLog.KINDS.has(r.c) && !App.preview && App.pageAllowed('shadow') && App.canEdit('shadow');
+  },
+  ref(r) {
+    if (r.c === 'todo' && typeof TodoId !== 'undefined') return TodoId.key(r);
+    if (r.c === 'quickwin') return r.qwId || r.ref || '';
+    if (r.c === 'central' && typeof FollowUp !== 'undefined') return FollowUp.key(r);
+    if (r.c === 'ptask' && typeof ptKey === 'function') return ptKey(r);
+    return r.ref || '';
+  },
+  title(r) {
+    return r.task || r.title || r.subject || '';
+  },
+  open(r) {
+    const last = ps('home');
+    UI.editRecord(
+      'shadow',
+      {
+        analyst: App.me,
+        date: U.todayStr(),
+        minutes: 30,
+        subject: MyLog.title(r).slice(0, 200),
+        ref: MyLog.ref(r),
+        taskType: last.lastType || '',
+        source: last.lastSource || '',
+      },
+      {
+        title: '⏱ Log time on: ' + MyLog.title(r).slice(0, 50),
+        savedMsg: 'Shadow work logged',
+        with: out => {
+          if (!out.id) out.id = U.uid('shadow');
+          return typeof WorkLinks !== 'undefined' && WorkLinks.COLLS.has(r.c) ? [WorkLinks.rec(out, r)].filter(Boolean) : [];
+        },
+      }
+    );
+  },
+};
+function bindLogTime(root) {
+  root.querySelectorAll('[data-mwlog]').forEach(
+    b =>
+      (b.onclick = e => {
+        e.stopPropagation();
+        const r = Store.get(b.dataset.mwlog);
+        if (r) MyLog.open(r);
+      })
   );
 }
 

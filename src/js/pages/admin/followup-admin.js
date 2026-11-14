@@ -36,7 +36,7 @@
       ${A.fieldsCard('fu')}
       ${card(
         'Follow-up workflows',
-        `<div class="row-btns"><button class="btn" id="fuflnew">＋ New from the Central workflow</button></div>
+        `<div class="row-btns"><button class="btn" id="fuflnew">＋ New from the standard workflow</button></div>
         ${flows
           .map(w => {
             const n = Store.all('central', '*').filter(r => FollowUp.flowOf(r).id === w.id).length;

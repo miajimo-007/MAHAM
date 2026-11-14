@@ -2,7 +2,7 @@
  * Change behaviour here rather than in the code that uses it. */
 'use strict';
 
-const APP_VERSION = '2026.11.10.2';
+const APP_VERSION = '2026.11.13.7';
 const APP_MARK = '🧭'; // the app's mark when no logo picture is set
 
 /* folder & polling */
@@ -16,7 +16,8 @@ const Config = {
   DEFAULT_TEAM: 'apps',
   SELF_BACKDATE_DAYS: 7, // analysts may log their own shadow work this many days back
   FAIR_SINCE: Date.parse('2026-10-23T00:00:00+03:00'),
-  OWN_SINCE: Date.parse('2026-11-03T00:00:00+03:00'), // "only the owner or someone with Change others' items" applies to changes saved from this version on   // fairness rules apply to changes saved from this version on
+  OWN_SINCE: Date.parse('2026-11-03T00:00:00+03:00'),
+  FLOW_SINCE: Date.parse('2026-11-11T00:00:00+03:00'), // workflow moves of project tasks / follow-ups saved from this version on are checked (domain/flowtrust.js)   // "only the owner or someone with Change others' items" applies to changes saved from this version on   // fairness rules apply to changes saved from this version on
   /* starting values for lists the super admin can edit in Settings (per team) */
   DEFAULT_LISTS: {
     projectCategories: [
@@ -86,16 +87,17 @@ const Config = {
   PAGES: [
     ['todo', 'To Do List'],
     ['mytasks', 'My Tasks'],
-    ['shadow', 'Shadow Works'],
+    ['shadow', 'Shadow work'],
     ['helpdesk', 'IT Help Desk'],
     ['attendance', 'Attendance'],
     ['dashboard', 'Team Dashboard'],
     ['employee', 'Employee'],
     ['performance', 'Performance'],
+    ['tasksov', 'Tasks overview'],
     ['lazy', 'Lazy Days'],
     ['projperf', 'Project Performance'],
-    ['quickwins', 'Quick Wins'],
-    ['central', 'Central Follow-up'],
+    ['quickwins', 'Quick wins'],
+    ['central', 'External Follow-up'],
     ['oncall', 'On-Call / Good Catch'],
     ['courses', 'Courses'],
     ['directory', 'Directory'],
@@ -182,18 +184,18 @@ const Config = {
       [
         ['todo', 'To Do List', '☑'],
         ['mytasks', 'Personal tasks', '✔'],
-        ['shadow', 'Shadow Works', '◐'],
+        ['shadow', 'Shadow work', '◐'],
         ['helpdesk', 'IT Help Desk', '✉'],
       ],
     ],
     ['Projects', [['projects', 'Projects', '◈']]],
     [
-      'Follow-up',
+      'Tracking',
       [
-        ['quickwins', 'Quick Wins', '⚡'],
-        ['central', 'Central Follow-up', '↗'],
+        ['quickwins', 'Quick wins', '⚡'],
+        ['central', 'External Follow-up', '↗'],
         ['goodcatch', 'Good Catch', '🎯', { href: '#/oncall/goodcatch', page: 'oncall' }],
-        ['mgrtasks', 'Tasks from Director', '✦', { mgr: true }],
+        ['mgrtasks', 'Tasks from the director', '✦', { mgr: true }],
       ],
     ],
     [
@@ -218,6 +220,7 @@ const Config = {
     [
       'Reference',
       [
+        ['kb', 'Knowledge base', '📚'],
         ['info', 'Info & Dashboards', 'ⓘ'],
         ['directory', 'Directory', '☰'],
         ['courses', 'Courses', '✎'],
@@ -225,7 +228,7 @@ const Config = {
     ],
   ],
   NAV_NAMES: { Home: 'Analyst Desk', Work: 'WorkList', Team: 'Team & Time' },
-  NAV_ICONS: { Home: '☀', Work: '☑', 'Follow-up': '⚡', Team: '👥', Performance: '◆', Reference: '📚', Admin: '⚙', Projects: '◈' }, // shown names of the headings (Admin → Customize can rename them)
+  NAV_ICONS: { Home: '☀', Work: '☑', Tracking: '⚡', Team: '👥', Performance: '◆', Reference: '📚', Admin: '⚙', Projects: '◈' }, // shown names of the headings (Admin → Customize can rename them)
   DEFAULT_SCORING: {
     weights: { todo: 35, helpdesk: 35, attendance: 15, quickwins: 10, shadow: 5 },
     helpdeskSplit: { closing: 70, requests: 30 },

@@ -5,7 +5,19 @@ const ptKey = t => (typeof Work !== 'undefined' ? Work.key(t) : '#' + (t.n || ''
 
 const typeIcon = t => ({ Story: '◆', Bug: '✱', Task: '▪' })[t] || '▪';
 
+/* Add-ons to the project card and the board, applied in this order (each file adds its own; nothing replaces ptCard):
+ *   PT_CARD.decorate: [(html, t, p, opts) → html]   e.g. workflow moves (pages/taskflow.js), epic / approval badges
+ *                                                     (pages/workitems.js), lane colour + status box (pages/lanes.js)
+ *   PT_CARD.bind:     [(root) → void]               their click handlers
+ *   PT_CARD.move:     (id, to) → void               how ◀ ▶ / drag move a card (the workflow, pages/taskflow.js) */
+const PT_CARD = { decorate: [], bind: [], move: null };
+
 function ptCard(t, p, opts = {}) {
+  let html = ptCardBase(t, p, opts);
+  for (const d of PT_CARD.decorate) html = d(html, t, p, opts || {});
+  return html;
+}
+function ptCardBase(t, p, opts = {}) {
   const cols = Scrum.columns(p),
     last = cols.length - 1,
     i = Scrum.colIndex(t);
@@ -21,6 +33,7 @@ function ptCard(t, p, opts = {}) {
 }
 
 function moveItem(id, to) {
+  if (PT_CARD.move) return PT_CARD.move(id, to);
   const t = Store.get(id);
   if (!t || !Scrum.canWork(t)) return UI.toast('Only the person assigned (or the manager) can move this', 'bad');
   const r = Object.assign({}, t, { status: to });
@@ -73,6 +86,7 @@ function bindScrum(root) {
       if (t && t.status !== col.dataset.col) moveItem(id, col.dataset.col);
     });
   });
+  for (const b of PT_CARD.bind) b(root);
 }
 
 function burndown(sp, items) {

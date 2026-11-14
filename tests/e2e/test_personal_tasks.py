@@ -6,7 +6,7 @@ async def main():
     async with app_session() as s:
         pg = s.page; J = s.js
         await s.sign_in_as('yousef', 'analyst'); t = await s.go('#/mytasks', 500)
-        c('My Tasks page, private note', 'Only you see your personal tasks' in t)
+        c('My Tasks page, private note', 'Only you see these' in t)
         c('My Tasks in the menu', await pg.locator('nav [data-nav="mytasks"]').count() == 1)
         await J("""(async () => { const d = n => U.addDays(U.todayStr(), n);
           Store.saveMany([{ c: 'mytask', owner: 'yousef', title: 'Call the vendor', status: 'Open', priority: 'High', due: d(1) },

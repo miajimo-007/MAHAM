@@ -43,7 +43,7 @@ const ScoreParts = {
     ],
     [
       'central',
-      'Central follow-ups solved',
+      'External follow-ups solved',
       'count',
       [
         [5, 100],

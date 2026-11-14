@@ -463,6 +463,15 @@ const Admin = {
     const lim = U.addDays(U.todayStr(), -(days || 3));
     return Store.all('todo', '*').filter(t => t.status === 'Ready for review' && t.finish && t.finish <= lim);
   },
+  /* teams whose month is not locked yet: every team with someone scored in it (a team of directors only has no score
+   * to lock). One rule for the Admin Home tile and anything else that asks. */
+  unlockedTeams(y, mo) {
+    return Store.teams().filter(
+      t =>
+        Store.members().some(m => m.active !== false && m.scored && (m.team || 'apps') === t.id) &&
+        !Store.all('scoresnap', t.id).some(s => +s.year === y && +s.month === mo)
+    );
+  },
   /* the daily admin checklist */
   checklist() {
     const today = U.todayStr();
@@ -479,15 +488,7 @@ const Admin = {
     });
     const end = U.addDays(today.slice(0, 8) + '01', 40).slice(0, 8) + '01';
     const left = U.diffDays(today, U.addDays(end, -1));
-    const pm = U.addDays(today.slice(0, 8) + '01', -1).slice(0, 7);
-    const [py, pmo] = pm.split('-').map(Number);
-    const unlocked = Store.teams().filter(t => !Store.all('scoresnap', t.id).some(s => +s.year === py && +s.month === pmo));
-    out.push({
-      ok: !unlocked.length,
-      label: `${U.MONTHS[pmo - 1]} is locked for every team`,
-      bad: `${U.MONTHS[pmo - 1]} not locked yet: ${unlocked.map(t => t.name).join(', ')}`,
-      href: '#/admin/months',
-    });
+    /* last month's lock and the backup copy are tiles on Admin Home (Admin.health) — not repeated here */
     if (left <= 5)
       out.push({
         ok: false,
@@ -496,14 +497,6 @@ const Admin = {
         href: '#/admin/months',
         soon: true,
       });
-    const copied = Store.setting('settings-backup', 'lastCopy', '');
-    const remind = Store.setting('settings-backup', 'remindDays', 30);
-    out.push({
-      ok: !!copied && U.diffDays(copied, today) <= remind,
-      label: `Backup copied elsewhere ${copied ? U.fmtDate(copied) : ''}`,
-      bad: copied ? `Backup last copied ${U.diffDays(copied, today)} days ago` : 'Backup never copied elsewhere — download one from Data',
-      href: '#/admin/data',
-    });
     const open = Store.all('nudge', '*').filter(n => ['update', 'import', 'confirm'].includes(n.kind) && !Dir.answered(n));
     out.push({
       ok: !open.length,
@@ -528,9 +521,7 @@ const Admin = {
     const onb = Admin.notOnboarded();
     const pm = U.addDays(today.slice(0, 8) + '01', -1).slice(0, 7);
     const [py, pmo] = pm.split('-').map(Number);
-    const unlocked = Store.teams().filter(
-      t => Store.all('scoresnap', t.id).length && !Store.all('scoresnap', t.id).some(s => +s.year === py && +s.month === pmo)
-    );
+    const unlocked = Admin.unlockedTeams(py, pmo);
     const copied = Store.setting('settings-backup', 'lastCopy', '');
     const remind = Store.setting('settings-backup', 'remindDays', 30);
     return [

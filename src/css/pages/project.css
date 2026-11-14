@@ -110,14 +110,14 @@
   color: #15803d;
 }
 .pc-type.t-bug {
-  color: #b91c1c;
+  color: color-mix(in srgb, #b91c1c var(--ltt), var(--ink));
 }
 .pc-type.t-task {
-  color: #1d4ed8;
+  color: color-mix(in srgb, #1d4ed8 var(--ltt), var(--ink));
 }
 .badge.cat {
-  background: #e8eefc;
-  color: #2a4a8f;
+  background: color-mix(in srgb, #e8eefc var(--lt), var(--card));
+  color: color-mix(in srgb, #2a4a8f var(--ltt), var(--ink));
 }
 .pc-type.t-other {
   color: var(--ink2);
@@ -219,31 +219,31 @@ select.xs {
   flex-wrap: wrap;
 }
 .badge.raid-risk {
-  background: #fef3c7;
-  color: #92400e;
+  background: color-mix(in srgb, #fef3c7 var(--lt), var(--card));
+  color: color-mix(in srgb, #92400e var(--ltt), var(--ink));
 }
 .badge.raid-issue {
-  background: #fee2e2;
-  color: #991b1b;
+  background: color-mix(in srgb, #fee2e2 var(--lt), var(--card));
+  color: color-mix(in srgb, #991b1b var(--ltt), var(--ink));
 }
 .badge.raid-decision {
-  background: #e0e7ff;
-  color: #3730a3;
+  background: color-mix(in srgb, #e0e7ff var(--lt), var(--card));
+  color: color-mix(in srgb, #3730a3 var(--ltt), var(--ink));
 }
 .badge.raid-action {
-  background: #ccfbf1;
-  color: #115e59;
+  background: color-mix(in srgb, #ccfbf1 var(--lt), var(--card));
+  color: color-mix(in srgb, #115e59 var(--ltt), var(--ink));
 }
 .gantt {
-  border: 1px solid #e2e8f0;
+  border: 1px solid color-mix(in srgb, #e2e8f0 var(--lt), var(--line));
   border-radius: 10px;
-  background: #fff;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
   overflow-x: auto;
 }
 .g-row {
   display: flex;
   min-width: 760px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid color-mix(in srgb, #f1f5f9 var(--lt), var(--line));
 }
 .g-row:last-child {
   border-bottom: 0;
@@ -255,7 +255,7 @@ select.xs {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid color-mix(in srgb, #e2e8f0 var(--lt), var(--line));
 }
 .g-track {
   position: relative;
@@ -266,7 +266,7 @@ select.xs {
   height: 26px;
 }
 .g-head {
-  background: #f8fafc;
+  background: color-mix(in srgb, #f8fafc var(--lt), var(--card));
   position: sticky;
   top: 0;
   z-index: 2;
@@ -276,15 +276,15 @@ select.xs {
   top: 5px;
   font-size: 11px;
   font-weight: 700;
-  color: #475569;
+  color: color-mix(in srgb, #475569 var(--ltt), var(--ink));
   padding-left: 4px;
-  border-left: 1px solid #cbd5e1;
+  border-left: 1px solid color-mix(in srgb, #cbd5e1 var(--lt), var(--line));
 }
 .g-wk {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-left: 1px dashed #eef2f7;
+  border-left: 1px dashed color-mix(in srgb, #eef2f7 var(--lt), var(--line));
 }
 .g-today {
   position: absolute;
@@ -387,7 +387,7 @@ select.xs {
 }
 .pm-print td,
 .pm-print th {
-  border: 1px solid #cbd5e1;
+  border: 1px solid color-mix(in srgb, #cbd5e1 var(--lt), var(--line));
   padding: 3px 6px;
   text-align: left;
 }
@@ -424,32 +424,32 @@ select.xs {
   font-size: 11px;
   padding: 1px 6px;
   border-radius: 9px;
-  background: #f1f5f9;
-  color: #475569;
+  background: color-mix(in srgb, #f1f5f9 var(--lt), var(--card));
+  color: color-mix(in srgb, #475569 var(--ltt), var(--ink));
   white-space: nowrap;
 }
 .pc-b.ok {
-  background: #dcfce7;
-  color: #166534;
+  background: color-mix(in srgb, #dcfce7 var(--lt), var(--card));
+  color: color-mix(in srgb, #166534 var(--ltt), var(--ink));
 }
 .wl-t td.wl {
   cursor: pointer;
 }
 .wl-t td.wl.good {
-  background: #f0fdf4;
+  background: color-mix(in srgb, #f0fdf4 var(--lt), var(--card));
 }
 .wl-t td.wl.warn {
-  background: #fef9c3;
+  background: color-mix(in srgb, #fef9c3 var(--lt), var(--card));
 }
 .wl-t td.wl.bad {
-  background: #fee2e2;
-  color: #991b1b;
+  background: color-mix(in srgb, #fee2e2 var(--lt), var(--card));
+  color: color-mix(in srgb, #991b1b var(--ltt), var(--ink));
 }
 .wl-t td[data-wl] {
   cursor: pointer;
 }
 .ptx {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid color-mix(in srgb, #e2e8f0 var(--lt), var(--line));
   margin-top: 10px;
   padding-top: 4px;
 }
@@ -471,7 +471,7 @@ select.xs {
   overflow: auto;
 }
 .ptx-c {
-  border-left: 3px solid #e2e8f0;
+  border-left: 3px solid color-mix(in srgb, #e2e8f0 var(--lt), var(--line));
   padding: 2px 8px;
   margin: 6px 0;
 }
@@ -493,7 +493,7 @@ select.xs {
 }
 .tf-hist {
   margin-top: 8px;
-  border-left: 2px solid var(--line, #e2e8f0);
+  border-left: 2px solid var(--line, color-mix(in srgb, #e2e8f0 var(--lt), var(--line)));
   padding-left: 8px;
   display: grid;
   gap: 2px;
@@ -506,7 +506,7 @@ select.xs {
   margin-bottom: 4px;
 }
 .tf-tr {
-  border: 1px solid var(--line, #e2e8f0);
+  border: 1px solid var(--line, color-mix(in srgb, #e2e8f0 var(--lt), var(--line)));
   border-radius: 8px;
   padding: 8px 10px;
   margin-bottom: 8px;
@@ -536,7 +536,7 @@ select.xs {
   gap: 10px;
 }
 .tf-node {
-  border: 1px solid var(--line, #e2e8f0);
+  border: 1px solid var(--line, color-mix(in srgb, #e2e8f0 var(--lt), var(--line)));
   border-radius: 8px;
   padding: 6px 10px;
   min-width: 150px;
@@ -558,7 +558,7 @@ select.xs {
   gap: 10px;
 }
 .tf-kind {
-  background: var(--bg2, #f8fafc);
+  background: var(--bg2, color-mix(in srgb, #f8fafc var(--lt), var(--card)));
   border-radius: 6px;
   padding: 6px 8px;
   display: grid;
@@ -566,8 +566,8 @@ select.xs {
   align-content: start;
 }
 .tf-kind .tf-rule {
-  background: var(--card, #fff);
-  border: 1px solid var(--line, #e2e8f0);
+  background: var(--card, color-mix(in srgb, #fff var(--lt), var(--card)));
+  border: 1px solid var(--line, color-mix(in srgb, #e2e8f0 var(--lt), var(--line)));
   border-radius: 6px;
   padding: 3px 6px;
 }
@@ -597,15 +597,15 @@ select.xs {
   margin: 2px 0;
 }
 .pc-b.ep {
-  background: #ede9fe;
-  color: #5b21b6;
+  background: color-mix(in srgb, #ede9fe var(--lt), var(--card));
+  color: color-mix(in srgb, #5b21b6 var(--ltt), var(--ink));
 }
 .pc-b.warn {
-  background: #fef3c7;
-  color: #92400e;
+  background: color-mix(in srgb, #fef3c7 var(--lt), var(--card));
+  color: color-mix(in srgb, #92400e var(--ltt), var(--ink));
 }
 .ep-key {
-  color: #5b21b6;
+  color: color-mix(in srgb, #5b21b6 var(--ltt), var(--ink));
   font-family: var(--mono, monospace);
   font-size: 13px;
 }
@@ -626,7 +626,7 @@ select.xs {
   display: grid;
   gap: 6px;
   align-items: start;
-  border: 1px solid var(--line, #e2e8f0);
+  border: 1px solid var(--line, color-mix(in srgb, #e2e8f0 var(--lt), var(--line)));
   border-radius: 8px;
   padding: 8px;
   margin-bottom: 6px;
@@ -666,4 +666,225 @@ select.xs {
 [data-tbl='riy'] .row-btns {
   flex-wrap: nowrap;
   white-space: nowrap;
+}
+
+/* Lanes (pages/lanes.js): a column per lane in its colour, the status box on each card, limit warning, quick add, editor */
+.kanban.lanes .kcol.lane {
+  border-top: 4px solid var(--lc, #64748b);
+}
+.lane-h .lane-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lc, #64748b);
+  flex: 0 0 auto;
+}
+.lane-sts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 2px 2px;
+}
+.kcol.lane-full .lane-h {
+  color: color-mix(in srgb, #b91c1c var(--ltt), var(--ink));
+}
+.kcol.lane-full .lane-h .count {
+  background: color-mix(in srgb, #fee2e2 var(--lt), var(--card));
+  color: color-mix(in srgb, #b91c1c var(--ltt), var(--ink));
+}
+.lane-warn {
+  font-size: 11px;
+  font-weight: 600;
+  color: color-mix(in srgb, #b91c1c var(--ltt), var(--ink));
+  margin-left: auto;
+}
+.lane-add {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px dashed #b8c4cc;
+  border-radius: 8px;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
+  font: inherit;
+  font-size: 13px;
+}
+.pcard.lane-card {
+  border-left: 4px solid var(--lc, #64748b);
+}
+.pcard.lane-done {
+  opacity: 0.75;
+}
+.pcard .pc-stat {
+  margin: 2px 0 4px;
+}
+.pcard select.lane-st {
+  width: auto;
+  min-width: 0;
+}
+.lane-st {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--sc, #64748b);
+  color: var(--sc, #64748b);
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
+  max-width: 100%;
+  cursor: pointer;
+}
+.modal.lane-modal {
+  max-width: 920px;
+  width: 94vw;
+}
+.lane-blk {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--lc, #64748b);
+  border-radius: 10px;
+  background: color-mix(in srgb, #fff var(--lt), var(--card));
+}
+.lane-blk.over {
+  outline: 2px dashed var(--accent);
+}
+.lane-blk.dragging {
+  opacity: 0.5;
+}
+.lane-row {
+  display: grid;
+  grid-template-columns: 22px minmax(160px, 1fr) 48px 100px auto;
+  gap: 8px;
+  align-items: center;
+}
+.lane-row .lr-name {
+  font-weight: 600;
+}
+.lane-grip {
+  cursor: grab;
+  color: #94a3b8;
+  text-align: center;
+}
+.lane-stl {
+  margin: 6px 0 0 30px;
+}
+.lane-stl-h {
+  margin-bottom: 2px;
+}
+.st-row {
+  display: grid;
+  grid-template-columns: 12px minmax(140px, 1fr) 48px 130px auto;
+  gap: 8px;
+  align-items: center;
+  margin: 3px 0;
+}
+.st-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sc, #64748b);
+}
+.lane-row input,
+.lane-row select,
+.st-row input,
+.st-row select {
+  width: 100%;
+  min-width: 0;
+}
+.lane-row .lr-color,
+.st-row .sr-color {
+  padding: 0;
+  height: 30px;
+  border: 0;
+  background: none;
+}
+.lane-more {
+  margin: 12px 0 4px;
+}
+
+/* Kanban Method (pages/kanban.js): WIP limit on the column header, red when over; the "Done when…" ⓘ */
+.kcol-h .wip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #e2e8f0 var(--lt), var(--card));
+  color: color-mix(in srgb, #334155 var(--ltt), var(--ink));
+}
+.kcol-h .wip.over {
+  background: color-mix(in srgb, #fee2e2 var(--lt), var(--card));
+  color: color-mix(in srgb, #b91c1c var(--ltt), var(--ink));
+}
+.kcol.wip-over {
+  box-shadow: inset 0 3px 0 #dc2626;
+}
+.kcol-h .kpol {
+  cursor: help;
+  color: #64748b;
+  font-size: 13px;
+}
+.kb-cols input[type='number'] {
+  width: 90px;
+}
+.legend .lg-box {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin: 0 4px 0 10px;
+  vertical-align: middle;
+}
+.cfd {
+  width: 100%;
+  height: auto;
+}
+.cfd text {
+  font-size: 10px;
+  fill: var(--muted);
+}
+.li.bk-over {
+  outline: 2px dashed var(--accent);
+}
+.li.dragging {
+  opacity: 0.5;
+}
+[data-bkrow] {
+  cursor: grab;
+}
+.kcol.lane.lane-closed {
+  opacity: 0.8;
+}
+.lane-closed-b {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: #15803d;
+  background: color-mix(in srgb, #dcfce7 var(--lt), var(--card));
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+/* ⚙ Board / ⚙ Lanes on a project's board (pages/boardedit.js) */
+.note-box {
+  background: var(--warn-soft);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.bd-tbl input:not([type='color']),
+.bd-tbl select {
+  width: 100%;
+}
+.bd-tbl input[type='color'] {
+  width: 40px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  background: none;
+}
+.bd-tbl .row-btns {
+  white-space: nowrap;
+}
+#bdadd {
+  margin-top: 8px;
 }

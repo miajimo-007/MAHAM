@@ -7,7 +7,7 @@ const COLL_LABEL = {
   helpdesk: 'Help desk',
   attendance: 'Attendance',
   quickwin: 'Quick win',
-  central: 'Central FU',
+  central: 'External FU',
   oncall: 'On-call',
   course: 'Course',
   reccourse: 'Recommended course',
@@ -203,10 +203,14 @@ P.syscheck = () => {
       <p class="muted small">Archived years: ${Store.archiveYears.size ? [...Store.archiveYears].sort().join(', ') + ' (read when picked in the year box)' : 'none yet'}.</p>`
     );
   })()}
-  ${card('Backups', `<p class="muted small">Every day the <b>first person who opens the app</b> saves a copy of all data files to <code class="pathcode">${h(Store.paths().backups)}</code> (the last ${Store.backupKeep()} days are kept — change it in Admin → Data). There is no server, so on a day nobody opens the app (e.g. during Eid) no backup is made. For extra safety, download one now and then and keep it somewhere else.</p><div id="bklist"><p class="muted">Loading backups…</p></div><div class="row-btns"><button class="btn" id="bknow">Back up now</button></div>`)}
+  ${card(
+    'Backups',
+    `<p class="muted small">Every day the <b>first person who opens the app</b> saves a copy of all data files to <code class="pathcode">${h(Store.paths().backups)}</code> (the last ${Store.backupKeep()} days are kept — change it in Admin → Data). There is no server, so on a day nobody opens the app (e.g. during Eid) no backup is made. For extra safety, download one now and then and keep it somewhere else.</p><div id="bklist"><p class="muted">Loading backups…</p></div><div class="row-btns"><button class="btn" id="bknow">Back up now</button><span class="grow"></span><button class="btn primary" id="bkfull" title="Every team's work (all years), all settings, workflows, people and permissions — one zip">⬇ Download full backup</button><button class="btn ghost" id="bkup">⬆ Restore from a backup file…</button><input type="file" id="bkfile" accept=".zip" hidden></div>
+    <p class="muted small">Keep the full backup somewhere safe (not on the same shared drive). If the data is ever lost, open the app on an empty folder, sign in, come here and press “Restore from a backup file” — everything comes back as it was.</p>`
+  )}
   ${card(
     'Teams',
-    `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Team</th><th>Manager</th><th>Team leader</th><th class="num">People</th><th class="num">To Do (open)</th><th class="num">Shadow</th><th class="num">Help desk</th><th>ME imported</th><th class="num">Attendance</th><th class="num">Quick wins (to approve)</th><th class="num">Central</th><th class="num">Courses</th><th class="num">Info & Dashboards</th></tr></thead><tbody>
+    `<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Team</th><th>Manager</th><th>Team leader</th><th class="num">People</th><th class="num">To Do (open)</th><th class="num">Shadow</th><th class="num">Help desk</th><th>ME imported</th><th class="num">Attendance</th><th class="num">Quick wins (to approve)</th><th class="num">External FU</th><th class="num">Courses</th><th class="num">Info & Dashboards</th></tr></thead><tbody>
     ${T.map(r => `<tr><td><b>${h(r.t.name)}</b></td><td>${r.mgr ? h(r.mgr.name) : '<span class="t-warn">none</span>'}</td><td>${h(r.tl.map(m => m.short || m.name).join(', ')) || '<span class="muted">—</span>'}</td><td class="num">${r.analysts}</td><td class="num">${r.todo} (${r.openTodo})</td><td class="num">${r.shadow}</td><td class="num">${r.hd}</td><td>${r.hdUpd ? (r.hdUpd === today ? UI.badge('Today', 'good') : UI.badge(U.fmtDate(r.hdUpd), 'warn')) : UI.badge('Never', '')}</td><td class="num">${r.att}</td><td class="num">${r.qw} (${r.qwPend})</td><td class="num">${r.riy}</td><td class="num">${r.course}</td><td class="num">${r.srs}</td></tr>`).join('')}
     <tr class="muted"><td><b>${h(Store.orgName())} — director level</b></td><td colspan="12">${Store.all('mgrtask').length} tasks (${Store.all('mgrtask').filter(r => r.status !== 'Done').length} open) · ${Store.all('project').length} projects (${Store.all('project').filter(r => !['Done', 'Canceled'].includes(r.status)).length} active) · ${Store.all('itdir').length} IT directory contacts</td></tr>
     </tbody></table></div>`
@@ -282,11 +286,22 @@ P.syscheck = () => {
         el.querySelectorAll('[data-bkrs]').forEach(b => (b.onclick = () => restoreDialog(b.dataset.bkrs)));
       };
       const restoreDialog = async name => {
-        const { files } = await Store.readBackup(name);
+        let files, info;
+        try {
+          ({ files, info } = await Store.readBackup(name));
+        } catch (e) {
+          return UI.toast('Could not open the backup: ' + e.message, 'bad');
+        }
         const names = Object.keys(files).sort();
+        const title = typeof name === 'string' ? name : name.name;
+        const tset = new Set(
+          names.flatMap(f => (files[f].records || []).map(r => Store.backupTeamOf(r, Store.fileOwner(f)))).filter(Boolean)
+        );
+        const tlist = [...new Set([...Store.teams().map(t => t.id), ...tset])].filter(t => tset.has(t));
         UI.modal({
-          title: 'Restore ' + name,
-          body: `<p>Puts records back <b>as they were in this backup</b>. Records added after the backup are kept. A safety backup of today's data is made first.</p>
+          title: 'Restore ' + title,
+          body: `<p>Puts records back <b>as they were in this backup</b>${info && info.made ? ` (made ${h(U.fmtTs(Date.parse(info.made)))}${info.version ? ', app ' + h(info.version) : ''})` : ''}. Records added after the backup are kept. A safety backup of today's data is made first.</p>
+            <h4 class="act-h">Teams</h4><div class="pick"><label class="check"><input type="checkbox" name="bkt" value="" checked> Shared by every team <span class="muted small">(people, teams, roles, permissions, shared settings)</span></label>${tlist.map(t => `<label class="check"><input type="checkbox" name="bkt" value="${h(t)}" checked> ${h(Store.teamName(t))} <span class="muted small">(its work, settings and workflows)</span></label>`).join('')}</div>
             <h4 class="act-h">People</h4><div class="pick">${names.map(f => `<label class="check"><input type="checkbox" name="bkf" value="${h(f)}" checked> ${h(Store.memberName(f.slice(0, -5)) || f)} <span class="muted small">${(files[f].records || []).length} records</span></label>`).join('')}</div>
             <h4 class="act-h">Kinds of record</h4><div class="pick">${[
               ...new Set(
@@ -304,12 +319,19 @@ P.syscheck = () => {
               if (!only.length) return UI.toast('Pick at least one person', 'bad');
               const kinds = [...w.querySelectorAll('[name=bkc]:checked')].map(x => x.value);
               if (!kinds.length) return UI.toast('Pick at least one kind of record', 'bad');
+              const teams = [...w.querySelectorAll('[name=bkt]:checked')].map(x => x.value);
+              if (!teams.length) return UI.toast('Pick at least one team', 'bad');
               w.querySelector('[data-ok]').disabled = true;
               w.querySelector('[data-ok]').textContent = 'Restoring…';
               try {
-                const n = await Store.restoreBackup(name, only, kinds.length === w.querySelectorAll('[name=bkc]').length ? null : kinds);
+                const n = await Store.restoreBackup(
+                  name,
+                  only,
+                  kinds.length === w.querySelectorAll('[name=bkc]').length ? null : kinds,
+                  teams.length === w.querySelectorAll('[name=bkt]').length ? null : teams
+                );
                 UI.closeModal();
-                UI.toast(`Restored ${n} records from ${name}`, 'good');
+                UI.toast(`Restored ${n} records from ${title}`, 'good');
                 App.render();
               } catch (e) {
                 UI.toast('Restore failed: ' + e.message, 'bad');
@@ -327,6 +349,26 @@ P.syscheck = () => {
         } catch (e) {
           UI.toast('Backup failed: ' + e.message, 'bad');
         }
+      };
+      root.querySelector('#bkfull').onclick = async e => {
+        const b = e.currentTarget;
+        b.disabled = true;
+        try {
+          const n = await Store.downloadFullBackup();
+          UI.toast(n + ' downloaded — keep it somewhere safe', 'good');
+          showBackups();
+        } catch (er) {
+          UI.toast('Backup failed: ' + er.message, 'bad');
+        }
+        b.disabled = false;
+      };
+      const fi = root.querySelector('#bkfile');
+      root.querySelector('#bkup').onclick = () => {
+        fi.value = '';
+        fi.click();
+      };
+      fi.onchange = () => {
+        if (fi.files && fi.files[0]) restoreDialog(fi.files[0]);
       };
       showBackups();
       root.querySelector('#sc_test').onclick = async () => {

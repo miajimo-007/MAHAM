@@ -33,6 +33,8 @@ const Work = {
 
   /* ---------- keys and types ---------- */
   key(t) {
+    const kd = typeof TaskFlow !== 'undefined' && TaskFlow.kindOf(t);
+    if (kd && kd.key) return kd.key(t);
     const p = t && Store.get(t.project);
     const k =
       p &&
@@ -274,62 +276,58 @@ const Work = {
     type: 'text',
     showIf: r => !!r.intake || !!r.requester,
   });
-  const base = S.fields.slice();
-  // custom fields of the project's team, for this type
-  const er = UI.editRecord;
-  UI.editRecord = function (coll, rec, opts) {
-    if (coll === 'ptask') {
+  Schemas.extend('ptask', {
+    name: 'work items',
+    // custom fields of the project's team, for this type
+    fields(list, rec) {
       const p = Scrum.proj((rec && rec.project) || UI._recProject);
       const team = p ? Scrum.teamOf(p) : App.viewTeam;
       const type = (rec && rec.type) || 'Task';
-      S.fields = base.concat(
+      return list.concat(
         Work.custom(team)
           .filter(f => Work.appliesTo(f, type) || (rec && rec[f.key] != null && rec[f.key] !== ''))
           .map(f => Work.ui(f, { required: Work.required(f, type) }))
       );
-    }
-    return er.apply(this, arguments);
-  };
-  const v0 = S.validate;
-  S.validate = out => {
-    const p = Scrum.proj(out.project);
-    const team = p ? Scrum.teamOf(p) : App.viewTeam;
-    const miss = Work.custom(team).filter(
-      f => Work.required(f, out.type) && (out[f.key] == null || out[f.key] === '' || out[f.key] === false)
-    );
-    if (miss.length) return 'Fill in ' + miss.map(f => f.label).join(', ');
-    if (p && Array.isArray(p.types) && p.types.length && out.type && !Work.typesFor(p).includes(out.type))
-      return `${p.name} does not take ${out.type} items`;
-    if (out.epic && out.epic === out.id) return 'An epic cannot be inside itself';
-    return v0 ? v0(out) : '';
-  };
-  // automation: created / reached a status / epic done
-  const bs = S.beforeSave;
-  S.beforeSave = function (r, before) {
-    bs.call(this, r, before);
-    if (Work.isEpic(r)) r.epic = '';
-    if (Work._noAuto) return;
-    const side = [];
-    if (!before || !before.id) {
-      if (!r.id) r.id = U.uid(r.c || 'ptask');
-      side.push(...Work.runAutos({ on: 'created' }, null, r));
-    } else if (before.status !== r.status) side.push(...Work.runAutos({ on: 'status', status: r.status }, before, r));
-    if (r.epic && Scrum.isDone(r) && !(before && Scrum.isDone(before))) {
-      const e = Store.get(r.epic);
-      if (
-        e &&
-        !Scrum.isDone(e) &&
-        Work.children(e)
-          .filter(x => x.id !== r.id)
-          .every(x => Scrum.isDone(x))
-      ) {
-        const er2 = Object.assign({}, e);
-        const s2 = Work.runAutos({ on: 'epicDone' }, e, er2);
-        if (s2.length || JSON.stringify(er2) !== JSON.stringify(e)) side.push(er2, ...s2);
+    },
+    validate(out) {
+      const p = Scrum.proj(out.project);
+      const team = p ? Scrum.teamOf(p) : App.viewTeam;
+      const miss = Work.custom(team).filter(
+        f => Work.required(f, out.type) && (out[f.key] == null || out[f.key] === '' || out[f.key] === false)
+      );
+      if (miss.length) return 'Fill in ' + miss.map(f => f.label).join(', ');
+      if (p && Array.isArray(p.types) && p.types.length && out.type && !Work.typesFor(p).includes(out.type))
+        return `${p.name} does not take ${out.type} items`;
+      if (out.epic && out.epic === out.id) return 'An epic cannot be inside itself';
+      return '';
+    },
+    // automation: created / reached a status / epic done
+    after(r, before) {
+      if (Work.isEpic(r)) r.epic = '';
+      if (Work._noAuto) return;
+      const side = [];
+      if (!before || !before.id) {
+        if (!r.id) r.id = U.uid(r.c || 'ptask');
+        side.push(...Work.runAutos({ on: 'created' }, null, r));
+      } else if (before.status !== r.status) side.push(...Work.runAutos({ on: 'status', status: r.status }, before, r));
+      if (r.epic && Scrum.isDone(r) && !(before && Scrum.isDone(before))) {
+        const e = Store.get(r.epic);
+        if (
+          e &&
+          !Scrum.isDone(e) &&
+          Work.children(e)
+            .filter(x => x.id !== r.id)
+            .every(x => Scrum.isDone(x))
+        ) {
+          const er2 = Object.assign({}, e);
+          const s2 = Work.runAutos({ on: 'epicDone' }, e, er2);
+          if (s2.length || JSON.stringify(er2) !== JSON.stringify(e)) side.push(er2, ...s2);
+        }
       }
-    }
-    Work.queue(side);
-  };
+      Work.queue(side);
+    },
+  });
+
   // permissions
   const cs = Scrum.canSee;
   Scrum.canSee = p => {

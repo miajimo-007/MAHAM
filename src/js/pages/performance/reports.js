@@ -307,7 +307,7 @@ const Rep = {
         ${tile('Quick wins', D.qwCount, P.qwCount, 'completed')}
         ${tile('⭐ Milestones', D.miles.length, P.miles.length, 'done')}
         ${tile('Shadow work', U.r2(D.swHrs), U.r2(P.swHrs), 'hours', true, x => U.num(x, 1))}
-        ${tile('Days off', D.off.length, P.off.length, U.num(D.permH, 1) + ' h permission', false)}</div>`
+        ${tile('Days off', D.off.length, P.off.length, U.mins(D.permH) + ' permission', false)}</div>`
       )}
       ${sec(
         'charts',
@@ -404,7 +404,7 @@ const Rep = {
             .filter(p => p.off || p.perm)
             .map(
               p =>
-                `<tr><td><b>${who(p.id)}</b></td><td>${p.off} day(s) off</td><td>${p.perm ? U.num(p.perm, 1) + ' h permission' : ''}</td></tr>`
+                `<tr><td><b>${who(p.id)}</b></td><td>${p.off} day(s) off</td><td>${p.perm ? U.mins(p.perm) + ' permission' : ''}</td></tr>`
             ),
           'Everyone was in — no days off or permission hours.'
         )
@@ -491,7 +491,7 @@ const Rep = {
             'Quick wins',
             'Milestones',
             'Days off',
-            'Permission h',
+            'Permission (min)',
             'Score',
           ],
           ...D.per.map(p => [
@@ -507,7 +507,7 @@ const Rep = {
             p.qw,
             p.ms,
             p.off,
-            p.perm,
+            Math.round((p.perm || 0) * 60),
             p.score != null ? U.r2(p.score) : '',
           ]),
         ],

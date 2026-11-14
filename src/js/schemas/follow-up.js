@@ -1,9 +1,9 @@
-/* MAHAM — Record types: Central follow-up, quick win, on-call log. */
+/* MAHAM — Record types: External follow-up, quick win, on-call log. */
 'use strict';
 
 Object.assign(Schemas, {
   central: {
-    single: 'Central follow-up',
+    single: 'External follow-up',
     defaults: () => ({ analyst: App.me, date: U.todayStr(), status: 'Under Review', type: 'Modification' }),
     fields: [
       { key: 'date', label: 'Date', type: 'date' },
@@ -40,8 +40,14 @@ Object.assign(Schemas, {
         hint: 'Teammates who worked on it with you — each gets a request to confirm, then it counts for them too (once for the team)',
       },
       { key: 'type', label: 'Type', type: 'select', options: L('qwTypes') },
-      { key: 'status', label: 'Status', type: 'select', options: L('qwStatus') },
+      { key: 'status', label: 'Status', type: 'select', options: () => UI.statusOpts(Store.list('qwStatus')) },
       { key: 'impact', label: 'Impact', type: 'text', span: 2 },
+      {
+        key: 'ref',
+        label: 'Reference',
+        type: 'text',
+        hint: 'Request ID / SRS / E-CTS no. / TD-12 / QW ID … — items with the same Reference are offered for 🔗 linking',
+      },
       { key: 'expected', label: 'Expected date', type: 'date', hint: 'Counts toward the month of this date' },
       { key: 'milestone', label: 'Milestone', type: 'bool', checkLabel: '⭐ Milestone', flag: true },
       { mgr: true, key: 'approval', label: 'Manager approval', type: 'select', options: L('approval') },
@@ -125,7 +131,7 @@ Object.assign(Schemas, {
           Store.visible()
             .filter(m => m.active !== false)
             .sort((a, b) => a.name.localeCompare(b.name))
-            .map(m => [m.id, Store.memberName(m.id)]),
+            .map(m => [m.id, UI.personName(m.id)]),
         blank: '— nobody yet —',
       },
       { key: 'resolution', label: 'Resolution (what fixed it / why not)', type: 'textarea', span: 2, rows: 2 },
